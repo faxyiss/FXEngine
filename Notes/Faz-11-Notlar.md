@@ -131,3 +131,88 @@ GL uyarisi: 0
 - [ ] Kullanıcı onayı (gizmo elle test edilmeli) → Faz 9
 
 ## Sonraki: Faz 9 (parent/child), sonra Faz 12 (content browser)
+
+---
+
+# Ek: Fare ile kamera + viewport gizmo çubuğu
+
+Faz 11'in kaldığı yerden iki eksik: kamera sadece klavyeyle sürülüyordu ve
+gizmo seçenekleri menünün içinde gömülüydü.
+
+## 1. Pan: piksel deltasını dünyaya çevirmenin ucuz yolu
+
+Orta tuş (veya Space + sol tuş) sürüklemesi kamerayı kaydırıyor.
+
+Doğrudan `delta_piksel * ölçek` yazmak cazip ama zoom **ve** kamera dönüşünü
+elle telafi etmek gerekirdi. Bunun yerine aynı karede iki ekran noktasını
+dünyaya çevirip farkını alıyoruz:
+
+```cpp
+now  = ScreenToWorld(mouse);
+prev = ScreenToWorld(mouse - MouseDelta);
+m_CameraPosition -= (now - prev);
+```
+
+`ScreenToWorld` zaten view+projeksiyonun tersini kullanıyor (Faz 12'de
+bırakma için yazılmıştı), yani zoom ve rotasyon bedavaya doğru çıkıyor.
+Yan etkisi tam istenen his: imlecin altındaki nokta parmağa yapışıyor.
+
+**Durum saklamak zorunlu.** Tuş basılıyken viewport'tan çıkılabildiği için
+`m_Panning` bayrağı var: *başlatma* viewport'a bağlı, *sürdürme* değil.
+Aksi halde panelin kenarına gelince sürükleme kopardı.
+
+## 2. Zoom artık imlece doğru
+
+Eskiden `m_ZoomLevel` çarpılıp bırakılıyordu — ekran merkezine zoom.
+Büyütmek istediğin şey ekrandan kaçıyordu.
+
+```cpp
+before = ScreenToWorld(imleç);
+// zoom + UpdateCameraProjection()
+after  = ScreenToWorld(imleç);
+m_CameraPosition += before - after;
+```
+
+Ölç, değiştir, tekrar ölç, farkı geri it. Aynı desen 3D orbit kameralarda
+da kullanılır.
+
+Koordinat `event.wheel.mouse_x/y`'den alınıyor, `GetMousePos()`'tan değil —
+Faz 12'deki OS sürükle-bırak dersinin aynısı: olayın kendi verisi daha güvenilir.
+
+## 3. Toolbar: viewport üstünde yüzen çocuk pencere
+
+`SetCursorScreenPos` ile imleç viewport'un sol üstüne geri alınıp
+`BeginChild` açılıyor. `ImGuiChildFlags_AutoResizeX|Y` sayesinde boyut
+elle hesaplanmıyor — ileride buton eklenince sessizce bozulmazdı.
+
+İçerik: işlem tipi (Ok/T/R/S), eksen (Yerel/Dünya), kademe aç-kapa ve
+işleme göre değişen kademe değeri (birim / derece / çarpan — aynı kutuda
+gösterilemezler).
+
+### Hover'ı elle düşürmek gerekti
+
+`m_ViewportHovered`, `Begin`'den hemen sonra hesaplanıyor; toolbar daha
+çizilmemiş oluyor. Düzeltmeseydik butona tıklamak **arkadaki entity'yi de
+seçerdi** ve tekerlek zoom yapardı. Bu yüzden çocuk pencere içindeyken
+bayrak düşürülüyor.
+
+Sıra da önemli: `DrawViewportToolbar()` → `UpdateCameraPan()`. Pan,
+düzeltilmiş bayrağı görmek zorunda.
+
+## 4. Ölçeklemede Dünya ekseni yok
+
+`ImGuizmo` ölçekleme için zaten `LOCAL`'e zorluyor — dünya ekseninde
+ölçekleme dönmüş bir nesnede kesme (shear) üretirdi ve `TransformComponent`
+bunu temsil edemez (ayrık translation/rotation/scale tutuyor).
+
+Bu yüzden mod seçimi ölçeklemede yok sayılıyor. Sessizce yok saymak yerine
+tooltip'te yazılı.
+
+## Onay
+- [x] Derlendi (uyarısız)
+- [x] Çalıştırıldı, GL hatası yok, temiz kapanış
+- [ ] Pan / zoom / toolbar elle test edilecek
+
+## Not
+Kamera hâlâ `EditorApp` içinde. `EditorCamera` sınıfına ayırma Faz 10'da
+(play modu) zaten gerekecek — teknik borç listesinde duruyor.

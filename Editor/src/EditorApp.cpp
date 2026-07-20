@@ -111,7 +111,8 @@ namespace FXEd
         FX_INFO("");
         FX_INFO("Editor hazir. Panelleri surukleyerek yeniden duzenleyebilirsin;");
         FX_INFO("duzen imgui.ini'ye kaydedilir.");
-        FX_INFO("Viewport uzerindeyken: W/A/S/D kamera, tekerlek zoom.");
+        FX_INFO("Viewport kamerasi: W/A/S/D veya orta tus / Space+sol tus ile kaydir,");
+        FX_INFO("tekerlek ile imlece dogru zoom, Q/E dondur.");
         FX_INFO("Ctrl+N yeni, Ctrl+O ac, Ctrl+S kaydet, Ctrl+Shift+S farkli kaydet.");
         FX_INFO("Icerik panelinden viewport'a resim/prefab/sahne surukleyebilirsin.");
         FX_INFO("Disaridan dosya: pencereye surukle-birak veya Ctrl+I.");
@@ -591,6 +592,66 @@ namespace FXEd
         m_Camera->SetRotation(m_CameraRotation);
     }
 
+    void EditorApp::UpdateCameraPan()
+    {
+        if (!m_Panning)
+        {
+            if (!m_ViewportHovered || ImGuizmo::IsUsing() || ImGuizmo::IsOver())
+                return;
+
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Middle))
+                m_PanButton = ImGuiMouseButton_Middle;
+            else if (ImGui::IsKeyDown(ImGuiKey_Space) &&
+                     !m_ImGuiLayer.WantsKeyboard() &&
+                     ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+                m_PanButton = ImGuiMouseButton_Left;
+            else
+                return;
+
+            m_Panning = true;
+        }
+
+        if (!ImGui::IsMouseDown(m_PanButton))
+        {
+            m_Panning = false;
+            return;
+        }
+
+        const ImVec2 delta = ImGui::GetIO().MouseDelta;
+        if (delta.x == 0.0f && delta.y == 0.0f)
+            return;
+
+        // Piksel deltasini elle olceklemek yerine AYNI KAREDE iki ekran
+        // noktasini dunyaya cevirip farkini aliyoruz. Zoom ve kamera
+        // donusu boylece bedavaya dogru cikiyor; ayrica imlecin altindaki
+        // nokta parmaga yapisik kaliyor.
+        const ImVec2 mouse = ImGui::GetMousePos();
+        const glm::vec2 now  = ScreenToWorld(mouse.x, mouse.y);
+        const glm::vec2 prev = ScreenToWorld(mouse.x - delta.x, mouse.y - delta.y);
+
+        m_CameraPosition.x -= now.x - prev.x;
+        m_CameraPosition.y -= now.y - prev.y;
+        m_Camera->SetPosition(m_CameraPosition);
+    }
+
+    void EditorApp::ZoomAtCursor(float wheelY, float mouseX, float mouseY)
+    {
+        // Imlec altindaki dunya noktasini sabit tutuyoruz: once olcuyoruz,
+        // zoom'dan sonra tekrar olcup kamerayi kaymanin tersine itiyoruz.
+        // Merkeze zoom yapmak, buyutmek istedigin seyi ekrandan kacirir.
+        const glm::vec2 before = ScreenToWorld(mouseX, mouseY);
+
+        m_ZoomLevel *= (wheelY > 0.0f) ? 0.9f : 1.1f;
+        m_ZoomLevel = glm::clamp(m_ZoomLevel, 1.0f, 40.0f);
+        UpdateCameraProjection();
+
+        const glm::vec2 after = ScreenToWorld(mouseX, mouseY);
+
+        m_CameraPosition.x += before.x - after.x;
+        m_CameraPosition.y += before.y - after.y;
+        m_Camera->SetPosition(m_CameraPosition);
+    }
+
     void EditorApp::OnUpdate(float dt)
     {
         m_Time += dt;
@@ -790,6 +851,16 @@ namespace FXEd
                     m_GizmoOperation = ImGuizmo::ROTATE;
                 if (ImGui::MenuItem("Olcekle", "B", m_GizmoOperation == ImGuizmo::SCALE))
                     m_GizmoOperation = ImGuizmo::SCALE;
+
+                ImGui::Separator();
+
+                if (ImGui::MenuItem("Yerel eksen", nullptr, m_GizmoMode == ImGuizmo::LOCAL))
+                    m_GizmoMode = ImGuizmo::LOCAL;
+                if (ImGui::MenuItem("Dunya ekseni", nullptr, m_GizmoMode == ImGuizmo::WORLD))
+                    m_GizmoMode = ImGuizmo::WORLD;
+
+                ImGui::Separator();
+                ImGui::MenuItem("Kademeli hareket", "Ctrl", &m_SnapEnabled);
                 ImGui::Separator();
                 ImGui::TextDisabled("Ctrl basili = kademeli");
                 ImGui::EndMenu();
@@ -883,8 +954,86 @@ namespace FXEd
         }
 
         DrawGizmo();
+        DrawViewportToolbar();
+        UpdateCameraPan();
 
         ImGui::End();
+        ImGui::PopStyleVar();
+    }
+
+    void EditorApp::DrawViewportToolbar()
+    {
+        ImGui::SetCursorScreenPos(ImVec2(m_ViewportBoundsMin.x + 8.0f,
+                                         m_ViewportBoundsMin.y + 8.0f));
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6.0f, 6.0f));
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.09f, 0.09f, 0.11f, 0.85f));
+
+        // AutoResize: icerik ne kadarsa cocuk pencere o kadar. Boyutu elle
+        // hesaplamak, ileride buton eklendiginde sessizce bozulurdu.
+        ImGui::BeginChild("##ViewportToolbar", ImVec2(0.0f, 0.0f),
+                          ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY |
+                          ImGuiChildFlags_AlwaysUseWindowPadding,
+                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+
+        const auto toolButton = [this](const char* label, int op, const char* tip)
+        {
+            const bool active = (m_GizmoOperation == op);
+            if (active)
+                ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+
+            if (ImGui::Button(label, ImVec2(34.0f, 0.0f)))
+                m_GizmoOperation = op;
+
+            if (active)
+                ImGui::PopStyleColor();
+
+            ImGui::SetItemTooltip("%s", tip);
+            ImGui::SameLine();
+        };
+
+        toolButton("Ok", -1,                  "Secim - gizmo kapali (Z)");
+        toolButton("T",  ImGuizmo::TRANSLATE, "Tasi (X)");
+        toolButton("R",  ImGuizmo::ROTATE,    "Dondur (C)");
+        toolButton("S",  ImGuizmo::SCALE,     "Olcekle (B)");
+
+        ImGui::SameLine(0.0f, 14.0f);
+
+        const bool world = (m_GizmoMode == ImGuizmo::WORLD);
+        if (ImGui::Button(world ? "Dunya" : "Yerel", ImVec2(52.0f, 0.0f)))
+            m_GizmoMode = world ? ImGuizmo::LOCAL : ImGuizmo::WORLD;
+        ImGui::SetItemTooltip("Tutamaklarin ekseni: nesnenin kendi donusu mu,\n"
+                              "dunya eksenleri mi? (Olceklemede her zaman yerel.)");
+
+        ImGui::SameLine(0.0f, 14.0f);
+
+        ImGui::Checkbox("Kademe", &m_SnapEnabled);
+        ImGui::SetItemTooltip("Kapaliyken de Ctrl basili tutarak kademeli hareket edilir.");
+
+        // Kademe degeri islem tipine gore degisir: derece ile birim ayni
+        // kutuda gosterilemez.
+        if (m_SnapEnabled && m_GizmoOperation >= 0)
+        {
+            float* value = &m_SnapTranslate;
+            const char* fmt = "%.2f br";
+
+            if (m_GizmoOperation == ImGuizmo::ROTATE)      { value = &m_SnapRotate; fmt = "%.0f°"; }
+            else if (m_GizmoOperation == ImGuizmo::SCALE)  { value = &m_SnapScale;  fmt = "%.2fx"; }
+
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(80.0f);
+            ImGui::DragFloat("##SnapValue", value, 0.05f, 0.01f, 90.0f, fmt);
+        }
+
+        // Toolbar uzerindeyken viewport "hovered" SAYILMAMALI: yoksa
+        // butona tiklamak ayni zamanda arkadaki entity'yi seciyor ve
+        // tekerlek zoom yapiyor. m_ViewportHovered yukarida, bu cocuk
+        // pencere daha cizilmeden hesaplandigi icin burada duzeltiyoruz.
+        if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
+            m_ViewportHovered = false;
+
+        ImGui::EndChild();
+        ImGui::PopStyleColor();
         ImGui::PopStyleVar();
     }
 
@@ -892,6 +1041,10 @@ namespace FXEd
     {
         // Framebuffer BAGLI durumdayken cagriliyor (OnRender icinde).
         if (!m_ViewportHovered || ImGuizmo::IsOver() || ImGuizmo::IsUsing())
+            return;
+
+        // Space + sol tus kamerayi kaydiriyor, secim yapmiyor.
+        if (m_Panning || ImGui::IsKeyDown(ImGuiKey_Space))
             return;
 
         if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left))
@@ -953,17 +1106,25 @@ namespace FXEd
 
         glm::mat4 transform = parentWorld * tc.GetTransform();
 
-        // Ctrl basiliyken kademeli hareket (snap).
+        // Kademe ya toolbar'dan surekli acik, ya da Ctrl ile anlik.
         const bool* keys = SDL_GetKeyboardState(nullptr);
-        const bool snap = keys[SDL_SCANCODE_LCTRL] || keys[SDL_SCANCODE_RCTRL];
+        const bool snap  = m_SnapEnabled ||
+                           keys[SDL_SCANCODE_LCTRL] || keys[SDL_SCANCODE_RCTRL];
 
-        const float snapValue =
-            (m_GizmoOperation == ImGuizmo::ROTATE) ? 15.0f : 0.5f;
+        float snapValue = m_SnapTranslate;
+        if (m_GizmoOperation == ImGuizmo::ROTATE)     snapValue = m_SnapRotate;
+        else if (m_GizmoOperation == ImGuizmo::SCALE) snapValue = m_SnapScale;
+
         const float snapValues[3] = { snapValue, snapValue, snapValue };
+
+        // Olcekleme dunya uzayinda anlamsiz; ImGuizmo zaten yerele zorlar.
+        const auto mode = (m_GizmoOperation == ImGuizmo::SCALE)
+                        ? ImGuizmo::LOCAL
+                        : static_cast<ImGuizmo::MODE>(m_GizmoMode);
 
         ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(proj),
                              static_cast<ImGuizmo::OPERATION>(m_GizmoOperation),
-                             ImGuizmo::LOCAL,
+                             mode,
                              glm::value_ptr(transform),
                              nullptr,
                              snap ? snapValues : nullptr);
@@ -1047,12 +1208,10 @@ namespace FXEd
         {
             // Zoom sadece viewport uzerindeyken. Panellerde tekerlek
             // kaydirma icin kullanilmali.
+            // Koordinat olayin kendisinden: SDL pencere-goreli verir,
+            // tek viewport'ta bu ImGui'nin ekran koordinatiyla ayni.
             if (m_ViewportHovered)
-            {
-                m_ZoomLevel *= (event.wheel.y > 0) ? 0.9f : 1.1f;
-                m_ZoomLevel = glm::clamp(m_ZoomLevel, 1.0f, 40.0f);
-                UpdateCameraProjection();
-            }
+                ZoomAtCursor(event.wheel.y, event.wheel.mouse_x, event.wheel.mouse_y);
             return;
         }
 

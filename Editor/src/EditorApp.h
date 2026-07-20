@@ -69,9 +69,16 @@ namespace FXEd
         void UpdateCameraMovement(float dt);
         void UpdateCameraProjection();
 
+        // Orta tus (veya Space + sol tus) ile suruklerken kamerayi kaydirir.
+        void UpdateCameraPan();
+
+        // Tekerlek zoom'u: imlecin altindaki dunya noktasi sabit kalir.
+        void ZoomAtCursor(float wheelY, float mouseX, float mouseY);
+
         // ImGui panellerini cizer.
         void DrawMenuBar();
         void DrawViewportPanel();
+        void DrawViewportToolbar();
         void DrawStatsPanel();
         void DrawGizmo();
 
@@ -120,6 +127,23 @@ namespace FXEd
 
         // ImGuizmo islem tipi (ImGuizmo::OPERATION). -1 = gizmo kapali.
         int m_GizmoOperation = -1;
+
+        // ImGuizmo::MODE - tutamaklar nesnenin kendi ekseninde mi (LOCAL)
+        // yoksa dunya ekseninde mi (WORLD) duracak. ImGuizmo.h burada
+        // dahil edilmedigi icin int; degerler .cpp'de atanir.
+        int m_GizmoMode = 0;   // = ImGuizmo::LOCAL
+
+        // Kademeli hareket. Ctrl basiliyken de gecici olarak acilir.
+        bool  m_SnapEnabled   = false;
+        float m_SnapTranslate = 0.5f;
+        float m_SnapRotate    = 15.0f;
+        float m_SnapScale     = 0.25f;
+
+        // Fare ile kaydirma suruyor mu, hangi tusla baslatildi?
+        // Tusu basili tutarken viewport'tan cikilabildigi icin durum
+        // saklanmak zorunda: baslatma viewport'a bagli, surdurme degil.
+        bool m_Panning   = false;
+        int  m_PanButton = 0;
 
         // Menuden gelen ice aktarma istegi. Yerel diyalog modaldir ve
         // ImGui cercevesinin ortasinda acilamaz; cerceve bittikten sonra

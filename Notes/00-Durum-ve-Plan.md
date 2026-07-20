@@ -100,7 +100,6 @@ Derleme: `cmake --build build --config Debug`
 | Sorun | Nerede | Not |
 |---|---|---|
 | **Undo/Redo yok** | editörün tamamı | Gizmo ile yanlış sürükleme geri alınamıyor. Komut deseni; editörün tamamına dokunan mimari değişiklik. |
-| **Seçim `SceneHierarchyPanel` içinde** | `SceneHierarchyPanel.h` | Viewport, gizmo, inspector hepsi okuyor; panel sahibi değil tüketicisi olmalı. Entity çoklu seçiminin ön adımı. |
 
 ### Orta
 | Sorun | Nerede |
@@ -141,8 +140,8 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 |---|---|---|
 | 0.1 | Faz 22'nin gerçek veriyle doğrulanması | ✅ sahne v4, GUID eşleşiyor, eksik `.meta` eklendi |
 | 0.4 | Dosya izleyici (`ReadDirectoryChangesW`) | ✅ GUID dışarıdan taşımada da korunuyor |
-| 0.2 | `SelectionContext` — seçimi panelden çıkar | **sıradaki** |
-| 0.3 | Entity çoklu seçimi | |
+| 0.2 | `SelectionContext` — seçimi panelden çıkar | ✅ sahibi `EditorApp`, paneller tüketici |
+| 0.3 | Entity çoklu seçimi | **sıradaki** |
 | 0.5 | Catch2 + `UUID`/`SceneSerializer`/`AssetManager` testleri | |
 | 0.6 | Faz 22 artıkları (Inspector doku ayarları, prefab GUID, `AssetDirectory`) | 16'dan sonra |
 

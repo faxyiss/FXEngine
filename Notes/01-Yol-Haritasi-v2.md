@@ -138,9 +138,10 @@ Faz 22'nin bıraktığı tutarlılık açığı.
       `.gitignore`'da `*.meta` yok. Kaynakta eksik olan
       `circle.png.meta` eklendi — yoksa her temiz derlemede motor
       varlığı yeni GUID alıyordu.
-- [ ] **0.2 — `SelectionContext`.** Seçim `SceneHierarchyPanel`'den
-      çıkarılıp ayrı bir nesneye taşınacak. Viewport, gizmo, inspector,
-      prefab hepsi tüketici olacak.
+- [x] **0.2 — `SelectionContext`.** Seçim `SceneHierarchyPanel`'den
+      çıkarıldı; `EditorApp` tutuyor, paneller tüketici. API baştan
+      çoklu seçime göre yazıldı, davranış şimdilik tek seçim.
+      Ayrıntı: [Borc-02-SelectionContext.md](Borc-02-SelectionContext.md)
 - [ ] **0.3 — Entity çoklu seçimi.** Ctrl/Shift, gizmoyla toplu
       dönüşüm, toplu silme.
 - [x] **0.4 — Dosya izleyici.** `FX::FileWatcher`
@@ -372,7 +373,7 @@ MVP sırasında bilinçli olarak bıraktıklarımız:
 | Prefab bağlantısı yok | Örnek kaynağından bağımsız; kaynak değişince örnekler güncellenmiyor (override sistemi yok). | `PrefabSerializer.cpp` (Faz 12) |
 | `GetRegistry()` çok açık | Registry'ye doğrudan `create`/`destroy` çağırmak UUID haritasını bozar. Daha dar bir erişim gerekebilir. | `Scene.h` (Faz 8) |
 | `FollowSystem` Scene'e bağımlı | Diğer sistemler sadece registry alıyor, bu Scene alıyor (UUID haritası için). Test etmesi daha zor. | `Systems.cpp` (Faz 8) |
-| Seçim `SceneHierarchyPanel` içinde | Viewport, gizmo, inspector, prefab hepsi okuyor; panel sahibi değil tüketicisi olmalı. Ayrı bir `SelectionContext` gerekiyor — çoklu seçimin ön adımı. | `SceneHierarchyPanel.h` (Faz 10) |
+| ~~Seçim `SceneHierarchyPanel` içinde~~ | ✅ 0.2'de `SelectionContext`'e taşındı; sahibi `EditorApp`, paneller tüketici. | `SelectionContext.h` |
 | Test yok | Hiç birim testi yok. Serializer ve matematik en çok fayda sağlayacak yerler. | — |
 | Sadece Windows'ta denendi | Kod taşınabilir yazıldı ama Linux'ta hiç derlenmedi. | — |
 

@@ -13,6 +13,7 @@
 #include <FXEngine/Scene/Entity.h>
 #include <FXEngine/Core/UUID.h>
 
+#include "SelectionContext.h"
 #include "ImGuiLayer.h"
 #include "EditorCamera.h"
 #include "Panels/SceneHierarchyPanel.h"
@@ -150,6 +151,12 @@ namespace FXEd
         FX::Entity GetPlayer();
 
         // --- Editor arayuzu ----------------------------------------------------
+        // Secimin SAHIBI burasi (0.2). Viewport, gizmo, inspector ve
+        // hierarchy paneli hepsi ayni nesneyi okuyor; hicbiri sahibi
+        // degil. Panellerden once tanimli olmali - onlara isaretcisini
+        // veriyoruz.
+        SelectionContext    m_Selection;
+
         ImGuiLayer          m_ImGuiLayer;
         SceneHierarchyPanel m_HierarchyPanel;
         ContentBrowserPanel m_ContentBrowser;

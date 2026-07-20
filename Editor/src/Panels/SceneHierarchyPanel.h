@@ -7,11 +7,16 @@
 //   HIERARCHY -> sahnedeki entity'lerin listesi, secim
 //   INSPECTOR -> secili entity'nin component'lerini goster/duzenle
 //
-// Neden ayri iki sinif degil? Cunku ikisi de AYNI durumu paylasiyor:
-// "hangi entity secili". Ayirsaydik bu durumu bir yerde tutup ikisine
-// de gecirmemiz gerekirdi. Birlikte tutmak simdilik daha basit ve
-// daha az hata kaynagi.
+// Neden ayri iki sinif degil? Cunku ikisi de AYNI durumu okuyor:
+// "hangi entity secili". Ayirsaydik ikisine de ayni SelectionContext'i
+// gecirmemiz gerekirdi; birlikte tutmak simdilik daha basit.
+//
+// SECIMIN SAHIBI BU PANEL DEGIL (0.2). Panel de viewport, gizmo ve
+// prefab gibi sadece bir TUKETICI; secim EditorApp'in tuttugu
+// SelectionContext'te duruyor.
 // ===========================================================================
+
+#include "SelectionContext.h"
 
 #include <FXEngine/Scene/Scene.h>
 #include <FXEngine/Scene/Entity.h>
@@ -35,8 +40,8 @@ namespace FXEd
         // Her karede cagrilir; iki ImGui penceresi cizer.
         void OnImGuiRender();
 
-        FX::Entity GetSelectedEntity() const { return m_Selection; }
-        void SetSelectedEntity(FX::Entity entity) { m_Selection = entity; }
+        // Secim disaridan veriliyor; panel sahibi degil.
+        void SetSelection(SelectionContext* selection) { m_Selection = selection; }
 
         // Kullanici "Prefab olarak kaydet" dediyse hedef entity'yi dondurur
         // ve istegi temizler. Dosya diyalogu acmak panelin isi degil -
@@ -57,7 +62,7 @@ namespace FXEd
 
         FX::Scene* m_Scene = nullptr;   // sahibi degiliz, sadece referans
 
-        FX::Entity m_Selection;
+        SelectionContext* m_Selection = nullptr;   // sahibi degiliz
 
         // Agac uzerinde gezerken yapiyi degistirmek yineleyicileri bozar;
         // istekleri biriktirip dongu bittikten sonra uyguluyoruz.

@@ -84,6 +84,7 @@ namespace FXEd
         };
         m_Framebuffer = std::make_unique<FX::Framebuffer>(fbSpec);
 
+        m_HierarchyPanel.SetSelection(&m_Selection);
         m_HierarchyPanel.SetTextureLibrary(&m_TextureLibrary);
         m_ContentBrowser.SetContext(&m_TextureLibrary);
 
@@ -448,7 +449,7 @@ namespace FXEd
 
         BuildScene();
         m_HierarchyPanel.SetContext(m_Scene);
-        m_HierarchyPanel.SetSelectedEntity(GetPlayer());
+        m_Selection.Select(GetPlayer());
 
         m_ShowLauncher = false;
         FX_WARN("Projesiz mod: varliklar exe klasorunde tutulacak.");
@@ -802,7 +803,7 @@ namespace FXEd
             FX::Entity instance = prefab.Instantiate(relativePath, { world.x, world.y, 0.2f });
             if (instance)
             {
-                m_HierarchyPanel.SetSelectedEntity(instance);
+                m_Selection.Select(instance);
                 SetStatus("Prefab eklendi: " + instance.GetName());
             }
             else
@@ -834,7 +835,7 @@ namespace FXEd
 
         entity.AddComponent<FX::SpriteRendererComponent>(texture);
 
-        m_HierarchyPanel.SetSelectedEntity(entity);
+        m_Selection.Select(entity);
         SetStatus("Sprite olusturuldu: " + entity.GetName());
     }
 
@@ -853,7 +854,7 @@ namespace FXEd
         // anlamsiz. Faz 8'de ogrendigimiz ders: tutamak sahneye bagli,
         // kimlik degil.
         m_HierarchyPanel.SetContext(m_Scene);
-        m_HierarchyPanel.SetSelectedEntity({});
+        m_Selection.Clear();
 
         m_ScenePaused = false;
 
@@ -880,7 +881,7 @@ namespace FXEd
         m_RuntimeScene.reset();   // kopyada olan biten burada kayboluyor
 
         m_HierarchyPanel.SetContext(m_Scene);
-        m_HierarchyPanel.SetSelectedEntity({});
+        m_Selection.Clear();
 
         SetStatus("Stop - duzenleme sahnesine donuldu");
     }
@@ -1556,7 +1557,7 @@ namespace FXEd
             return;
 
         const float aspect   = m_ViewportSize.x / m_ViewportSize.y;
-        FX::Entity  selected = m_HierarchyPanel.GetSelectedEntity();
+        FX::Entity  selected = m_Selection.GetPrimary();
 
         // Ikon dunya uzayinda cizildigi icin boyutu zoom'a bagli olmali;
         // sabit birim verseydik uzaklasinca kaybolur, yakinlasinca
@@ -1643,7 +1644,7 @@ namespace FXEd
 
     void EditorApp::DrawSelectionOutline()
     {
-        FX::Entity selected = m_HierarchyPanel.GetSelectedEntity();
+        FX::Entity selected = m_Selection.GetPrimary();
         if (!selected || !selected.HasComponent<FX::TransformComponent>())
             return;
 
@@ -1669,7 +1670,7 @@ namespace FXEd
 
     void EditorApp::FocusOnSelection()
     {
-        FX::Entity selected = m_HierarchyPanel.GetSelectedEntity();
+        FX::Entity selected = m_Selection.GetPrimary();
         if (!selected || !selected.HasComponent<FX::TransformComponent>())
         {
             SetStatus("Odaklanacak entity secili degil.");
@@ -1723,7 +1724,7 @@ namespace FXEd
 
         if (pixel < 0)
         {
-            m_HierarchyPanel.SetSelectedEntity({});
+            m_Selection.Clear();
             return;
         }
 
@@ -1731,14 +1732,14 @@ namespace FXEd
         if (m_Scene->GetRegistry().valid(handle))
         {
             FX::Entity picked{ handle, m_Scene };
-            m_HierarchyPanel.SetSelectedEntity(picked);
+            m_Selection.Select(picked);
             FX_INFO("Secildi: %s", picked.GetComponent<FX::TagComponent>().Tag.c_str());
         }
     }
 
     void EditorApp::DrawGizmo()
     {
-        FX::Entity selected = m_HierarchyPanel.GetSelectedEntity();
+        FX::Entity selected = m_Selection.GetPrimary();
         if (IsPlaying() || !selected || m_GizmoOperation < 0)
             return;
         if (!selected.HasComponent<FX::TransformComponent>())

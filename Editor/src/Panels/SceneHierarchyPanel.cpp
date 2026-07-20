@@ -21,7 +21,8 @@ namespace FXEd
         // Sahne degisince secimi TEMIZLE. Yoksa eski sahnenin entity
         // kimligi yeni sahnede baska bir entity'ye denk gelir ve
         // Inspector alakasiz veri gosterir. Sinsi bir hata turudur.
-        m_Selection = {};
+        if (m_Selection)
+            m_Selection->Clear();
     }
 
     FX::Entity SceneHierarchyPanel::TakePrefabRequest()
@@ -33,7 +34,7 @@ namespace FXEd
 
     void SceneHierarchyPanel::OnImGuiRender()
     {
-        if (!m_Scene)
+        if (!m_Scene || !m_Selection)
             return;
 
         // ===================================================================
@@ -85,7 +86,7 @@ namespace FXEd
 
         // Bos alana sol tik -> secimi kaldir.
         if (ImGui::IsMouseDown(ImGuiMouseButton_Left) && ImGui::IsWindowHovered())
-            m_Selection = {};
+            m_Selection->Clear();
 
         // Bos alana sag tik -> yeni entity olustur.
         if (ImGui::BeginPopupContextWindow("HierarchyContext",
@@ -93,7 +94,7 @@ namespace FXEd
                                            ImGuiPopupFlags_NoOpenOverItems))
         {
             if (ImGui::MenuItem("Bos Entity Olustur"))
-                m_Selection = m_Scene->CreateEntity("Yeni Entity");
+                m_Selection->Select(m_Scene->CreateEntity("Yeni Entity"));
             ImGui::EndPopup();
         }
 
@@ -113,8 +114,14 @@ namespace FXEd
         if (m_ToDelete)
         {
             // Secili entity silinenin ALTINDA olabilir; o da yok olacak.
-            if (m_Selection && (m_Selection == m_ToDelete || m_ToDelete.IsAncestorOf(m_Selection)))
-                m_Selection = {};
+            // Silmeden ONCE ayikliyoruz: sonrasinda IsAncestorOf'a
+            // gecersiz entity sormus olurduk.
+            const std::vector<FX::Entity> selection = m_Selection->GetAll();
+            for (FX::Entity selected : selection)
+            {
+                if (selected == m_ToDelete || m_ToDelete.IsAncestorOf(selected))
+                    m_Selection->Remove(selected);
+            }
             m_Scene->DestroyEntity(m_ToDelete);
         }
 
@@ -123,8 +130,8 @@ namespace FXEd
         // ===================================================================
         ImGui::Begin("Inspector");
 
-        if (m_Selection)
-            DrawComponents(m_Selection);
+        if (FX::Entity primary = m_Selection->GetPrimary())
+            DrawComponents(primary);
         else
             ImGui::TextDisabled("Hierarchy'den bir entity sec.");
 
@@ -141,7 +148,7 @@ namespace FXEd
 
         if (!hasChildren)
             flags |= ImGuiTreeNodeFlags_Leaf;
-        if (m_Selection == entity)
+        if (m_Selection->IsSelected(entity))
             flags |= ImGuiTreeNodeFlags_Selected;
 
         // ImGui bir "ID yigini" tutar. Ayni isimde iki entity varsa
@@ -153,7 +160,7 @@ namespace FXEd
             flags, "%s", tag.c_str());
 
         if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
-            m_Selection = entity;
+            m_Selection->Select(entity);
 
         if (ImGui::BeginPopupContextItem())
         {
@@ -162,7 +169,7 @@ namespace FXEd
                 FX::Entity child = m_Scene->CreateEntity("Yeni Entity");
                 m_ReparentChild  = child;
                 m_ReparentTarget = entity;
-                m_Selection      = child;
+                m_Selection->Select(child);
             }
             if (ImGui::MenuItem("Koke Tasi", nullptr, false, static_cast<bool>(entity.GetParent())))
             {

@@ -361,6 +361,21 @@ namespace FXEd
         // ===================================================================
         // 1) SAHNEYI FRAMEBUFFER'A CIZ (ekrana degil)
         // ===================================================================
+        // Viewport paneli buyumus/kucultulmusse framebuffer'i BURADA,
+        // ImGui cercevesi acilmadan once yeniden olustur.
+        if (m_ViewportSize.x > 0.0f && m_ViewportSize.y > 0.0f)
+        {
+            const auto w = static_cast<std::uint32_t>(m_ViewportSize.x);
+            const auto h = static_cast<std::uint32_t>(m_ViewportSize.y);
+            const auto& spec = m_Framebuffer->GetSpec();
+
+            if (spec.Width != w || spec.Height != h)
+            {
+                m_Framebuffer->Resize(w, h);
+                UpdateCameraProjection();
+            }
+        }
+
         m_Framebuffer->Bind();
 
         FX::RenderCommand::SetClearColor({ 0.07f, 0.08f, 0.11f, 1.0f });
@@ -503,17 +518,13 @@ namespace FXEd
         m_ViewportBoundsMin = { contentMin.x, contentMin.y };
         m_ViewportBoundsMax = { contentMin.x + panelSize.x, contentMin.y + panelSize.y };
 
-        // Panel boyutu degistiyse framebuffer'i ve kamerayi guncelle.
-        // Framebuffer::Resize kendi icinde "ayni boyutsa hicbir sey yapma"
-        // kontrolu yapiyor, o yuzden her karede cagirmak guvenli.
-        if (panelSize.x > 0.0f && panelSize.y > 0.0f &&
-            (m_ViewportSize.x != panelSize.x || m_ViewportSize.y != panelSize.y))
-        {
+        // Sadece KAYDEDIYORUZ. Framebuffer'i burada yeniden olusturmak,
+        // ImGui cercevesinin ortasinda texture silmek demek: ImGui o
+        // kare icinde eski kimlige hala atifta bulunabiliyor ve
+        // "Texture name does not refer to a texture object" hatasi aliniyor.
+        // Yeniden boyutlandirma OnRender'in basinda, cerceve acilmadan once.
+        if (panelSize.x > 0.0f && panelSize.y > 0.0f)
             m_ViewportSize = { panelSize.x, panelSize.y };
-            m_Framebuffer->Resize(static_cast<std::uint32_t>(panelSize.x),
-                                  static_cast<std::uint32_t>(panelSize.y));
-            UpdateCameraProjection();
-        }
 
         // ===============================================================
         // Framebuffer texture'ini panelde goster.

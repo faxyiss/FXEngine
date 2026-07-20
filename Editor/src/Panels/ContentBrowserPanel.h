@@ -124,6 +124,12 @@ namespace FXEd
         // ayni davranisi paylasiyor.
         void AcceptMoveTarget(const std::filesystem::path& targetDir);
 
+        // Varligin .meta dosyasini onunla birlikte tasir. Gitmeseydi bir
+        // sonraki taramada varliga YENI bir GUID atanirdi ve tum
+        // referanslar kopardi - .meta'nin varlik sebebini yok ederdik.
+        void MoveMetaAlongside(const std::filesystem::path& oldPath,
+                               const std::filesystem::path& newPath);
+
         void SetMessage(const std::string& text);
 
         // Islemler dongu DISINDA uygulanir: uzerinde gezdigimiz listeyi

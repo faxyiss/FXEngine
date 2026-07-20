@@ -35,7 +35,7 @@ namespace FX
 
         // Surum 1: Faz 7. Surum 2: UUID + Follow. Surum 3: hiyerarsi.
         // Eski surumler hala aciliyor.
-        root["Version"] = 3;
+        root["Version"] = 4;
         root["Scene"]   = "Untitled";
 
         json entities = json::array();
@@ -118,8 +118,11 @@ namespace FX
         if (version == 1)
             FX_CORE_WARN("Sahne surumu 1 (Faz 7). UUID'ler yeniden uretilecek, "
                          "entity referanslari kaybolabilir.");
-        else if (version != 2 && version != 3)
-            FX_CORE_WARN("Sahne surumu %d, beklenen 3. Yine de denenecek.", version);
+        else if (version == 2 || version == 3)
+            FX_CORE_INFO("Sahne surum %d (varlik kimligi yol tabanli). Kaydedince "
+                         "surum 4'e (GUID) gececek.", version);
+        else if (version != 4)
+            FX_CORE_WARN("Sahne surumu %d, beklenen 4. Yine de denenecek.", version);
 
         if (!root.contains("Entities") || !root["Entities"].is_array())
         {

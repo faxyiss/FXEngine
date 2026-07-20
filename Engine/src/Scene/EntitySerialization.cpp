@@ -1,6 +1,7 @@
 #include "Scene/EntitySerialization.h"
 
 #include "FXEngine/Scene/Components.h"
+#include "FXEngine/Asset/AssetManager.h"
 #include "FXEngine/Core/Log.h"
 
 namespace FX::Detail
@@ -75,9 +76,28 @@ namespace FX::Detail
             sprite["Color"]        = ToJson(sc.Color);
             sprite["TilingFactor"] = sc.TilingFactor;
 
-            // Isaretci yerine YOL: shared_ptr bir calisma zamani adresi,
-            // sonraki acilista anlamsiz. Texture'in kimligi dosya yolu.
-            sprite["Texture"] = sc.Texture ? sc.Texture->GetPath() : std::string();
+            // Isaretci yerine KIMLIK: shared_ptr bir calisma zamani adresi,
+            // sonraki acilista anlamsiz.
+            //
+            // Artik YOL degil GUID yaziyoruz. Yol yazsaydik dosya
+            // tasindiginda referans kopardi - Faz 12'den beri surunen
+            // sorun tam olarak buydu.
+            //
+            // Yolu da yaziyoruz ama SADECE INSAN OKUSUN diye: dosyayi
+            // elle inceleyen biri "GUID 8412..." yerine ne oldugunu
+            // gorebilsin. Yukleme onu kullanmiyor.
+            if (sc.Texture)
+            {
+                const std::string path = sc.Texture->GetPath();
+                const AssetHandle handle = AssetManager::GetHandle(path);
+
+                sprite["TextureHandle"] = static_cast<std::uint64_t>(handle);
+                sprite["TexturePath"]   = path;   // yorum amacli
+            }
+            else
+            {
+                sprite["TextureHandle"] = std::uint64_t{ 0 };
+            }
 
             e["SpriteRenderer"] = sprite;
         }
@@ -133,7 +153,45 @@ namespace FX::Detail
             sc.Color        = ToVec4(s.value("Color", json::array()));
             sc.TilingFactor = s.value("TilingFactor", 1.0f);
 
-            const std::string texPath = s.value("Texture", std::string());
+            // Once GUID (surum 4+), yoksa eski "Texture" yolu (surum <=3).
+            //
+            // Eski sahneleri kirmiyoruz: yolu okuyup AssetManager'dan
+            // kimligini soruyoruz. Kaydettiginde dosya yeni bicime
+            // gecmis oluyor - sessiz ve kademeli gecis.
+            std::string texPath;
+
+            if (s.contains("TextureHandle"))
+            {
+                const auto raw = s.value("TextureHandle", std::uint64_t{ 0 });
+                if (raw != 0)
+                {
+                    const AssetHandle handle(raw);
+                    texPath = AssetManager::GetPath(handle);
+
+                    if (texPath.empty())
+                    {
+                        // GUID var ama karsiligi yok: varlik silinmis
+                        // veya proje disindan gelmis olabilir. Dosyadaki
+                        // yol ipucusuna DUSUYORUZ - sessizce duz renk
+                        // gostermektense elimizdeki en iyi bilgiyi
+                        // kullanmak daha faydali.
+                        texPath = s.value("TexturePath", std::string());
+
+                        if (!texPath.empty())
+                            FX_CORE_WARN("Entity '%s': varlik kimligi %llu bulunamadi, "
+                                         "dosyadaki yola donuluyor (%s).",
+                                         entity.GetName().c_str(),
+                                         static_cast<unsigned long long>(raw),
+                                         texPath.c_str());
+                    }
+                }
+            }
+            else
+            {
+                // Surum <= 3: kimlik dosya yoluydu.
+                texPath = s.value("Texture", std::string());
+            }
+
             if (!texPath.empty() && library)
             {
                 sc.Texture = library->Load(texPath);

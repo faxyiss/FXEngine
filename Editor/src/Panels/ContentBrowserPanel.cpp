@@ -2,6 +2,7 @@
 #include "Platform/FileDialogs.h"
 
 #include <FXEngine/Core/FileSystem.h>
+#include <FXEngine/Asset/AssetManager.h>
 #include <FXEngine/Core/Log.h>
 
 #include <imgui.h>
@@ -159,8 +160,19 @@ namespace FXEd
         std::error_code ec;
         for (const auto& entry : std::filesystem::directory_iterator(m_Current, ec))
         {
-            if (entry.is_directory(ec)) m_Directories.push_back(entry);
-            else                        m_Files.push_back(entry);
+            if (entry.is_directory(ec))
+            {
+                m_Directories.push_back(entry);
+                continue;
+            }
+
+            // .meta dosyalari kullaniciya GOSTERILMIYOR: onlar varligin
+            // kendisi degil, hakkindaki bilgi. Unity de gizler.
+            // Yine de diskte duruyorlar ve surum kontrolune girmeliler.
+            if (FX::AssetManager::IsMetaFile(entry.path().string()))
+                continue;
+
+            m_Files.push_back(entry);
         }
 
         // directory_iterator'in sirasi ISLETIM SISTEMINE BAGLIDIR ve NTFS
@@ -215,6 +227,11 @@ namespace FXEd
         Refresh();
 
         const std::string relative = FX::FileSystem::MakeRelativeToProject(target.string());
+
+        // Yeni varliga HEMEN kimlik ver: sahneye surukleyip birakildiginda
+        // GUID'i hazir olsun, bir sonraki proje taramasini beklemesin.
+        FX::AssetManager::Register(relative);
+
         FX_INFO("Ice aktarildi: %s", relative.c_str());
         return relative;
     }
@@ -349,8 +366,7 @@ namespace FXEd
             // sadece sonuncusu kalirdi. Ozet daha faydali.
             if (sources.size() > 1)
                 SetMessage(std::to_string(sources.size()) + " oge tasindi -> " +
-                           dst.filename().string() +
-                           "  (bu ogeleri kullanan sahneler onlari bulamayacak)");
+                           dst.filename().string());
 
             ClearSelection();
         }
@@ -829,6 +845,28 @@ namespace FXEd
         ImGui::PopID();
     }
 
+    void ContentBrowserPanel::MoveMetaAlongside(const std::filesystem::path& oldPath,
+                                                const std::filesystem::path& newPath)
+    {
+        std::error_code ec;
+
+        // Klasorlerin .meta'si yok; iclerindeki dosyalarinki zaten
+        // klasorle birlikte tasindi.
+        if (std::filesystem::is_directory(newPath, ec))
+            return;
+
+        const std::filesystem::path oldMeta = oldPath.string() + ".meta";
+        if (!std::filesystem::exists(oldMeta, ec))
+            return;
+
+        const std::filesystem::path newMeta = newPath.string() + ".meta";
+        std::filesystem::rename(oldMeta, newMeta, ec);
+
+        if (ec)
+            FX_WARN("Meta tasinamadi: %s (%s)",
+                    oldMeta.string().c_str(), ec.message().c_str());
+    }
+
     void ContentBrowserPanel::SetMessage(const std::string& text)
     {
         m_Message      = text;
@@ -912,6 +950,11 @@ namespace FXEd
             return;
         }
 
+        // Goreceli yollari rename'den ONCE hesapliyoruz: sonrasinda
+        // kaynak dosya artik yerinde olmaz.
+        const std::string oldRel = FX::FileSystem::MakeRelativeToProject(src.string());
+        const std::string newRel = FX::FileSystem::MakeRelativeToProject(target.string());
+
         std::filesystem::rename(src, target, ec);
         if (ec)
         {
@@ -921,13 +964,17 @@ namespace FXEd
             return;
         }
 
-        // Varlik kimligi hala DOSYA YOLU (bkz. teknik borc): tasinan
-        // dosyaya isaret eden sahneler onu bulamayacak. Yeniden
-        // adlandirmada bunu modal ile soyluyoruz; burada surukleme
-        // akisini modal ile kesmek yerine mesaj olarak veriyoruz.
-        SetMessage(src.filename().string() + " tasindi -> " +
-                   dst.filename().string() +
-                   "  (bu ogeyi kullanan sahneler onu bulamayacak)");
+        // .meta dosyasi varligin YANINDA yasar ve onunla birlikte gider.
+        // Gitmeseydi bir sonraki taramada varliga yeni bir GUID
+        // atanirdi ve tum referanslar kopardi - .meta'nin varlik
+        // sebebini yok ederdik.
+        MoveMetaAlongside(src, target);
+
+        // Kimlik korunuyor, sadece yol degisiyor. Sahne dosyalari GUID
+        // sakladigi icin referanslar SAGLAM KALIYOR.
+        FX::AssetManager::OnAssetMoved(oldRel, newRel);
+
+        SetMessage(src.filename().string() + " tasindi -> " + dst.filename().string());
 
         FX_INFO("Tasindi: %s -> %s", src.string().c_str(), target.string().c_str());
         Refresh();
@@ -980,11 +1027,15 @@ namespace FXEd
         {
             ImGui::TextDisabled("%s", m_RenameTarget.filename().string().c_str());
 
-            // Yeniden adlandirmak, yolu kimlik olarak kullandigimiz icin
-            // o dosyaya isaret eden TUM referanslari koparir. Sessiz
-            // kalmak yerine uyariyoruz.
-            ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.35f, 1.0f),
-                               "Bu dosyayi kullanan sahneler onu bulamayacak.");
+            // ESKIDEN buraya "bu dosyayi kullanan sahneler onu bulamayacak"
+            // uyarisi basiyorduk: kimlik dosya yoluydu ve adi degistirmek
+            // tum referanslari koparirdi.
+            //
+            // AssetManager ile kimlik .meta'daki GUID'e tasindi; ad ve
+            // konum artik sadece birer etiket. Uyari gecersiz kaldigi
+            // icin KALDIRILDI - dogru olmayan bir uyari, uyari olmamasindan
+            // daha kotudur.
+            ImGui::TextDisabled("Referanslar korunur (kimlik .meta'da).");
 
             ImGui::SetNextItemWidth(280.0f);
             const bool submitted = ImGui::InputText("##yeniad", m_NameBuffer, sizeof(m_NameBuffer),
@@ -995,8 +1046,21 @@ namespace FXEd
                 if (m_NameBuffer[0] != '\0')
                 {
                     std::error_code ec;
-                    std::filesystem::rename(m_RenameTarget,
-                                            m_RenameTarget.parent_path() / m_NameBuffer, ec);
+                    const std::filesystem::path renamed =
+                        m_RenameTarget.parent_path() / m_NameBuffer;
+
+                    const std::string oldRel =
+                        FX::FileSystem::MakeRelativeToProject(m_RenameTarget.string());
+                    const std::string newRel =
+                        FX::FileSystem::MakeRelativeToProject(renamed.string());
+
+                    std::filesystem::rename(m_RenameTarget, renamed, ec);
+
+                    if (!ec)
+                    {
+                        MoveMetaAlongside(m_RenameTarget, renamed);
+                        FX::AssetManager::OnAssetMoved(oldRel, newRel);
+                    }
                     if (ec)
                         FX_ERROR("Yeniden adlandirilamadi: %s", ec.message().c_str());
                     Refresh();
@@ -1063,10 +1127,26 @@ namespace FXEd
                 for (const auto& t : targets)
                 {
                     std::error_code ec;
-                    if (std::filesystem::is_directory(t, ec))
+                    const bool isDir = std::filesystem::is_directory(t, ec);
+                    const std::string rel = FX::FileSystem::MakeRelativeToProject(t.string());
+
+                    if (isDir)
+                    {
                         std::filesystem::remove_all(t, ec);
+                    }
                     else
+                    {
                         std::filesystem::remove(t, ec);
+
+                        // Varligin .meta'si de gitmeli, yoksa sahipsiz
+                        // bir .meta kalir ve bir sonraki taramada
+                        // "dosyasi olmayan kayit" olusurdu.
+                        std::error_code metaEc;
+                        std::filesystem::remove(t.string() + ".meta", metaEc);
+
+                        if (!ec)
+                            FX::AssetManager::OnAssetDeleted(rel);
+                    }
 
                     if (ec)
                         FX_ERROR("Silinemedi (%s): %s",

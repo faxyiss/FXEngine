@@ -32,6 +32,7 @@ namespace FX
             glm::vec2 TexCoord;
             float     TexIndex;       // hangi slot? float cunku attribute'lar float
             float     TilingFactor;
+            int       EntityID;       // -1 = entity'ye ait degil
         };
 
         // -------------------------------------------------------------------
@@ -120,7 +121,8 @@ namespace FX
             { ShaderDataType::Float4, "a_Color"        },
             { ShaderDataType::Float2, "a_TexCoord"     },
             { ShaderDataType::Float,  "a_TexIndex"     },
-            { ShaderDataType::Float,  "a_TilingFactor" }
+            { ShaderDataType::Float,  "a_TilingFactor" },
+            { ShaderDataType::Int,    "a_EntityID"     }
         });
         s_Data.QuadVA->AddVertexBuffer(s_Data.QuadVB);
 
@@ -342,7 +344,7 @@ namespace FX
         // Tek bir yerde toplamak, bir hata duzeltmesinin 6 fonksiyona
         // tek tek uygulanmasi gerekmemesini saglar.
         void SubmitQuad(const glm::mat4& transform, const glm::vec4& color,
-                        float texIndex, float tilingFactor)
+                        float texIndex, float tilingFactor, int entityID)
         {
             EnsureRoom();
 
@@ -362,6 +364,7 @@ namespace FX
                 s_Data.QuadVertexBufferPtr->TexCoord     = DEFAULT_TEX_COORDS[i];
                 s_Data.QuadVertexBufferPtr->TexIndex     = texIndex;
                 s_Data.QuadVertexBufferPtr->TilingFactor = tilingFactor;
+                s_Data.QuadVertexBufferPtr->EntityID     = entityID;
 
                 ++s_Data.QuadVertexBufferPtr;
             }
@@ -390,53 +393,53 @@ namespace FX
     // Genel API
     // -----------------------------------------------------------------------
     void Renderer2D::DrawQuad(const glm::vec2& position, const glm::vec2& size,
-                              const glm::vec4& color)
+                              const glm::vec4& color, int entityID)
     {
-        DrawQuad(glm::vec3(position, 0.0f), size, color);
+        DrawQuad(glm::vec3(position, 0.0f), size, color, entityID);
     }
 
     void Renderer2D::DrawQuad(const glm::vec3& position, const glm::vec2& size,
-                              const glm::vec4& color)
+                              const glm::vec4& color, int entityID)
     {
         // texIndex 0 = beyaz texture -> renk oldugu gibi cikar.
-        SubmitQuad(MakeTransform(position, size), color, 0.0f, 1.0f);
+        SubmitQuad(MakeTransform(position, size), color, 0.0f, 1.0f, entityID);
     }
 
     void Renderer2D::DrawQuad(const glm::vec2& position, const glm::vec2& size,
                               const std::shared_ptr<Texture2D>& texture,
-                              float tilingFactor, const glm::vec4& tint)
+                              float tilingFactor, const glm::vec4& tint, int entityID)
     {
-        DrawQuad(glm::vec3(position, 0.0f), size, texture, tilingFactor, tint);
+        DrawQuad(glm::vec3(position, 0.0f), size, texture, tilingFactor, tint, entityID);
     }
 
     void Renderer2D::DrawQuad(const glm::vec3& position, const glm::vec2& size,
                               const std::shared_ptr<Texture2D>& texture,
-                              float tilingFactor, const glm::vec4& tint)
+                              float tilingFactor, const glm::vec4& tint, int entityID)
     {
         const float texIndex = ResolveTextureSlot(texture);
-        SubmitQuad(MakeTransform(position, size), tint, texIndex, tilingFactor);
+        SubmitQuad(MakeTransform(position, size), tint, texIndex, tilingFactor, entityID);
     }
 
     void Renderer2D::DrawRotatedQuad(const glm::vec2& position, const glm::vec2& size,
-                                     float rotationRadians, const glm::vec4& color)
+                                     float rotationRadians, const glm::vec4& color, int entityID)
     {
-        DrawRotatedQuad(glm::vec3(position, 0.0f), size, rotationRadians, color);
+        DrawRotatedQuad(glm::vec3(position, 0.0f), size, rotationRadians, color, entityID);
     }
 
     void Renderer2D::DrawRotatedQuad(const glm::vec3& position, const glm::vec2& size,
-                                     float rotationRadians, const glm::vec4& color)
+                                     float rotationRadians, const glm::vec4& color, int entityID)
     {
-        SubmitQuad(MakeRotatedTransform(position, size, rotationRadians), color, 0.0f, 1.0f);
+        SubmitQuad(MakeRotatedTransform(position, size, rotationRadians), color, 0.0f, 1.0f, entityID);
     }
 
     void Renderer2D::DrawRotatedQuad(const glm::vec2& position, const glm::vec2& size,
                                      float rotationRadians,
                                      const std::shared_ptr<Texture2D>& texture,
-                                     float tilingFactor, const glm::vec4& tint)
+                                     float tilingFactor, const glm::vec4& tint, int entityID)
     {
         const float texIndex = ResolveTextureSlot(texture);
         SubmitQuad(MakeRotatedTransform(glm::vec3(position, 0.0f), size, rotationRadians),
-                   tint, texIndex, tilingFactor);
+                   tint, texIndex, tilingFactor, entityID);
     }
 
     Renderer2D::Statistics Renderer2D::GetStats() { return s_Data.Stats; }

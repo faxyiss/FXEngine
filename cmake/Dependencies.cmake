@@ -88,6 +88,19 @@ FetchContent_Declare(imgui
     GIT_SHALLOW    TRUE)
 
 # ---------------------------------------------------------------------------
+# 6b) ImGuizmo - 3B tasima/dondurme/olcekleme tutamaklari (Faz 11)
+# ---------------------------------------------------------------------------
+# SOURCE_SUBDIR "src": ImGuizmo'nun kendi CMakeLists'i (kokte) bizim
+# imgui target'imizi bilmiyor ve derlenmiyor. FetchContent, belirtilen alt
+# dizinde CMakeLists.txt YOKSA add_subdirectory cagirmaz - "sadece indir"
+# demenin belgelenmis yolu budur.
+FetchContent_Declare(ImGuizmo
+    GIT_REPOSITORY https://github.com/CedricGuillemet/ImGuizmo.git
+    GIT_TAG        master
+    GIT_SHALLOW    TRUE
+    SOURCE_SUBDIR  src)
+
+# ---------------------------------------------------------------------------
 # 7) stb - stb_image.h (texture yukleme)
 # ---------------------------------------------------------------------------
 FetchContent_Declare(stb
@@ -101,8 +114,8 @@ FetchContent_Declare(stb
 message(STATUS "[FXEngine] Bagimliliklar cekiliyor (ilk sefer birkac dakika surebilir)...")
 FetchContent_MakeAvailable(SDL3 glm EnTT nlohmann_json glad)
 
-# imgui ve stb icin: sadece indir, add_subdirectory YAPMA (CMakeLists'leri yok).
-FetchContent_MakeAvailable(imgui stb)
+# imgui, ImGuizmo ve stb icin: sadece indir, add_subdirectory YAPMA.
+FetchContent_MakeAvailable(imgui ImGuizmo stb)
 
 # ---------------------------------------------------------------------------
 # imgui target'ini elle kuruyoruz
@@ -124,6 +137,14 @@ target_include_directories(imgui PUBLIC
 
 # imgui_impl_sdl3.cpp icinde <SDL3/SDL.h> var -> SDL3'e link etmeli.
 target_link_libraries(imgui PUBLIC SDL3::SDL3)
+
+# ---------------------------------------------------------------------------
+# ImGuizmo target'i
+# ---------------------------------------------------------------------------
+# Kaynaklar src/ altinda (depo yakin zamanda yeniden duzenlenmis).
+add_library(ImGuizmo STATIC ${imguizmo_SOURCE_DIR}/src/ImGuizmo.cpp)
+target_include_directories(ImGuizmo PUBLIC ${imguizmo_SOURCE_DIR}/src)
+target_link_libraries(ImGuizmo PUBLIC imgui)
 
 # ---------------------------------------------------------------------------
 # stb target'i (header-only => INTERFACE)

@@ -112,16 +112,19 @@ namespace FX
             // olup olmadigini soruyoruz, bir hesabin sonucunu degil.
             // Kucuk bir aci (0.0001) hizli yola girmezse zarari da yok.
             const bool rotated = (transform.Rotation != 0.0f);
+            const int  id      = static_cast<int>(entity);
 
             if (sprite.Texture)
             {
                 if (rotated)
                     Renderer2D::DrawRotatedQuad(glm::vec2(transform.Translation),
                                                 transform.Scale, transform.Rotation,
-                                                sprite.Texture, sprite.TilingFactor, sprite.Color);
+                                                sprite.Texture, sprite.TilingFactor,
+                                                sprite.Color, id);
                 else
                     Renderer2D::DrawQuad(transform.Translation, transform.Scale,
-                                         sprite.Texture, sprite.TilingFactor, sprite.Color);
+                                         sprite.Texture, sprite.TilingFactor,
+                                         sprite.Color, id);
             }
             else
             {
@@ -129,9 +132,11 @@ namespace FX
                 // texture kullaniyor, yani bu da AYNI batch'e giriyor.
                 if (rotated)
                     Renderer2D::DrawRotatedQuad(glm::vec2(transform.Translation),
-                                                transform.Scale, transform.Rotation, sprite.Color);
+                                                transform.Scale, transform.Rotation,
+                                                sprite.Color, id);
                 else
-                    Renderer2D::DrawQuad(transform.Translation, transform.Scale, sprite.Color);
+                    Renderer2D::DrawQuad(transform.Translation, transform.Scale,
+                                         sprite.Color, id);
             }
         }
 

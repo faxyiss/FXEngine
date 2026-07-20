@@ -8,6 +8,9 @@
 #include <FXEngine/Scene/SceneSerializer.h>
 
 #include <imgui.h>
+#include <ImGuizmo.h>
+
+#include <glm/gtc/type_ptr.hpp>
 
 #include <SDL3/SDL.h>
 
@@ -51,10 +54,15 @@ namespace FXEd
 
         m_ImGuiLayer.Init(GetWindow());
 
-        // Framebuffer: sahne buraya cizilecek, ekrana degil.
+        // Iki renk eki: gorunen goruntu + entity ID (secim icin).
         FX::FramebufferSpec fbSpec;
         fbSpec.Width  = GetWindow().GetWidth();
         fbSpec.Height = GetWindow().GetHeight();
+        fbSpec.Attachments = {
+            FX::FramebufferTextureFormat::RGBA8,
+            FX::FramebufferTextureFormat::RED_INTEGER,
+            FX::FramebufferTextureFormat::DEPTH24STENCIL8
+        };
         m_Framebuffer = std::make_unique<FX::Framebuffer>(fbSpec);
 
         FX::TextureSpec sharpSpec;
@@ -92,6 +100,8 @@ namespace FXEd
         FX_INFO("duzen imgui.ini'ye kaydedilir.");
         FX_INFO("Viewport uzerindeyken: W/A/S/D kamera, tekerlek zoom.");
         FX_INFO("Ctrl+S kaydet, Ctrl+O yukle. Sahne dosyasi: %s", m_ScenePath.c_str());
+        FX_INFO("Viewport'ta sol tik ile entity sec.");
+        FX_INFO("Gizmo: Z kapali, X tasi, C dondur, B olcekle (Ctrl = kademeli)");
     }
 
     void EditorApp::BuildScene()
@@ -355,9 +365,16 @@ namespace FXEd
 
         FX::RenderCommand::SetClearColor({ 0.07f, 0.08f, 0.11f, 1.0f });
         FX::RenderCommand::Clear();
+
+        // ID ekini -1'e doldur. glClear onu 0 yapardi ve 0 gecerli bir
+        // entity kimligi - bos alana tiklayinca ilk entity secilirdi.
+        m_Framebuffer->ClearAttachment(1, -1);
+
         FX::Renderer2D::ResetStats();
 
         m_Scene->OnRender(*m_Camera);
+
+        PickEntity();
 
         m_Framebuffer->Unbind();
 
@@ -418,6 +435,21 @@ namespace FXEd
                 ImGui::EndMenu();
             }
 
+            if (ImGui::BeginMenu("Gizmo"))
+            {
+                if (ImGui::MenuItem("Kapali",  "Z", m_GizmoOperation == -1))
+                    m_GizmoOperation = -1;
+                if (ImGui::MenuItem("Tasi",    "X", m_GizmoOperation == ImGuizmo::TRANSLATE))
+                    m_GizmoOperation = ImGuizmo::TRANSLATE;
+                if (ImGui::MenuItem("Dondur",  "C", m_GizmoOperation == ImGuizmo::ROTATE))
+                    m_GizmoOperation = ImGuizmo::ROTATE;
+                if (ImGui::MenuItem("Olcekle", "B", m_GizmoOperation == ImGuizmo::SCALE))
+                    m_GizmoOperation = ImGuizmo::SCALE;
+                ImGui::Separator();
+                ImGui::TextDisabled("Ctrl basili = kademeli");
+                ImGui::EndMenu();
+            }
+
             if (ImGui::BeginMenu("Gorunum"))
             {
                 if (ImGui::MenuItem("Kamerayi Sifirla"))
@@ -427,6 +459,8 @@ namespace FXEd
                     m_ZoomLevel      = 8.0f;
                     UpdateCameraProjection();
                 }
+                if (ImGui::MenuItem("Panel Duzenini Sifirla"))
+                    m_ImGuiLayer.ResetLayout();
                 ImGui::MenuItem("ImGui Demo", nullptr, &m_ShowDemoWindow);
                 ImGui::EndMenu();
             }
@@ -461,7 +495,13 @@ namespace FXEd
         m_ViewportFocused = ImGui::IsWindowFocused();
         m_ViewportHovered = ImGui::IsWindowHovered();
 
-        const ImVec2 panelSize = ImGui::GetContentRegionAvail();
+        // Panelin ekran uzerindeki sinirlari. GetCursorScreenPos, icerik
+        // alaninin sol UST kosesini verir - baslik cubugu haric.
+        const ImVec2 contentMin = ImGui::GetCursorScreenPos();
+        const ImVec2 panelSize  = ImGui::GetContentRegionAvail();
+
+        m_ViewportBoundsMin = { contentMin.x, contentMin.y };
+        m_ViewportBoundsMax = { contentMin.x + panelSize.x, contentMin.y + panelSize.y };
 
         // Panel boyutu degistiyse framebuffer'i ve kamerayi guncelle.
         // Framebuffer::Resize kendi icinde "ayni boyutsa hicbir sey yapma"
@@ -484,11 +524,95 @@ namespace FXEd
         // Faz 3'te stb_image icin yaptigimiz cevirmenin ayni mantigi,
         // bu sefer diger yonde.
         // ===============================================================
-        const auto texID = static_cast<ImTextureID>(m_Framebuffer->GetColorAttachmentID());
+        const auto texID = static_cast<ImTextureID>(m_Framebuffer->GetColorAttachmentID(0));
         ImGui::Image(texID, panelSize, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
+
+        DrawGizmo();
 
         ImGui::End();
         ImGui::PopStyleVar();
+    }
+
+    void EditorApp::PickEntity()
+    {
+        // Framebuffer BAGLI durumdayken cagriliyor (OnRender icinde).
+        if (!m_ViewportHovered || ImGuizmo::IsOver() || ImGuizmo::IsUsing())
+            return;
+
+        if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+            return;
+
+        const ImVec2 mouse = ImGui::GetMousePos();
+
+        float mx = mouse.x - m_ViewportBoundsMin.x;
+        float my = mouse.y - m_ViewportBoundsMin.y;
+
+        // OpenGL'in Y ekseni asagidan yukari; ImGui'nin yukaridan asagi.
+        const float height = m_ViewportBoundsMax.y - m_ViewportBoundsMin.y;
+        my = height - my;
+
+        const int pixel = m_Framebuffer->ReadPixel(1, static_cast<int>(mx), static_cast<int>(my));
+
+        if (pixel < 0)
+        {
+            m_HierarchyPanel.SetSelectedEntity({});
+            return;
+        }
+
+        const auto handle = static_cast<entt::entity>(pixel);
+        if (m_Scene->GetRegistry().valid(handle))
+        {
+            FX::Entity picked{ handle, m_Scene.get() };
+            m_HierarchyPanel.SetSelectedEntity(picked);
+            FX_INFO("Secildi: %s", picked.GetComponent<FX::TagComponent>().Tag.c_str());
+        }
+    }
+
+    void EditorApp::DrawGizmo()
+    {
+        FX::Entity selected = m_HierarchyPanel.GetSelectedEntity();
+        if (!selected || m_GizmoOperation < 0)
+            return;
+        if (!selected.HasComponent<FX::TransformComponent>())
+            return;
+
+        ImGuizmo::SetOrthographic(true);
+        ImGuizmo::SetDrawlist();
+        ImGuizmo::SetRect(m_ViewportBoundsMin.x, m_ViewportBoundsMin.y,
+                          m_ViewportBoundsMax.x - m_ViewportBoundsMin.x,
+                          m_ViewportBoundsMax.y - m_ViewportBoundsMin.y);
+
+        const glm::mat4& view = m_Camera->GetViewMatrix();
+        const glm::mat4& proj = m_Camera->GetProjectionMatrix();
+
+        auto& tc = selected.GetComponent<FX::TransformComponent>();
+        glm::mat4 transform = tc.GetTransform();
+
+        // Ctrl basiliyken kademeli hareket (snap).
+        const bool* keys = SDL_GetKeyboardState(nullptr);
+        const bool snap = keys[SDL_SCANCODE_LCTRL] || keys[SDL_SCANCODE_RCTRL];
+
+        const float snapValue =
+            (m_GizmoOperation == ImGuizmo::ROTATE) ? 15.0f : 0.5f;
+        const float snapValues[3] = { snapValue, snapValue, snapValue };
+
+        ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(proj),
+                             static_cast<ImGuizmo::OPERATION>(m_GizmoOperation),
+                             ImGuizmo::LOCAL,
+                             glm::value_ptr(transform),
+                             nullptr,
+                             snap ? snapValues : nullptr);
+
+        if (ImGuizmo::IsUsing())
+        {
+            float translation[3], rotation[3], scale[3];
+            ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(transform),
+                                                  translation, rotation, scale);
+
+            tc.Translation = { translation[0], translation[1], translation[2] };
+            tc.Rotation    = glm::radians(rotation[2]);
+            tc.Scale       = { scale[0], scale[1] };
+        }
     }
 
     void EditorApp::DrawStatsPanel()
@@ -575,6 +699,21 @@ namespace FXEd
 
             case SDLK_O:
                 if (ctrl) LoadScene();
+                break;
+
+            // Gizmo kisayollari - sadece viewport odaktayken, cunku
+            // W/E/R ayni zamanda kamera tuslari.
+            case SDLK_Z:
+                if (m_ViewportHovered) m_GizmoOperation = -1;
+                break;
+            case SDLK_X:
+                if (m_ViewportHovered) m_GizmoOperation = ImGuizmo::TRANSLATE;
+                break;
+            case SDLK_C:
+                if (m_ViewportHovered) m_GizmoOperation = ImGuizmo::ROTATE;
+                break;
+            case SDLK_B:
+                if (m_ViewportHovered) m_GizmoOperation = ImGuizmo::SCALE;
                 break;
 
             default:

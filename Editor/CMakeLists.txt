@@ -21,7 +21,8 @@ target_include_directories(FXEditor PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 # imgui'yi ayrica ekliyoruz cunku o Engine'in degil, EDITOR'un araci.
 target_link_libraries(FXEditor PRIVATE
     FXEngine
-    imgui)
+    imgui
+    ImGuizmo)
 
 # ---------------------------------------------------------------------------
 # Windows: SDL3.dll'i exe'nin yanina kopyala

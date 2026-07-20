@@ -1,11 +1,13 @@
-#version 330 core
+﻿#version 330 core
 
-out vec4 o_Color;
+layout(location = 0) out vec4 o_Color;
+layout(location = 1) out int  o_EntityID;
 
 in vec4  v_Color;
 in vec2  v_TexCoord;
 flat in float v_TexIndex;
 in float v_TilingFactor;
+flat in int v_EntityID;
 
 // 32 texture ayni anda bagli. Her kose hangisini kullanacagini
 // v_TexIndex ile soyluyor.
@@ -77,5 +79,6 @@ void main()
     if (result.a < 0.01)
         discard;
 
-    o_Color = result;
+    o_Color    = result;
+    o_EntityID = v_EntityID;
 }

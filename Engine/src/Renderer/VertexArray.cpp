@@ -79,24 +79,31 @@ namespace FX
             // acmayi unutmak "ekranda hicbir sey yok" hatasinin klasik sebebidir.
             glEnableVertexAttribArray(m_VertexBufferIndex);
 
-            // Tarifin kendisi:
-            //   index      : shader'daki "layout(location = N)" ile eslesir
-            //   size       : kac bilesen (vec3 -> 3)
-            //   type       : GL_FLOAT
-            //   normalized : tamsayilari 0..1'e olceklensin mi
-            //   stride     : bir koseden digerine kac bayt
-            //   pointer    : kose baslangicindan itibaren bu alanin ofseti
-            //
-            // Son parametre tarihsel bir tuhaflik: tipi const void* ama
-            // aslinda bir OFSET sayisi. Eski OpenGL'de gercekten isaretciydi,
-            // simdi tampon icindeki bayt kaydirmasi anlamina geliyor.
-            glVertexAttribPointer(
-                m_VertexBufferIndex,
-                static_cast<GLint>(element.GetComponentCount()),
-                ShaderDataTypeToGLBaseType(element.Type),
-                element.Normalized ? GL_TRUE : GL_FALSE,
-                static_cast<GLsizei>(layout.GetStride()),
-                reinterpret_cast<const void*>(element.Offset));
+            const GLenum baseType = ShaderDataTypeToGLBaseType(element.Type);
+
+            if (baseType == GL_INT || baseType == GL_BOOL)
+            {
+                // TAMSAYILAR ICIN AYRI FONKSIYON: glVertexAttribIPointer.
+                // Normal glVertexAttribPointer degeri float'a CEVIRIR;
+                // shader'da "in int" okursan cop deger gelir. Belirtisi
+                // sinsidir: sayilar makul gorunur ama yanlistir.
+                glVertexAttribIPointer(
+                    m_VertexBufferIndex,
+                    static_cast<GLint>(element.GetComponentCount()),
+                    baseType,
+                    static_cast<GLsizei>(layout.GetStride()),
+                    reinterpret_cast<const void*>(element.Offset));
+            }
+            else
+            {
+                glVertexAttribPointer(
+                    m_VertexBufferIndex,
+                    static_cast<GLint>(element.GetComponentCount()),
+                    baseType,
+                    element.Normalized ? GL_TRUE : GL_FALSE,
+                    static_cast<GLsizei>(layout.GetStride()),
+                    reinterpret_cast<const void*>(element.Offset));
+            }
 
             ++m_VertexBufferIndex;
         }

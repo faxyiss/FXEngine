@@ -14,6 +14,13 @@ namespace FX
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+        // Dithering tamsayi eklerinde desteklenmiyor ve modern renk
+        // derinliginde bir isimize yaramiyor.
+        // (Blending'in tamsayi ekleri icin kapatilmasi Framebuffer::Bind'de:
+        // ImGui her karede blend durumunu geri yukledigi icin tek seferlik
+        // ayar orada tutmuyor.)
+        glDisable(GL_DITHER);
+
         // --- Derinlik testi ---------------------------------------------------
         // 2D'de derinligi Z ile siralamak isteyebiliriz (katmanlar).
         // Simdilik aciyoruz; Faz 4'te sprite siralamasi konusunu ele alacagiz.

@@ -48,6 +48,10 @@ namespace FXEd
         void DrawMenuBar();
         void DrawViewportPanel();
         void DrawStatsPanel();
+        void DrawGizmo();
+
+        // Fare altindaki entity'yi framebuffer'in ID ekinden okur.
+        void PickEntity();
 
         // --- Sahne -------------------------------------------------------------
         std::unique_ptr<FX::Scene> m_Scene;
@@ -78,10 +82,18 @@ namespace FXEd
         // Kamera en-boy orani BUNA gore hesaplanmali, pencereye gore degil.
         glm::vec2 m_ViewportSize{ 0.0f, 0.0f };
 
+        // Viewport panelinin ekran uzerindeki sinirlari. Fare konumunu
+        // panel-yerel koordinata cevirmek icin gerekli.
+        glm::vec2 m_ViewportBoundsMin{ 0.0f, 0.0f };
+        glm::vec2 m_ViewportBoundsMax{ 0.0f, 0.0f };
+
         // Fare viewport panelinin uzerinde mi? Kamera kisayollarini
         // sadece o zaman calistiracagiz.
         bool m_ViewportHovered = false;
         bool m_ViewportFocused = false;
+
+        // ImGuizmo islem tipi (ImGuizmo::OPERATION). -1 = gizmo kapali.
+        int m_GizmoOperation = -1;
 
         // --- Kaynaklar ---------------------------------------------------------
         // Kutuphane, yol -> texture eslemesini tutar. Sahne yuklerken

@@ -15,6 +15,7 @@
 // ===========================================================================
 
 #include <cstdint>
+#include <string>
 
 namespace FX { class Window; }
 union SDL_Event;
@@ -46,7 +47,18 @@ namespace FXEd
         bool WantsKeyboard() const;
         bool WantsMouse() const;
 
+        // Panelleri varsayilan duzene dondurur (bir sonraki Begin'de uygulanir).
+        void ResetLayout() { m_BuildDefaultLayout = true; }
+
     private:
+        void BuildDefaultLayout(unsigned int dockspaceID);
+
         bool m_Initialized = false;
+
+        // ImGui, IniFilename isaretcisini SAKLAR ve sonra okur - gecici bir
+        // string veremeyiz, uye olarak yasatmak zorundayiz.
+        std::string m_IniPath;
+
+        bool m_BuildDefaultLayout = false;
     };
 }

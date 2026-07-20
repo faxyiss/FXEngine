@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // ===========================================================================
 // FXEngine - Renderer2D (Batch Renderer)
@@ -56,33 +56,33 @@ namespace FX
 
         // Duz renkli
         static void DrawQuad(const glm::vec2& position, const glm::vec2& size,
-                             const glm::vec4& color);
+                             const glm::vec4& color, int entityID = -1);
         static void DrawQuad(const glm::vec3& position, const glm::vec2& size,
-                             const glm::vec4& color);
+                             const glm::vec4& color, int entityID = -1);
 
         // Texture'li
         static void DrawQuad(const glm::vec2& position, const glm::vec2& size,
                              const std::shared_ptr<Texture2D>& texture,
                              float tilingFactor = 1.0f,
-                             const glm::vec4& tint = glm::vec4(1.0f));
+                             const glm::vec4& tint = glm::vec4(1.0f), int entityID = -1);
         static void DrawQuad(const glm::vec3& position, const glm::vec2& size,
                              const std::shared_ptr<Texture2D>& texture,
                              float tilingFactor = 1.0f,
-                             const glm::vec4& tint = glm::vec4(1.0f));
+                             const glm::vec4& tint = glm::vec4(1.0f), int entityID = -1);
 
         // Dondurulmus surumler. Ayri fonksiyon olmasinin sebebi: donme
         // gerektirmeyen quad'lar icin sin/cos hesabini ve matris carpimini
         // tamamen atlayabilmek. Cogu sprite dondurulmez; bu ayrim
         // binlerce quad'da olculebilir fark yaratir.
         static void DrawRotatedQuad(const glm::vec2& position, const glm::vec2& size,
-                                    float rotationRadians, const glm::vec4& color);
+                                    float rotationRadians, const glm::vec4& color, int entityID = -1);
         static void DrawRotatedQuad(const glm::vec3& position, const glm::vec2& size,
-                                    float rotationRadians, const glm::vec4& color);
+                                    float rotationRadians, const glm::vec4& color, int entityID = -1);
         static void DrawRotatedQuad(const glm::vec2& position, const glm::vec2& size,
                                     float rotationRadians,
                                     const std::shared_ptr<Texture2D>& texture,
                                     float tilingFactor = 1.0f,
-                                    const glm::vec4& tint = glm::vec4(1.0f));
+                                    const glm::vec4& tint = glm::vec4(1.0f), int entityID = -1);
 
         // --- Istatistik --------------------------------------------------------
         // Batch renderer'in ISE YARADIGINI OLCEBILMEK icin. Sayilari

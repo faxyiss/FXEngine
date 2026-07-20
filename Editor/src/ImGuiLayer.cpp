@@ -2,10 +2,13 @@
 
 #include <FXEngine/Core/Window.h>
 #include <FXEngine/Core/Log.h>
+#include <FXEngine/Core/FileSystem.h>
 
 #include <imgui.h>
+#include <imgui_internal.h>   // DockBuilder API'si burada
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_opengl3.h>
+#include <ImGuizmo.h>
 
 #include <SDL3/SDL.h>
 
@@ -30,9 +33,15 @@ namespace FXEd
         // yonetimi gerektirir ve hata kaynagi olur. MVP'de gereksiz.
         // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
-        // Panel duzenini imgui.ini'ye kaydeder. Programi kapatip acinca
-        // panelleri tekrar duzenlemek zorunda kalmazsin.
-        io.IniFilename = "imgui.ini";
+        // Ini dosyasini EXE'NIN YANINA yaziyoruz, calisma dizinine degil.
+        // Aksi halde programi farkli klasorlerden baslattiginda duzen
+        // kayboluyor - Faz 2'de shader yollarinda yasadigimiz sorunun aynisi.
+        m_IniPath = FX::FileSystem::GetBaseDirectory() + "imgui.ini";
+        io.IniFilename = m_IniPath.c_str();
+
+        // Ini yoksa ilk acilista varsayilan duzeni kuracagiz. Yoksa tum
+        // paneller ust uste, icerige gore kucucuk boyutlarda aciliyor.
+        m_BuildDefaultLayout = !FX::FileSystem::Exists(m_IniPath);
 
         ImGui::StyleColorsDark();
 
@@ -79,6 +88,7 @@ namespace FXEd
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
+        ImGuizmo::BeginFrame();
 
         // --- Dockspace ---------------------------------------------------------
         // Tum ekrani kaplayan gorunmez bir "kenetlenme alani" olusturur.
@@ -86,8 +96,34 @@ namespace FXEd
         //
         // PassthruCentralNode: ortadaki bos alan SEFFAF kalir. Bunu
         // istiyoruz cunku viewport paneli oraya yerlesecek.
-        ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(),
-                                     ImGuiDockNodeFlags_PassthruCentralNode);
+        const ImGuiID dockspaceID =
+            ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(),
+                                         ImGuiDockNodeFlags_PassthruCentralNode);
+
+        if (m_BuildDefaultLayout)
+        {
+            m_BuildDefaultLayout = false;
+            BuildDefaultLayout(dockspaceID);
+        }
+    }
+
+    void ImGuiLayer::BuildDefaultLayout(unsigned int dockspaceID)
+    {
+        ImGui::DockBuilderRemoveNode(dockspaceID);
+        ImGui::DockBuilderAddNode(dockspaceID, ImGuiDockNodeFlags_DockSpace);
+        ImGui::DockBuilderSetNodeSize(dockspaceID, ImGui::GetMainViewport()->Size);
+
+        ImGuiID center = dockspaceID;
+        const ImGuiID left  = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left,  0.18f, nullptr, &center);
+        const ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.24f, nullptr, &center);
+        const ImGuiID leftBottom = ImGui::DockBuilderSplitNode(left, ImGuiDir_Down, 0.45f, nullptr, nullptr);
+
+        ImGui::DockBuilderDockWindow("Hierarchy",      left);
+        ImGui::DockBuilderDockWindow("Istatistikler",  leftBottom);
+        ImGui::DockBuilderDockWindow("Inspector",      right);
+        ImGui::DockBuilderDockWindow("Viewport",       center);
+
+        ImGui::DockBuilderFinish(dockspaceID);
     }
 
     void ImGuiLayer::End(std::uint32_t displayWidth, std::uint32_t displayHeight)

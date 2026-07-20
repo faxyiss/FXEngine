@@ -31,6 +31,15 @@ namespace FX
             if (id == 131169 || id == 131185 || id == 131218 || id == 131204)
                 return;
 
+            // 131140: "Blending is enabled, but is not supported for integer
+            // framebuffers." NVIDIA bu kontrolu KABA yapiyor - global
+            // GL_BLEND bayragina bakip uyariyor, tamsayi ekleri icin
+            // glDisablei(GL_BLEND, i) ile yaptigimiz per-buffer kapatmayi
+            // dikkate almiyor. Entity ID tamponu dogru okundugu icin
+            // (secim calisiyor) bu uyari bizim durumumuzda yanlis pozitif.
+            if (id == 131140)
+                return;
+
             const char* sourceStr = "Bilinmiyor";
             switch (source)
             {
@@ -60,10 +69,10 @@ namespace FX
                     FX_CORE_ERROR("[GL/%s/%s] %s", sourceStr, typeStr, message);
                     break;
                 case GL_DEBUG_SEVERITY_MEDIUM:
-                    FX_CORE_WARN("[GL/%s/%s] %s", sourceStr, typeStr, message);
-                    break;
                 case GL_DEBUG_SEVERITY_LOW:
-                    FX_CORE_WARN("[GL/%s/%s] %s", sourceStr, typeStr, message);
+                    // id'yi de basiyoruz: bir mesaji susturmak gerekirse
+                    // yukaridaki filtre listesine eklenecek numara budur.
+                    FX_CORE_WARN("[GL/%s/%s/id=%u] %s", sourceStr, typeStr, id, message);
                     break;
                 default: // NOTIFICATION
                     FX_CORE_TRACE("[GL/%s/%s] %s", sourceStr, typeStr, message);

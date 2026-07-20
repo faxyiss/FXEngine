@@ -1,4 +1,4 @@
-# FXEngine v2 — Yol Haritası
+﻿# FXEngine v2 — Yol Haritası
 
 MVP (Faz 0–7) tamamlandı. Bu belge bir sonraki sürümün planı.
 
@@ -83,21 +83,20 @@ oyun **kopya bir sahnede** çalışır, ⏹ deyince düzenleme hali geri gelir.
 
 ---
 
-## Faz 11 — Viewport'ta seçim + gizmo
+## Faz 11 — Viewport'ta seçim + gizmo ✅ TAMAM
 
 Şu an entity'yi sadece Hierarchy listesinden seçebiliyorsun.
 
-- [ ] Framebuffer'a **ikinci renk eki**: `R32I` formatında entity ID
-- [ ] Fragment shader ikinci çıktıya entity ID yazsın
-- [ ] `glReadPixels` ile fare altındaki pikselin ID'sini oku → seçim
-- [ ] **ImGuizmo** entegrasyonu: taşı / döndür / ölçekle tutamakları
-- [ ] `Q/W/E/R` kısayolları (gizmo modu)
-- [ ] Seçili entity'ye turuncu çerçeve
+- [x] Framebuffer'a **ikinci renk eki**: `R32I` formatında entity ID
+- [x] Fragment shader ikinci çıktıya entity ID yazsın
+- [x] `glReadPixels` ile fare altındaki pikselin ID'sini oku → seçim
+- [x] **ImGuizmo** entegrasyonu: taşı / döndür / ölçekle tutamakları
+- [x] Gizmo kısayolları — Z/X/C/B (W/E/R kamera tuşlarıyla çakışıyordu)
+- [x] Bonus: `glVertexAttribIPointer` hatası düzeltildi
+- [x] Bonus: varsayılan panel düzeni (DockBuilder), `imgui.ini` exe yanına
+- [ ] Seçili entity'ye turuncu çerçeve → Faz 18 (debug çizim) ile birlikte
 
-**Öğrenilecek:** "Color picking" tekniği — GPU'yu bir *sorgu* aracı olarak
-kullanmak. Framebuffer'ın çoklu ek (MRT) yeteneği.
-
-**Bağımlılık:** ImGuizmo yeni bir bağımlılık (header-only, FetchContent).
+Ayrıntılar: [Faz-11-Notlar.md](Faz-11-Notlar.md)
 
 ---
 

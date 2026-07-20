@@ -3,9 +3,10 @@ build/
 out/
 _deps/
 
-# IDE
+# IDE ve arac ayarlari (makineye ozgu, paylasilmaz)
 .vs/
 .vscode/
+.claude/settings.local.json
 *.user
 CMakeSettings.json
 compile_commands.json

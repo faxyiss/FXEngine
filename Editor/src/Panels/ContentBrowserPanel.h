@@ -62,9 +62,30 @@ namespace FXEd
         void DrawToolbar();
         void DrawModals();
 
-        void DrawEntry(const std::filesystem::directory_entry& entry);
-        void DrawEntryGrid(const std::filesystem::directory_entry& entry);
-        void DrawEntryList(const std::filesystem::directory_entry& entry);
+        void DrawEntry(const std::filesystem::directory_entry& entry, int index);
+        void DrawEntryGrid(const std::filesystem::directory_entry& entry, int index);
+        void DrawEntryList(const std::filesystem::directory_entry& entry, int index);
+
+        // --- Coklu secim ------------------------------------------------------
+        // Explorer davranisi: tek tik secer, cift tik klasore girer,
+        // Ctrl ekler/cikarir, Shift aralik secer.
+        //
+        // Tek tikla klasore girmeye devam etseydik secim ile gezinme ayni
+        // eylemi paylasirdi ve klasorler hicbir zaman secilemezdi.
+        void HandleSelectionClick(const std::filesystem::path& path, int index);
+
+        bool IsSelected(const std::filesystem::path& path) const;
+
+        // Suruklenen oge secimde degilse secim ONA ayarlanir; secimdeyse
+        // tum secim tasinir. (Explorer da boyle yapar.)
+        std::vector<std::filesystem::path> ItemsToDrag(
+            const std::filesystem::path& dragged) const;
+
+        // Gorunen siradaki (klasorler once, sonra dosyalar) tum ogeler.
+        // Shift araligi bu sira uzerinden hesaplaniyor.
+        std::vector<std::filesystem::path> VisibleOrder() const;
+
+        void ClearSelection();
 
         // Iki gorunumun PAYLASTIGI davranis: surukleme kaynagi, birakma
         // hedefi, sag tik menusu, klasore girme.
@@ -74,7 +95,7 @@ namespace FXEd
         // icin ogrendigimiz dersin aynisi.
         void DrawEntryInteractions(const std::filesystem::path& path,
                                    const std::string& filename,
-                                   bool isDirectory, bool clicked);
+                                   bool isDirectory, bool clicked, int index);
 
         // Ikonu verilen dikdortgene cizer (izgarada buyuk, listede kucuk).
         void DrawEntryIcon(const std::filesystem::path& path, bool isDirectory,
@@ -111,9 +132,17 @@ namespace FXEd
         std::filesystem::path m_DeleteTarget;
 
         // Tasima da dongu disinda: rename cagrisi dizin listesini
-        // gecersiz kilar.
-        std::filesystem::path m_MoveSource;
-        std::filesystem::path m_MoveTarget;
+        // gecersiz kilar. Coklu secimde birden fazla kaynak olabiliyor.
+        std::vector<std::filesystem::path> m_MoveSources;
+        std::filesystem::path              m_MoveTarget;
+
+        // Secili ogeler. Klasor degisince temizleniyor: baska bir
+        // klasordeki ogeleri secili tutmak, gorunmeyen dosyalar uzerinde
+        // islem yapilmasina yol acardi.
+        std::vector<std::filesystem::path> m_Selected;
+
+        // Shift araligi icin son tiklanan ogenin gorunen sirasi.
+        int m_LastClickedIndex = -1;
 
         // Kullaniciya geri bildirim (tasima hatasi, referans uyarisi).
         std::string m_Message;

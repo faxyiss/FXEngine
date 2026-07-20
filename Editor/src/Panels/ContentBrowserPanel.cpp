@@ -272,8 +272,9 @@ namespace FXEd
         {
             ImGui::Columns(columns, nullptr, false);
 
-            for (const auto& e : m_Directories) if (matches(e)) DrawEntry(e);
-            for (const auto& e : m_Files)       if (matches(e)) DrawEntry(e);
+            int index = 0;
+            for (const auto& e : m_Directories) { if (matches(e)) DrawEntry(e, index); ++index; }
+            for (const auto& e : m_Files)       { if (matches(e)) DrawEntry(e, index); ++index; }
 
             ImGui::Columns(1);
         }
@@ -294,10 +295,20 @@ namespace FXEd
             ImGui::TableSetupScrollFreeze(0, 1);
             ImGui::TableHeadersRow();
 
-            for (const auto& e : m_Directories) if (matches(e)) DrawEntry(e);
-            for (const auto& e : m_Files)       if (matches(e)) DrawEntry(e);
+            int index = 0;
+            for (const auto& e : m_Directories) { if (matches(e)) DrawEntry(e, index); ++index; }
+            for (const auto& e : m_Files)       { if (matches(e)) DrawEntry(e, index); ++index; }
 
             ImGui::EndTable();
+        }
+
+        // Bos alana SOL tik secimi temizler - Explorer'da oldugu gibi.
+        // IsWindowHovered + !IsAnyItemHovered: bir ogenin uzerinde
+        // degilsek bos alandayiz demektir.
+        if (ImGui::IsWindowHovered() && !ImGui::IsAnyItemHovered() &&
+            ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+        {
+            ClearSelection();
         }
 
         // Bos alana sag tik: klasor islemleri.
@@ -324,13 +335,24 @@ namespace FXEd
 
         // Tasima cerceve SONUNDA: rename cagrisi dizin listesini
         // gecersiz kilar, listeyi gezerken cagrilamaz.
-        if (!m_MoveSource.empty() && !m_MoveTarget.empty())
+        if (!m_MoveSources.empty() && !m_MoveTarget.empty())
         {
-            const auto src = m_MoveSource;
-            const auto dst = m_MoveTarget;
-            m_MoveSource.clear();
+            const auto sources = m_MoveSources;
+            const auto dst     = m_MoveTarget;
+            m_MoveSources.clear();
             m_MoveTarget.clear();
-            MoveItem(src, dst);
+
+            for (const auto& src : sources)
+                MoveItem(src, dst);
+
+            // MoveItem her oge icin kendi mesajini basiyor; cokluda
+            // sadece sonuncusu kalirdi. Ozet daha faydali.
+            if (sources.size() > 1)
+                SetMessage(std::to_string(sources.size()) + " oge tasindi -> " +
+                           dst.filename().string() +
+                           "  (bu ogeleri kullanan sahneler onlari bulamayacak)");
+
+            ClearSelection();
         }
 
         DrawModals();
@@ -346,6 +368,7 @@ namespace FXEd
         if (ImGui::Button("<"))
         {
             m_Current = m_Current.parent_path();
+            ClearSelection();
             Refresh();
         }
         ImGui::EndDisabled();
@@ -405,6 +428,7 @@ namespace FXEd
         if (!jumpTo.empty() && jumpTo != m_Current)
         {
             m_Current = jumpTo;
+            ClearSelection();
             Refresh();
         }
 
@@ -446,10 +470,90 @@ namespace FXEd
         }
     }
 
-    void ContentBrowserPanel::DrawEntry(const std::filesystem::directory_entry& entry)
+    void ContentBrowserPanel::DrawEntry(const std::filesystem::directory_entry& entry,
+                                        int index)
     {
-        if (m_ViewMode == ViewMode::Grid) DrawEntryGrid(entry);
-        else                              DrawEntryList(entry);
+        if (m_ViewMode == ViewMode::Grid) DrawEntryGrid(entry, index);
+        else                              DrawEntryList(entry, index);
+    }
+
+    // -----------------------------------------------------------------------
+    // Coklu secim
+    // -----------------------------------------------------------------------
+    bool ContentBrowserPanel::IsSelected(const std::filesystem::path& path) const
+    {
+        return std::find(m_Selected.begin(), m_Selected.end(), path) != m_Selected.end();
+    }
+
+    void ContentBrowserPanel::ClearSelection()
+    {
+        m_Selected.clear();
+        m_LastClickedIndex = -1;
+    }
+
+    std::vector<std::filesystem::path> ContentBrowserPanel::VisibleOrder() const
+    {
+        // Cizim sirasiyla AYNI olmali: Shift araligi kullanicinin
+        // ekranda gordugu siraya gore hesaplanmali, disk sirasina gore
+        // degil.
+        std::vector<std::filesystem::path> order;
+        order.reserve(m_Directories.size() + m_Files.size());
+
+        for (const auto& e : m_Directories) order.push_back(e.path());
+        for (const auto& e : m_Files)       order.push_back(e.path());
+        return order;
+    }
+
+    void ContentBrowserPanel::HandleSelectionClick(const std::filesystem::path& path,
+                                                   int index)
+    {
+        const ImGuiIO& io = ImGui::GetIO();
+
+        if (io.KeyShift && m_LastClickedIndex >= 0)
+        {
+            // Aralik secimi: son tiklanan ile bu ogenin arasindaki her sey.
+            const auto order = VisibleOrder();
+
+            int a = m_LastClickedIndex;
+            int b = index;
+            if (a > b) std::swap(a, b);
+
+            m_Selected.clear();
+            for (int i = a; i <= b && i < static_cast<int>(order.size()); ++i)
+                m_Selected.push_back(order[static_cast<std::size_t>(i)]);
+
+            // m_LastClickedIndex'i GUNCELLEMIYORUZ: Shift ile arka arkaya
+            // tiklayarak araligi buyutup kucultmek isteniyor; capa
+            // sabit kalmali.
+            return;
+        }
+
+        if (io.KeyCtrl)
+        {
+            const auto it = std::find(m_Selected.begin(), m_Selected.end(), path);
+            if (it != m_Selected.end()) m_Selected.erase(it);
+            else                        m_Selected.push_back(path);
+
+            m_LastClickedIndex = index;
+            return;
+        }
+
+        // Duz tik: sadece bu oge.
+        m_Selected.assign(1, path);
+        m_LastClickedIndex = index;
+    }
+
+    std::vector<std::filesystem::path> ContentBrowserPanel::ItemsToDrag(
+        const std::filesystem::path& dragged) const
+    {
+        // Suruklenen oge secimin PARCASIYSA tum secimi tasi; degilse
+        // sadece onu. Explorer'in davranisi bu ve dogrusu da bu:
+        // secimin disindaki bir seyi surukleyince kullanici o tek
+        // ogeyi kastediyordur.
+        if (IsSelected(dragged) && m_Selected.size() > 1)
+            return m_Selected;
+
+        return { dragged };
     }
 
     void ContentBrowserPanel::DrawEntryIcon(const std::filesystem::path& path,
@@ -505,7 +609,8 @@ namespace FXEd
 
     void ContentBrowserPanel::DrawEntryInteractions(const std::filesystem::path& path,
                                                     const std::string& filename,
-                                                    bool isDirectory, bool clicked)
+                                                    bool isDirectory, bool clicked,
+                                                    int index)
     {
         // Surukleme kaynagi: KLASORLER DAHIL her sey.
         //
@@ -517,10 +622,21 @@ namespace FXEd
         {
             const std::string relative = FX::FileSystem::MakeRelativeToProject(path.string());
 
+            // Yuk hala TEK yol tasiyor: viewport'a birakma (Faz 12) bu
+            // bicimi bekliyor ve coklu sprite olusturma ayri bir is.
+            // Coklu tasimada hangi ogelerin gidecegini ItemsToDrag
+            // belirliyor - yuke bakmiyoruz, secime bakiyoruz.
+            //
             // Sonlandirici DAHIL gonderiyoruz: alan tarafi payload'i
             // dogrudan const char* olarak okuyor, olmazsa tasar.
             ImGui::SetDragDropPayload(kContentPayload, relative.c_str(), relative.size() + 1);
-            ImGui::Text("%s%s", isDirectory ? "[klasor] " : "", filename.c_str());
+
+            const auto items = ItemsToDrag(path);
+            if (items.size() > 1)
+                ImGui::Text("%d oge", static_cast<int>(items.size()));
+            else
+                ImGui::Text("%s%s", isDirectory ? "[klasor] " : "", filename.c_str());
+
             ImGui::EndDragDropSource();
         }
 
@@ -529,15 +645,29 @@ namespace FXEd
         if (isDirectory)
             AcceptMoveTarget(path);
 
+        // Sag tik secimin DISINDA bir ogeye yapildiysa secimi ona
+        // ayarliyoruz: menudeki islem gorunmeyen bir secime uygulanmasin.
+        if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right) &&
+            !IsSelected(path))
+        {
+            m_Selected.assign(1, path);
+            m_LastClickedIndex = index;
+        }
+
         if (ImGui::BeginPopupContextItem("OgeMenu"))
         {
-            if (ImGui::MenuItem("Yeniden Adlandir..."))
+            const int selCount = static_cast<int>(m_Selected.size());
+
+            if (selCount > 1)
+                ImGui::TextDisabled("%d oge secili", selCount);
+
+            if (selCount == 1 && ImGui::MenuItem("Yeniden Adlandir..."))
             {
                 std::strncpy(m_NameBuffer, filename.c_str(), sizeof(m_NameBuffer) - 1);
                 m_NameBuffer[sizeof(m_NameBuffer) - 1] = 0;
                 m_RenameTarget = path;
             }
-            if (ImGui::MenuItem("Sil..."))
+            if (ImGui::MenuItem(selCount > 1 ? "Secilenleri Sil..." : "Sil..."))
                 m_DeleteTarget = path;
             ImGui::Separator();
             if (ImGui::MenuItem("Explorer'da Goster"))
@@ -548,17 +678,34 @@ namespace FXEd
             ImGui::EndPopup();
         }
 
-        // Klasore girme dongunun SONUNDA degil burada guvenli: m_Current
-        // degisse bile bu karede listeyi bir daha gezmiyoruz, Refresh
-        // bayragi bir sonraki karede okunuyor.
-        if (clicked && isDirectory)
+        if (clicked)
         {
-            m_Current = path;
-            Refresh();
+            // CIFT tik klasore girer, TEK tik secer.
+            //
+            // Tek tikla girmeye devam etseydik secim ile gezinme ayni
+            // eylemi paylasirdi: bir klasoru secmek imkansiz olurdu ve
+            // coklu secim klasorleri disarida birakirdi.
+            const bool enterFolder =
+                isDirectory && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+
+            if (enterFolder)
+            {
+                // Klasore girme dongunun SONUNDA degil burada guvenli:
+                // m_Current degisse bile bu karede listeyi bir daha
+                // gezmiyoruz, Refresh bayragi bir sonraki karede okunuyor.
+                m_Current = path;
+                ClearSelection();
+                Refresh();
+            }
+            else
+            {
+                HandleSelectionClick(path, index);
+            }
         }
     }
 
-    void ContentBrowserPanel::DrawEntryGrid(const std::filesystem::directory_entry& entry)
+    void ContentBrowserPanel::DrawEntryGrid(const std::filesystem::directory_entry& entry,
+                                            int index)
     {
         const auto& path = entry.path();
         const std::string filename = path.filename().string();
@@ -573,15 +720,30 @@ namespace FXEd
         // Dugmeyi SEFFAF cizip uzerine kendi ikonumuzu koyuyoruz.
         // Boylece vurgu/tiklama gorselleri ImGui'den bedava geliyor
         // ama gorunum bize ait.
-        ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+        const bool selected = IsSelected(path);
+
+        ImGui::PushStyleColor(ImGuiCol_Button,
+                              selected ? ImVec4(0.26f, 0.45f, 0.72f, 0.55f)
+                                       : ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 1.0f, 1.0f, 0.10f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(1.0f, 1.0f, 1.0f, 0.18f));
         const bool clicked = ImGui::Button("##oge", size);
         ImGui::PopStyleColor(3);
 
-        DrawEntryIcon(path, isDirectory, ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+        const ImVec2 cellMin = ImGui::GetItemRectMin();
+        const ImVec2 cellMax = ImGui::GetItemRectMax();
 
-        DrawEntryInteractions(path, filename, isDirectory, clicked);
+        // Secili ogeye cerceve: dolgu rengi kucuk resmin arkasinda
+        // kaliyor, kenarlik ise her zaman gorunur.
+        if (selected)
+        {
+            ImGui::GetWindowDrawList()->AddRect(cellMin, cellMax,
+                                                IM_COL32(120, 170, 255, 220), 3.0f, 0, 2.0f);
+        }
+
+        DrawEntryIcon(path, isDirectory, cellMin, cellMax);
+
+        DrawEntryInteractions(path, filename, isDirectory, clicked, index);
 
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", filename.c_str());
@@ -593,7 +755,8 @@ namespace FXEd
         ImGui::PopID();
     }
 
-    void ContentBrowserPanel::DrawEntryList(const std::filesystem::directory_entry& entry)
+    void ContentBrowserPanel::DrawEntryList(const std::filesystem::directory_entry& entry,
+                                            int index)
     {
         const auto& path = entry.path();
         const std::string filename = path.filename().string();
@@ -609,8 +772,9 @@ namespace FXEd
 
         // Selectable TUM SATIRI kapliyor: tiklama alani genis olsun,
         // kullanici ince bir metin seridini avlamak zorunda kalmasin.
-        const bool clicked = ImGui::Selectable("##satir", false,
-                                               ImGuiSelectableFlags_SpanAllColumns,
+        const bool clicked = ImGui::Selectable("##satir", IsSelected(path),
+                                               ImGuiSelectableFlags_SpanAllColumns |
+                                               ImGuiSelectableFlags_AllowDoubleClick,
                                                ImVec2(0.0f, rowHeight));
 
         const ImVec2 rowMin = ImGui::GetItemRectMin();
@@ -626,7 +790,7 @@ namespace FXEd
             ImVec2(iconMax.x + 8.0f, rowMin.y + 3.0f),
             ImGui::GetColorU32(ImGuiCol_Text), filename.c_str());
 
-        DrawEntryInteractions(path, filename, isDirectory, clicked);
+        DrawEntryInteractions(path, filename, isDirectory, clicked, index);
 
         // --- Tur sutunu -----------------------------------------------------
         ImGui::TableNextColumn();
@@ -685,9 +849,11 @@ namespace FXEd
             // Tasimayi BURADA yapmiyoruz: dizin listesini gezerken
             // rename cagirmak yineleyicileri bozar. Istegi biriktirip
             // cerceve sonunda isliyoruz - Faz 9'daki kuralin aynisi.
-            m_MoveSource = std::filesystem::path(
+            const std::filesystem::path dragged(
                 FX::FileSystem::ResolveProjectAsset(relative));
-            m_MoveTarget = targetDir;
+
+            m_MoveSources = ItemsToDrag(dragged);
+            m_MoveTarget  = targetDir;
         }
 
         ImGui::EndDragDropTarget();
@@ -850,26 +1016,71 @@ namespace FXEd
 
         if (ImGui::BeginPopupModal("Sil", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
         {
-            const bool isDirectory = std::filesystem::is_directory(m_DeleteTarget);
+            // Secim varsa TUM secim silinir; yoksa sag tiklanan oge.
+            // Menude "Secilenleri Sil..." yazip tek dosya silmek
+            // kullaniciyi yaniltirdi.
+            std::vector<std::filesystem::path> targets =
+                IsSelected(m_DeleteTarget) && m_Selected.size() > 1
+                    ? m_Selected
+                    : std::vector<std::filesystem::path>{ m_DeleteTarget };
 
-            ImGui::Text("%s", m_DeleteTarget.filename().string().c_str());
+            bool anyDirectory = false;
+            for (const auto& t : targets)
+            {
+                std::error_code dirEc;
+                if (std::filesystem::is_directory(t, dirEc))
+                    anyDirectory = true;
+            }
+
+            if (targets.size() > 1)
+            {
+                ImGui::Text("%d oge", static_cast<int>(targets.size()));
+
+                // Ilk birkacini SAYMAKLA kalmiyor, gosteriyoruz: "12 oge
+                // silinecek" diyen bir onay kutusu neyin gittigini
+                // gizler.
+                ImGui::Indent();
+                for (std::size_t i = 0; i < targets.size() && i < 6; ++i)
+                    ImGui::TextDisabled("%s", targets[i].filename().string().c_str());
+                if (targets.size() > 6)
+                    ImGui::TextDisabled("... ve %d tane daha",
+                                        static_cast<int>(targets.size() - 6));
+                ImGui::Unindent();
+            }
+            else
+            {
+                ImGui::Text("%s", m_DeleteTarget.filename().string().c_str());
+            }
+
             ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.45f, 1.0f),
-                               isDirectory ? "Klasor ve TUM icerigi silinecek."
-                                           : "Dosya kalici olarak silinecek.");
+                               anyDirectory ? "Klasorler ve TUM icerikleri silinecek."
+                                            : "Kalici olarak silinecek.");
             ImGui::TextDisabled("Geri alinamaz.");
 
             if (ImGui::Button("Sil", ImVec2(120.0f, 0.0f)))
             {
-                std::error_code ec;
-                if (isDirectory) std::filesystem::remove_all(m_DeleteTarget, ec);
-                else             std::filesystem::remove(m_DeleteTarget, ec);
+                int removed = 0;
+                for (const auto& t : targets)
+                {
+                    std::error_code ec;
+                    if (std::filesystem::is_directory(t, ec))
+                        std::filesystem::remove_all(t, ec);
+                    else
+                        std::filesystem::remove(t, ec);
 
-                if (ec)
-                    FX_ERROR("Silinemedi: %s", ec.message().c_str());
-                else
-                    FX_INFO("Silindi: %s", m_DeleteTarget.filename().string().c_str());
+                    if (ec)
+                        FX_ERROR("Silinemedi (%s): %s",
+                                 t.filename().string().c_str(), ec.message().c_str());
+                    else
+                        ++removed;
+                }
+
+                FX_INFO("Silindi: %d oge", removed);
+                if (targets.size() > 1)
+                    SetMessage(std::to_string(removed) + " oge silindi.");
 
                 m_DeleteTarget.clear();
+                ClearSelection();
                 Refresh();
                 ImGui::CloseCurrentPopup();
             }

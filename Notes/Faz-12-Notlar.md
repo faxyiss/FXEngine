@@ -372,12 +372,119 @@ oluşturma/açma sistemi ayrı bir faz olarak yazılacak ve varlıklara oradan
 bakılacak → **Faz 21**. `AssetManager` de ona bağlı: GUID→yol tablosunun
 taranacağı bir *proje kökü* olmadan varlık veritabanı kurulamaz.
 
+---
+
+## 15. 🐞 İçe aktarılan PNG'ler bozuk görünüyordu
+
+**Belirti:** Çalışma zamanında eklenen her PNG "abuk sabuk", alakasız bir
+görüntü olarak çıkıyordu. Açılışta yüklenen `checkerboard.png` ve
+`circle.png` ise sağlamdı.
+
+Bu ayrım tek başına sebebi işaret ediyor: **açılış dokuları ImGui'nin ilk
+karesinden ÖNCE, içe aktarılanlar SONRA yükleniyor.** Yani araya ImGui
+girdiğinde bir şey bozuluyor.
+
+### Sebep: kirli global GL durumu
+
+`glTexImage2D`, verdiğin işaretçiyi tek başına yorumlamaz — bir grup
+**global** ayara bakar:
+
+| Ayar | Anlamı | Varsayılan |
+|---|---|---|
+| `GL_UNPACK_ROW_LENGTH` | bir satır kaç piksel? (0 = görüntü genişliği) | 0 |
+| `GL_UNPACK_ALIGNMENT` | satır başlangıçları kaç bayta hizalı? | 4 |
+| `GL_UNPACK_SKIP_PIXELS/ROWS` | baştan ne kadar atla | 0 |
+
+ImGui 1.92'nin font atlası **512 piksel geniş** ve kısmi güncelleme için
+`ROW_LENGTH`'i 512 yapıyor. Geri koyması gerekiyor, ama koymuyor:
+
+```c
+// imgui_impl_opengl3.cpp - ImGui_ImplOpenGL3_UpdateTexture
+glPixelStorei(GL_UNPACK_ROW_LENGTH, tex->Width);   // 512
+...
+tex->SetStatus(ImTextureStatus_OK);                // ← durum burada değişiyor
+...
+if (tex->Status == WantCreate || tex->Status == WantUpdates)   // ← artık OK
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, last_unpack_row_length);   // hiç çalışmıyor
+```
+
+Geri yükleme koşulu, kendisinden önce durumu değiştiren koda bakıyor.
+`ROW_LENGTH` 512'de kalıyor.
+
+Sonuç: 32 piksel genişliğindeki bir sprite'ın satırları 512 piksel adımla
+okunuyor. Her satır veriyi 16 kat ileriden alıyor → görüntü tamamen
+dağılıyor.
+
+### Çözüm: ortam durumuna güvenme
+
+ImGui'yi yamalamak yanlış olurdu (FetchContent ile çekiyoruz, güncellemede
+kaybolur) ve zaten asıl ders başka:
+
+> **Global durum okuyan bir API'yi çağırıyorsan, ihtiyacın olan durumu
+> kendin kur.** "Herkes temiz bırakır" varsayımı er geç tutmaz.
+
+```cpp
+glPixelStorei(GL_UNPACK_ROW_LENGTH,  0);
+glPixelStorei(GL_UNPACK_ALIGNMENT,   1);
+glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
+glPixelStorei(GL_UNPACK_SKIP_ROWS,   0);
+```
+
+`ALIGNMENT` zaten kısmen kuruluyordu (sadece RGB/RED için) — Faz 3'te bu
+tuzağı biliyorduk ama **yalnızca kendi ürettiğimiz durumu** düşünmüştük,
+başkasının bıraktığını değil.
+
+### Nasıl bulundu
+
+Tahmin etmek yerine ölçtük:
+
+1. Bilinen desenli test PNG'leri üretildi (13×7 RGB, 13×7 RGBA, gri,
+   gri+alfa, 16×16, 17×9 — bilerek 4'ün katı olmayan genişlikler).
+2. ImGui **20 kare çizdikten sonra** yüklendiler (çalışma zamanı taklidi).
+3. `glGetTexImage` ile GPU'dan geri okunup kaynakla piksel piksel
+   karşılaştırıldı.
+4. Yükleme öncesi tüm `GL_UNPACK_*` değerleri loglandı.
+
+```
+ÖNCE : rowLen=512   rgb_13x7 -> hatali 78/91 ... rgba_17x9 -> hatali 131/153
+SONRA: rowLen=512   hepsi    -> hatali 0
+```
+
+`rowLen` hâlâ 512 (ImGui'nin hatası duruyor) ama artık bizi etkilemiyor.
+
+---
+
+## 16. Yan bulgular
+
+Aynı testte iki sorun daha çıktı:
+
+**1 ve 2 kanallı PNG'ler yüklenmiyordu.**
+`"Desteklenmeyen kanal sayisi: 2"` → texture geçersiz → sprite düz renk.
+Aseprite'ın **Grayscale** kipinden çıkan pixel-art tam olarak gri+alfa
+(2 kanal). Artık stb'ye `desired_channels = 4` verip RGBA'ya genişletiyoruz.
+
+1 kanallı (gri) görüntüler de `GL_R8` olarak yüklenince shader'da
+`(r, 0, 0, 1)` okunuyordu — gri bir sprite **kırmızı** görünürdü. Genişletme
+bunu da çözdü. 3 ve 4 kanala dokunulmuyor; orada genişletmek boşuna bellek.
+
+**Varsayılan filtre `Linear`'dı** → içe aktarılan her pixel-art bulanık.
+Artık `Nearest`. Bu bir 2D motor; varsayılan buna göre olmalı. Sahne dosyası
+sadece *yolu* sakladığı için filtre yeniden yüklemede varsayılana dönüyor —
+yani kalıcı, dosya başına ayar `.fxmeta` olmadan mümkün değil (Faz 21).
+
+`TextureLibrary` önbelleği yola göre anahtarlı, spec'e göre değil: aynı dosya
+farklı bir spec ile istenirse ilk yüklemeninki geçerli kalıyor. Sessiz
+bırakmak yerine artık **uyarı basıyor** — belirtisi çok dolaylı olurdu
+("sahneyi yeniden yükleyince zeminin döşemesi bozuldu").
+
 ## Onay
 - [x] Derlendi (uyarısız)
 - [x] Prefab kaydet/örnekle, kimlik yeniden eşleme
 - [x] Yol göreceleştirme
 - [x] GL hatası yok
-- [ ] Kullanıcı onayı
+- [x] İçe aktarılan PNG'ler doğru görünüyor (GL_UNPACK_* kendimiz kuruluyor)
+- [x] 1/2 kanallı PNG'ler RGBA'ya genişletiliyor
+- [x] Kullanıcı onayı
 
 ## Ertelenenler → teknik borç
 - **AssetManager (UUID tabanlı varlık kimliği)** — `.meta` dosyaları + varlık

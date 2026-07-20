@@ -74,18 +74,18 @@ namespace FXEd
         };
         m_Framebuffer = std::make_unique<FX::Framebuffer>(fbSpec);
 
-        FX::TextureSpec sharpSpec;
-        sharpSpec.MinFilter = FX::TextureFilter::Nearest;
-        sharpSpec.MagFilter = FX::TextureFilter::Nearest;
-        sharpSpec.WrapS     = FX::TextureWrap::Repeat;
-        sharpSpec.WrapT     = FX::TextureWrap::Repeat;
+        // Filtre artik varsayilan olarak Nearest; burada sadece SARMA
+        // farkli: zemin dosemesi TilingFactor ile tekrarlaniyor.
+        FX::TextureSpec tilingSpec;
+        tilingSpec.WrapS = FX::TextureWrap::Repeat;
+        tilingSpec.WrapT = FX::TextureWrap::Repeat;
 
         // ARTIK KUTUPHANE UZERINDEN yukluyoruz.
         // Onemli: sahne yuklerken serializer de ayni kutuphaneyi kullanacak.
         // Boylece "assets/textures/circle.png" yolu her iki yolda da AYNI
         // texture nesnesine cozulur - Inspector'daki texture secimi
         // isaretci karsilastirmasiyla calistigi icin bu sart.
-        m_Checkerboard = m_TextureLibrary.Load("assets/textures/checkerboard.png", sharpSpec);
+        m_Checkerboard = m_TextureLibrary.Load("assets/textures/checkerboard.png", tilingSpec);
         m_Circle       = m_TextureLibrary.Load("assets/textures/circle.png");
 
         if (!m_Checkerboard || !m_Circle)

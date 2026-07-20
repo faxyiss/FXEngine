@@ -273,6 +273,7 @@ MVP sırasında bilinçli olarak bıraktıklarımız:
 | Editör kamerası `EditorApp` içinde | Ayrı `EditorCamera` sınıfına taşınmalı (Faz 10'da zaten gerekecek). | `EditorApp.cpp` |
 | ~~Sahne yolu koda gömülü~~ | ✅ Faz 12'de dosya diyaloğuyla çözüldü. | — |
 | Hata durumunda yedek doku yok | Texture yüklenemezse `nullptr`; mor "eksik doku" dokusu daha iyi olurdu. | `TextureLibrary.cpp` |
+| Doku ayarı dosya başına saklanamıyor | Filtre/sarma yalnızca ilk yüklemede belirleniyor; sahne dosyası sadece *yolu* saklıyor. Kalıcı ayar `.fxmeta` gerektiriyor → Faz 21. Şimdilik farklı spec istenirse uyarı basılıyor. | `TextureLibrary.cpp` (Faz 12) |
 | **Varlık kimliği = dosya yolu** | Dosyayı taşımak/yeniden adlandırmak tüm referansları koparır. Çözüm: `.meta` dosyaları + GUID tabanlı `AssetManager`. | `SceneSerializer`, `TextureLibrary` (Faz 12) |
 | Dosya diyalogları sadece Win32 | Linux/macOS'ta boş gövde derleniyor; `nfd` veya portal gerekli. | `Editor/src/Platform/FileDialogs.cpp` |
 | Proje klasörü kavramı yok | Editör `<exe>/assets`'i kök alıyor; içe aktarılan varlıklar `build/` altında kalıyor. **Bilinçli:** Faz 21'e bırakıldı. | `ContentBrowserPanel.cpp` (Faz 12) |

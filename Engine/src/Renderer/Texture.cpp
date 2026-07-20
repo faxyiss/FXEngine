@@ -62,12 +62,31 @@ namespace FX
         // her yuklemeden once set ediyoruz.
         stbi_set_flip_vertically_on_load(spec.FlipVertically ? 1 : 0);
 
-        int width = 0, height = 0, channels = 0;
+        int width = 0, height = 0, fileChannels = 0;
 
-        // Son parametre 0 = "dosyada kac kanal varsa onu ver".
-        // 4 yazsaydik her seyi RGBA'ya zorlardik; bazen istenir ama
-        // gri tonlamali bir maskeyi 4 kanala sismek bellek israfidir.
-        stbi_uc* data = stbi_load(fullPath.c_str(), &width, &height, &channels, 0);
+        if (!stbi_info(fullPath.c_str(), &width, &height, &fileChannels))
+        {
+            FX_CORE_ERROR("Texture okunamadi: %s", fullPath.c_str());
+            FX_CORE_ERROR("  stb_image: %s", stbi_failure_reason());
+            return;
+        }
+
+        // 1 ve 2 kanalli goruntuleri RGBA'ya GENISLETIYORUZ.
+        //
+        // 2 kanal (gri + alfa) icin GL'de dogrudan karsilik yok; eskiden
+        // "desteklenmeyen kanal sayisi" deyip vazgeciyorduk - Aseprite'in
+        // Grayscale kipinden cikan pixel-art tam olarak bu bicimde ve
+        // sessizce yuklenmiyordu.
+        //
+        // 1 kanal (gri) ise GL_R8 olarak yuklenince shader'da (r,0,0,1)
+        // okunur, yani gri bir sprite KIRMIZI gorunur. Genisletmek hem
+        // dogru rengi verir hem tek kod yolu birakir.
+        //
+        // 3 ve 4 kanala dokunmuyoruz: orada genisletmek bosuna bellek.
+        const int desired = (fileChannels == 1 || fileChannels == 2) ? 4 : 0;
+
+        int loadedChannels = 0;
+        stbi_uc* data = stbi_load(fullPath.c_str(), &width, &height, &loadedChannels, desired);
 
         if (!data)
         {
@@ -75,6 +94,10 @@ namespace FX
             FX_CORE_ERROR("  stb_image: %s", stbi_failure_reason());
             return;
         }
+
+        // desired != 0 iken stb, loadedChannels'a DOSYADAKI sayiyi yazar,
+        // verdigi tampon ise desired kanallidir.
+        const int channels = (desired != 0) ? desired : loadedChannels;
 
         m_Width  = static_cast<std::uint32_t>(width);
         m_Height = static_cast<std::uint32_t>(height);
@@ -85,8 +108,9 @@ namespace FX
         // delete[] veya free() KULLANMA; stb ileride ayirici degistirebilir.
         stbi_image_free(data);
 
-        FX_CORE_INFO("Texture yuklendi: %s (%ux%u, %d kanal, id=%u)",
-                     path.c_str(), m_Width, m_Height, channels, m_RendererID);
+        FX_CORE_INFO("Texture yuklendi: %s (%ux%u, %d kanal%s, id=%u)",
+                     path.c_str(), m_Width, m_Height, fileChannels,
+                     (desired != 0) ? " -> RGBA" : "", m_RendererID);
     }
 
     Texture2D::Texture2D(std::uint32_t width, std::uint32_t height,
@@ -119,14 +143,27 @@ namespace FX
         glGenTextures(1, &m_RendererID);
         glBindTexture(GL_TEXTURE_2D, m_RendererID);
 
-        // --- Hizalama tuzagi -------------------------------------------------
-        // OpenGL varsayilan olarak her satirin 4 baytin kati oldugunu varsayar.
-        // 3 kanalli (RGB) ve genisligi 4'un kati OLMAYAN bir goruntude
-        // (orn. 254x254 RGB) bu varsayim tutmaz ve goruntu KAYARAK bozulur -
-        // egik cizgiler halinde. Cok kafa karistirici bir hatadir.
-        // 1 = "satirlari hizalama, bayt bayt oku".
-        if (dataFormat == GL_RGB || dataFormat == GL_RED)
-            glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        // --- Piksel okuma durumu ---------------------------------------------
+        // BUNLAR GLOBAL DURUM. glTexImage2D, verdigimiz isaretciyi bu
+        // ayarlara gore YORUMLAR: satir adimi, hizalama, atlanacak piksel.
+        // Ortamda ne kaldiysa ona guvenemeyiz - baska bir kutuphane
+        // (bizim durumumuzda ImGui'nin font atlasi) bunlari degistirip
+        // geri koymayi unutabilir, unutuyor da.
+        //
+        // Belirtisi cok net ve cok kafa karistirici: goruntu KAYARAK,
+        // egik seritler halinde bozulur; "alakasiz bir sey" gorunur.
+        //
+        // Bu yuzden her yuklemeden once dordunu de KENDIMIZ kuruyoruz:
+        //   ROW_LENGTH  0 = "satir genisligi neyse o" (0 disi kalirsa felaket)
+        //   ALIGNMENT   1 = "satirlari hizalama, bayt bayt oku"
+        //   SKIP_*      0 = bastan basla
+        //
+        // ALIGNMENT ozellikle 3 kanalli ve genisligi 4'un kati olmayan
+        // goruntulerde sarttir (orn. 13x7 RGB -> satir 39 bayt).
+        glPixelStorei(GL_UNPACK_ROW_LENGTH,  0);
+        glPixelStorei(GL_UNPACK_ALIGNMENT,   1);
+        glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
+        glPixelStorei(GL_UNPACK_SKIP_ROWS,   0);
 
         // Veriyi GPU'ya yukle.
         glTexImage2D(GL_TEXTURE_2D, 0, static_cast<GLint>(internalFormat),

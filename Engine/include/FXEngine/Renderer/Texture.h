@@ -37,8 +37,18 @@ namespace FX
 
     struct TextureSpec
     {
-        TextureFilter MinFilter = TextureFilter::Linear;
-        TextureFilter MagFilter = TextureFilter::Linear;
+        // VARSAYILAN NEAREST.
+        //
+        // Bu bir 2D motor ve varliklarin cogu pixel-art olacak. Linear
+        // varsayilan, ice aktarilan her pixel-art dokuyu bulaniklastirir
+        // ve kullanicinin bunu duzeltmesi icin bir yol yok (sahne dosyasi
+        // sadece YOLU sakliyor, filtreyi degil - yeniden yuklendiginde
+        // varsayilana doner).
+        //
+        // Yumusak filtre isteyen ozel durumlar spec'i acikca verebilir.
+        // Kalici, dosya basina ayar icin .fxmeta gerekiyor -> Faz 21.
+        TextureFilter MinFilter = TextureFilter::Nearest;
+        TextureFilter MagFilter = TextureFilter::Nearest;
         TextureWrap   WrapS     = TextureWrap::ClampToEdge;
         TextureWrap   WrapT     = TextureWrap::ClampToEdge;
 
@@ -51,6 +61,14 @@ namespace FX
         // nesnelerde titremeyi (aliasing) onler. 2D'de her zaman gerekmez
         // ama zoom-out yapilan bir editorde faydali.
         bool GenerateMipmaps = true;
+
+        bool operator==(const TextureSpec& o) const
+        {
+            return MinFilter == o.MinFilter && MagFilter == o.MagFilter &&
+                   WrapS == o.WrapS && WrapT == o.WrapT &&
+                   FlipVertically == o.FlipVertically &&
+                   GenerateMipmaps == o.GenerateMipmaps;
+        }
     };
 
     class Texture2D

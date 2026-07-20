@@ -12,7 +12,22 @@ namespace FX
         // Onbellekte var mi?
         const auto it = m_Textures.find(path);
         if (it != m_Textures.end())
+        {
+            // DIKKAT: onbellek YOLA gore anahtarli, spec'e gore degil.
+            // Ayni dosya farkli bir spec ile ikinci kez istenirse ILK
+            // yuklemenin spec'i gecerli kalir - sessizce.
+            //
+            // Sessiz birakmiyoruz cunku belirtisi cok dolayli: "sahneyi
+            // yeniden yukleyince zeminin dosemesi bozuldu" gibi.
+            //
+            // Dogru cozum dosya basina kalici doku ayari (.fxmeta) -> Faz 21.
+            // O zamana kadar bir dosyanin spec'i, ilk yuklendigi yerdedir.
+            if (m_Specs.count(path) && !(m_Specs[path] == spec))
+                FX_CORE_WARN("TextureLibrary: '%s' farkli bir spec ile istendi; "
+                             "ilk yuklemenin ayarlari kullanilacak.", path.c_str());
+
             return it->second;
+        }
 
         auto texture = std::make_shared<Texture2D>(path, spec);
 
@@ -28,6 +43,7 @@ namespace FX
         }
 
         m_Textures[path] = texture;
+        m_Specs[path]    = spec;
         return texture;
     }
 
@@ -53,5 +69,6 @@ namespace FX
     void TextureLibrary::Clear()
     {
         m_Textures.clear();
+        m_Specs.clear();
     }
 }

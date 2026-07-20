@@ -50,5 +50,9 @@ namespace FX
         // Kutuphane temizlense bile hala kullanilan bir texture yasamaya
         // devam eder - sahiplik paylasimi tam da bu durum icin var.
         std::unordered_map<std::string, std::shared_ptr<Texture2D>> m_Textures;
+
+        // Hangi dosya hangi ayarlarla yuklendi? Sadece "farkli spec ile
+        // tekrar istendi" uyarisini verebilmek icin tutuluyor.
+        std::unordered_map<std::string, TextureSpec> m_Specs;
     };
 }

@@ -15,7 +15,7 @@ Faz sırası keyfi değil — bazıları diğerlerinin **önkoşulu**:
 Faz 8 (UUID)  ──┬──> Faz 9  (parent/child)  ──> Faz 12 (prefab)
                 └──> Faz 11 (seçim/gizmo)
 
-Faz 10 (play modu) ──> Faz 16 (script)      — script'in "çalışıyor" hali olmalı
+Faz 10 (play modu) ✅ ──> Faz 16 (script)   — script'in "çalışıyor" hali olmalı
 Faz 13 (input)     ──> Faz 16 (script)      — script girdi okuyacak
 Faz 14 (subtexture)──> Faz 15 (animasyon)   — animasyon kareleri subtexture
 ```
@@ -62,20 +62,25 @@ Ayrıntılar: [Faz-09-Notlar.md](Faz-09-Notlar.md)
 
 ---
 
-## Faz 10 — Play / Stop modu
+## Faz 10 — Play / Stop modu ✅ TAMAM
 
-Şu an editör ve oyun aynı şey. Gerçek bir editörde ▶ tuşuna basınca
-oyun **kopya bir sahnede** çalışır, ⏹ deyince düzenleme hali geri gelir.
+- [x] `Scene::Copy()` — derin kopya, **UUID'ler korunur** (prefab'ın tersi),
+      tek geçiş yeterli
+- [x] `ComponentGroup`/`AllComponents` — kopyalanacak component'ler tek yerde
+- [x] `SceneState { Edit, Play }` — `Simulate` ertelendi, aşağıya bak
+- [x] ▶ / ⏹ / ⏸ araç çubuğu (viewport toolbar'ında)
+- [x] Play'de runtime kopya güncellenir; Stop'ta kopya atılır
+- [x] `CameraComponent` + `Scene::GetPrimaryCameraEntity()` + serileştirme
+- [x] Editör kamerası `EditorCamera` sınıfına taşındı
+- [x] Edit modu artık **durağan** — sahne sadece Play'de çalışıyor
 
-- [ ] `Scene::Copy()` — registry'nin derin kopyası
-- [ ] `SceneState { Edit, Play, Simulate }`
-- [ ] ▶ / ⏹ / ⏸ araç çubuğu
-- [ ] Play'de: runtime kopya güncellenir; Stop'ta orijinale dönülür
-- [ ] `CameraComponent` + `Scene::GetPrimaryCamera()`
-      — Play modunda **sahnenin** kamerası, Edit'te editör kamerası
-- [ ] Editör kamerası ayrı bir sınıfa (`EditorCamera`) taşınsın
+> `Simulate` modu ertelendi: fizik (Faz 17) ve script (Faz 16) olmadan
+> Play'den farkı olmazdı. Kullanılmayan bir durum eklemek, var olmayan
+> bir özellik vaat etmek olurdu.
 
-**Öğrenilecek:** Neden oyunu düzenlenen sahnede çalıştırmak felakettir
+Ayrıntılar: [Faz-10-Notlar.md](Faz-10-Notlar.md)
+
+**Öğrenilen:** Neden oyunu düzenlenen sahnede çalıştırmak felakettir
 (Unity'de "play modunda yaptığın değişiklikler kayboldu" travması).
 
 ---
@@ -281,7 +286,7 @@ MVP sırasında bilinçli olarak bıraktıklarımız:
 | `Renderer2D` global durum | `s_Data` dosya kapsamlı statik. İkinci bir renderer örneği imkânsız, test etmek zor. | `Renderer2D.cpp` |
 | Batch bölme yolu hacky | Slotlar dolunca `EndScene()` çağırıp elle durum düzeltiliyor. Ayrı bir `FlushAndReset()` olmalı. | `Renderer2D.cpp` |
 | `Shader::FromFiles` ham `new` | `unique_ptr` döndürmeli. | `Shader.cpp` |
-| Editör kamerası `EditorApp` içinde | Ayrı `EditorCamera` sınıfına taşınmalı (Faz 10'da zaten gerekecek). | `EditorApp.cpp` |
+| ~~Editör kamerası `EditorApp` içinde~~ | ✅ Faz 10'da `EditorCamera` sınıfına taşındı. | — |
 | ~~Sahne yolu koda gömülü~~ | ✅ Faz 12'de dosya diyaloğuyla çözüldü. | — |
 | Hata durumunda yedek doku yok | Texture yüklenemezse `nullptr`; mor "eksik doku" dokusu daha iyi olurdu. | `TextureLibrary.cpp` |
 | Doku ayarı dosya başına saklanamıyor | Filtre/sarma yalnızca ilk yüklemede belirleniyor; sahne dosyası sadece *yolu* saklıyor. Kalıcı ayar `.fxmeta` gerektiriyor → Faz 21. Şimdilik farklı spec istenirse uyarı basılıyor. | `TextureLibrary.cpp` (Faz 12) |
@@ -292,6 +297,7 @@ MVP sırasında bilinçli olarak bıraktıklarımız:
 | Prefab bağlantısı yok | Örnek kaynağından bağımsız; kaynak değişince örnekler güncellenmiyor (override sistemi yok). | `PrefabSerializer.cpp` (Faz 12) |
 | `GetRegistry()` çok açık | Registry'ye doğrudan `create`/`destroy` çağırmak UUID haritasını bozar. Daha dar bir erişim gerekebilir. | `Scene.h` (Faz 8) |
 | `FollowSystem` Scene'e bağımlı | Diğer sistemler sadece registry alıyor, bu Scene alıyor (UUID haritası için). Test etmesi daha zor. | `Systems.cpp` (Faz 8) |
+| Seçim `SceneHierarchyPanel` içinde | Viewport, gizmo, inspector, prefab hepsi okuyor; panel sahibi değil tüketicisi olmalı. Ayrı bir `SelectionContext` gerekiyor — çoklu seçimin ön adımı. | `SceneHierarchyPanel.h` (Faz 10) |
 | Test yok | Hiç birim testi yok. Serializer ve matematik en çok fayda sağlayacak yerler. | — |
 | Sadece Windows'ta denendi | Kod taşınabilir yazıldı ama Linux'ta hiç derlenmedi. | — |
 

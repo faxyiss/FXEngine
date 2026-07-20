@@ -101,6 +101,15 @@ namespace FX::Detail
             };
         }
 
+        if (entity.HasComponent<CameraComponent>())
+        {
+            const auto& cc = entity.GetComponent<CameraComponent>();
+            e["Camera"] = {
+                { "OrthographicSize", cc.OrthographicSize },
+                { "Primary",          cc.Primary }
+            };
+        }
+
         return e;
     }
 
@@ -153,6 +162,14 @@ namespace FX::Detail
             fc.Target       = UUID(f.value("Target", std::uint64_t{ 0 }));
             fc.Speed        = f.value("Speed", 2.0f);
             fc.StopDistance = f.value("StopDistance", 1.0f);
+        }
+
+        if (j.contains("Camera"))
+        {
+            const auto& c = j["Camera"];
+            auto& cc = entity.AddOrReplaceComponent<CameraComponent>();
+            cc.OrthographicSize = c.value("OrthographicSize", 8.0f);
+            cc.Primary          = c.value("Primary", true);
         }
     }
 }

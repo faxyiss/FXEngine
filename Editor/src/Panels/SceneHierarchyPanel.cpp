@@ -419,6 +419,42 @@ namespace FXEd
                 entity.RemoveComponent<FX::VelocityComponent>();
         }
 
+        // --- Camera ---------------------------------------------------------------
+        if (entity.HasComponent<FX::CameraComponent>())
+        {
+            bool keep = true;
+            if (ImGui::CollapsingHeader("Camera", &keep, ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                auto& cc = entity.GetComponent<FX::CameraComponent>();
+
+                DrawFloatControl("Boyut", cc.OrthographicSize, 0.1f);
+                if (cc.OrthographicSize < 0.1f)
+                    cc.OrthographicSize = 0.1f;
+
+                ImGui::Text("Birincil");
+                ImGui::SameLine(110.0f);
+                if (ImGui::Checkbox("##Primary", &cc.Primary) && cc.Primary)
+                {
+                    // Tek birincil kamera olmali. Isaretlenen kamerayi
+                    // birincil yaparken digerlerinin isaretini kaldiriyoruz;
+                    // aksi halde "hangisi kazanir" sorusunun cevabi
+                    // registry'deki siraya kalirdi - kullanicinin
+                    // goremedigi bir sey.
+                    auto view = m_Scene->GetRegistry().view<FX::CameraComponent>();
+                    for (auto other : view)
+                    {
+                        if (other != entity.GetHandle())
+                            view.get<FX::CameraComponent>(other).Primary = false;
+                    }
+                }
+
+                ImGui::TextDisabled("Konum ve donme Transform'dan gelir.");
+            }
+
+            if (!keep)
+                entity.RemoveComponent<FX::CameraComponent>();
+        }
+
         // --- Follow ---------------------------------------------------------------
         if (entity.HasComponent<FX::FollowComponent>())
         {
@@ -534,6 +570,15 @@ namespace FXEd
                 }
             }
 
+            if (!entity.HasComponent<FX::CameraComponent>())
+            {
+                if (ImGui::MenuItem("Camera"))
+                {
+                    entity.AddComponent<FX::CameraComponent>();
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+
             if (!entity.HasComponent<FX::FollowComponent>())
             {
                 if (ImGui::MenuItem("Follow"))
@@ -553,6 +598,7 @@ namespace FXEd
             // Hicbir sey eklenemiyorsa kullaniciya sebebini soyle.
             if (entity.HasComponent<FX::SpriteRendererComponent>() &&
                 entity.HasComponent<FX::VelocityComponent>() &&
+                entity.HasComponent<FX::CameraComponent>() &&
                 entity.HasComponent<FX::FollowComponent>())
             {
                 ImGui::TextDisabled("Eklenebilecek component yok");

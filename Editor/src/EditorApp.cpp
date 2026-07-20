@@ -1,4 +1,4 @@
-#include "EditorApp.h"
+﻿#include "EditorApp.h"
 
 #include <FXEngine/Core/Log.h>
 #include <FXEngine/Core/FileSystem.h>

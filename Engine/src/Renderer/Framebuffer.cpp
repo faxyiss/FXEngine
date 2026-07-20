@@ -1,4 +1,4 @@
-#include "FXEngine/Renderer/Framebuffer.h"
+﻿#include "FXEngine/Renderer/Framebuffer.h"
 #include "FXEngine/Core/Log.h"
 
 #include <glad/glad.h>
@@ -52,7 +52,11 @@ namespace FX
         glDeleteFramebuffers(1, &m_RendererID);
         glDeleteTextures(static_cast<GLsizei>(m_ColorAttachments.size()),
                          m_ColorAttachments.data());
-        glDeleteTextures(1, &m_DepthAttachment);
+
+        // Derinlik eki RENDERBUFFER'dir, texture degil. Renderbuffer ve
+        // texture ayri isim uzaylaridir: glDeleteTextures ile silmek,
+        // ayni numaraya sahip BASKA bir texture'i silmek demektir.
+        glDeleteRenderbuffers(1, &m_DepthAttachment);
     }
 
     void Framebuffer::Invalidate()
@@ -62,7 +66,7 @@ namespace FX
             glDeleteFramebuffers(1, &m_RendererID);
             glDeleteTextures(static_cast<GLsizei>(m_ColorAttachments.size()),
                              m_ColorAttachments.data());
-            glDeleteTextures(1, &m_DepthAttachment);
+            glDeleteRenderbuffers(1, &m_DepthAttachment);
 
             m_ColorAttachments.clear();
             m_DepthAttachment = 0;

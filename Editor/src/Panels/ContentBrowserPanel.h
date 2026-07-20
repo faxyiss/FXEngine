@@ -15,6 +15,8 @@
 
 #include <FXEngine/Renderer/TextureLibrary.h>
 
+#include <imgui.h>
+
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -52,9 +54,31 @@ namespace FXEd
         void Refresh() { m_NeedsRefresh = true; }
 
     private:
+        // Izgara: buyuk kucuk resimler, gorsel varliklar icin.
+        // Liste: tek sutun, ad + tur + boyut. Cok dosya varken ve
+        //        adlar uzunken izgaradan cok daha okunur.
+        enum class ViewMode { Grid, List };
+
         void DrawToolbar();
-        void DrawEntry(const std::filesystem::directory_entry& entry);
         void DrawModals();
+
+        void DrawEntry(const std::filesystem::directory_entry& entry);
+        void DrawEntryGrid(const std::filesystem::directory_entry& entry);
+        void DrawEntryList(const std::filesystem::directory_entry& entry);
+
+        // Iki gorunumun PAYLASTIGI davranis: surukleme kaynagi, birakma
+        // hedefi, sag tik menusu, klasore girme.
+        //
+        // Ayri ayri yazsaydik bir duzeltmeyi iki yere uygulamak
+        // gerekirdi ve biri er gec unutulurdu - Faz 12'de serilestirme
+        // icin ogrendigimiz dersin aynisi.
+        void DrawEntryInteractions(const std::filesystem::path& path,
+                                   const std::string& filename,
+                                   bool isDirectory, bool clicked);
+
+        // Ikonu verilen dikdortgene cizer (izgarada buyuk, listede kucuk).
+        void DrawEntryIcon(const std::filesystem::path& path, bool isDirectory,
+                           const ImVec2& min, const ImVec2& max);
 
         void RefreshIfNeeded();
 
@@ -99,6 +123,8 @@ namespace FXEd
 
         char m_NameBuffer[128]{};
         char m_SearchBuffer[64]{};
+
+        ViewMode m_ViewMode = ViewMode::Grid;
 
         float m_ThumbnailSize = 84.0f;
         float m_Padding       = 16.0f;

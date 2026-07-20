@@ -259,18 +259,46 @@ namespace FXEd
 
         ImGui::BeginChild("IcerikIzgara", ImVec2(0.0f, 0.0f), false);
 
-        ImGui::Columns(columns, nullptr, false);
-
         const std::string search = ToLower(m_SearchBuffer);
         auto matches = [&search](const std::filesystem::directory_entry& e) {
             return search.empty() ||
                    ToLower(e.path().filename().string()).find(search) != std::string::npos;
         };
 
-        for (const auto& e : m_Directories) if (matches(e)) DrawEntry(e);
-        for (const auto& e : m_Files)       if (matches(e)) DrawEntry(e);
+        // KLASORLER HER ZAMAN ONCE. Alfabetik siralamaya karistirsaydik
+        // klasorler dosyalarin arasina dagilirdi; dosya yoneticilerinin
+        // tamaminin klasorleri ayri gruplamasinin sebebi bu.
+        if (m_ViewMode == ViewMode::Grid)
+        {
+            ImGui::Columns(columns, nullptr, false);
 
-        ImGui::Columns(1);
+            for (const auto& e : m_Directories) if (matches(e)) DrawEntry(e);
+            for (const auto& e : m_Files)       if (matches(e)) DrawEntry(e);
+
+            ImGui::Columns(1);
+        }
+        else if (ImGui::BeginTable("IcerikListe", 3,
+                                   ImGuiTableFlags_RowBg |
+                                   ImGuiTableFlags_BordersInnerV |
+                                   ImGuiTableFlags_Resizable |
+                                   ImGuiTableFlags_ScrollY))
+        {
+            // Ad esneyip kalan alani aliyor; tur ve boyut sabit.
+            // Tersi olsaydi uzun bir dosya adi kesilir, boyut sutunu
+            // gereksiz yere genisleyerek bos dururdu.
+            ImGui::TableSetupColumn("Ad",    ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableSetupColumn("Tur",   ImGuiTableColumnFlags_WidthFixed, 70.0f);
+            ImGui::TableSetupColumn("Boyut", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+
+            // Baslik satiri kaydirirken sabit kalsin.
+            ImGui::TableSetupScrollFreeze(0, 1);
+            ImGui::TableHeadersRow();
+
+            for (const auto& e : m_Directories) if (matches(e)) DrawEntry(e);
+            for (const auto& e : m_Files)       if (matches(e)) DrawEntry(e);
+
+            ImGui::EndTable();
+        }
 
         // Bos alana sag tik: klasor islemleri.
         if (ImGui::BeginPopupContextWindow("IcerikBosAlan",
@@ -384,12 +412,153 @@ namespace FXEd
         ImGui::SetNextItemWidth(160.0f);
         ImGui::InputTextWithHint("##Ara", "ara...", m_SearchBuffer, sizeof(m_SearchBuffer));
 
+        // --- Gorunum secici -------------------------------------------------
         ImGui::SameLine();
-        ImGui::SetNextItemWidth(120.0f);
-        ImGui::SliderFloat("##Boyut", &m_ThumbnailSize, 48.0f, 160.0f, "boyut %.0f");
+        ImGui::TextDisabled("|");
+
+        const bool isGrid = (m_ViewMode == ViewMode::Grid);
+
+        ImGui::SameLine();
+        if (isGrid)
+            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+        if (ImGui::Button("Izgara"))
+            m_ViewMode = ViewMode::Grid;
+        if (isGrid)
+            ImGui::PopStyleColor();
+        ImGui::SetItemTooltip("Buyuk kucuk resimler");
+
+        ImGui::SameLine();
+        if (!isGrid)
+            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+        if (ImGui::Button("Liste"))
+            m_ViewMode = ViewMode::List;
+        if (!isGrid)
+            ImGui::PopStyleColor();
+        ImGui::SetItemTooltip("Tek sutun: ad, tur, boyut");
+
+        // Kucuk resim boyutu sadece izgarada anlamli; listede satir
+        // yuksekligi metne gore sabit.
+        if (isGrid)
+        {
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(120.0f);
+            ImGui::SliderFloat("##Boyut", &m_ThumbnailSize, 48.0f, 160.0f, "boyut %.0f");
+        }
     }
 
     void ContentBrowserPanel::DrawEntry(const std::filesystem::directory_entry& entry)
+    {
+        if (m_ViewMode == ViewMode::Grid) DrawEntryGrid(entry);
+        else                              DrawEntryList(entry);
+    }
+
+    void ContentBrowserPanel::DrawEntryIcon(const std::filesystem::path& path,
+                                            bool isDirectory,
+                                            const ImVec2& min, const ImVec2& max)
+    {
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+        if (isDirectory)
+        {
+            DrawFolderIcon(drawList, min, max);
+            return;
+        }
+
+        if (IsImage(path) && m_Library)
+        {
+            // Kucuk resim = dosyanin KENDISI. Ayri bir ikon setine gerek yok
+            // ve tarayicida gordugun her resim zaten onbellege giriyor.
+            const std::string relative = FX::FileSystem::MakeRelativeToProject(path.string());
+            auto texture = m_Library->Load(relative);
+
+            if (texture)
+            {
+                // Resmi kendi en-boy oraninda, hucreye ORTALAYARAK ciz.
+                // Hucreyi doldursaydik dikdortgen resimler ezik gorunurdu.
+                const float cell   = std::min(max.x - min.x, max.y - min.y);
+                const float aspect = static_cast<float>(texture->GetWidth()) /
+                                     static_cast<float>(texture->GetHeight());
+                const float box    = cell * 0.84f;
+
+                const float drawW = (aspect >= 1.0f) ? box : box * aspect;
+                const float drawH = (aspect >= 1.0f) ? box / aspect : box;
+
+                const ImVec2 center{ (min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f };
+
+                drawList->AddImage(static_cast<ImTextureID>(texture->GetRendererID()),
+                                   ImVec2(center.x - drawW * 0.5f, center.y - drawH * 0.5f),
+                                   ImVec2(center.x + drawW * 0.5f, center.y + drawH * 0.5f),
+                                   ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
+                return;
+            }
+
+            DrawFileIcon(drawList, min, max, IM_COL32(180, 60, 60, 255), "?");
+            return;
+        }
+
+        std::string ext = path.extension().string();
+        if (!ext.empty())
+            ext.erase(ext.begin());   // bastaki noktayi at
+
+        DrawFileIcon(drawList, min, max, AccentColor(path), ToLower(ext));
+    }
+
+    void ContentBrowserPanel::DrawEntryInteractions(const std::filesystem::path& path,
+                                                    const std::string& filename,
+                                                    bool isDirectory, bool clicked)
+    {
+        // Surukleme kaynagi: KLASORLER DAHIL her sey.
+        //
+        // Klasorler de suruklenebiliyor cunku tasima ozelligi onlari da
+        // kapsiyor. Viewport'a birakilan bir klasor zaten hicbir sey
+        // yapmaz - HandleContentDrop uzantiya bakiyor ve klasorun
+        // uzantisi yok.
+        if (ImGui::BeginDragDropSource())
+        {
+            const std::string relative = FX::FileSystem::MakeRelativeToProject(path.string());
+
+            // Sonlandirici DAHIL gonderiyoruz: alan tarafi payload'i
+            // dogrudan const char* olarak okuyor, olmazsa tasar.
+            ImGui::SetDragDropPayload(kContentPayload, relative.c_str(), relative.size() + 1);
+            ImGui::Text("%s%s", isDirectory ? "[klasor] " : "", filename.c_str());
+            ImGui::EndDragDropSource();
+        }
+
+        // Birakma hedefi: sadece klasorler. Bir dosyanin uzerine birakmak
+        // anlamsiz - "icine" koyacak bir yeri yok.
+        if (isDirectory)
+            AcceptMoveTarget(path);
+
+        if (ImGui::BeginPopupContextItem("OgeMenu"))
+        {
+            if (ImGui::MenuItem("Yeniden Adlandir..."))
+            {
+                std::strncpy(m_NameBuffer, filename.c_str(), sizeof(m_NameBuffer) - 1);
+                m_NameBuffer[sizeof(m_NameBuffer) - 1] = 0;
+                m_RenameTarget = path;
+            }
+            if (ImGui::MenuItem("Sil..."))
+                m_DeleteTarget = path;
+            ImGui::Separator();
+            if (ImGui::MenuItem("Explorer'da Goster"))
+                FileDialogs::RevealInFileManager(path.string());
+            if (ImGui::MenuItem("Yolu Kopyala"))
+                ImGui::SetClipboardText(
+                    FX::FileSystem::MakeRelativeToProject(path.string()).c_str());
+            ImGui::EndPopup();
+        }
+
+        // Klasore girme dongunun SONUNDA degil burada guvenli: m_Current
+        // degisse bile bu karede listeyi bir daha gezmiyoruz, Refresh
+        // bayragi bir sonraki karede okunuyor.
+        if (clicked && isDirectory)
+        {
+            m_Current = path;
+            Refresh();
+        }
+    }
+
+    void ContentBrowserPanel::DrawEntryGrid(const std::filesystem::directory_entry& entry)
     {
         const auto& path = entry.path();
         const std::string filename = path.filename().string();
@@ -410,112 +579,89 @@ namespace FXEd
         const bool clicked = ImGui::Button("##oge", size);
         ImGui::PopStyleColor(3);
 
-        const ImVec2 itemMin = ImGui::GetItemRectMin();
-        const ImVec2 itemMax = ImGui::GetItemRectMax();
-        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        DrawEntryIcon(path, isDirectory, ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
 
-        if (isDirectory)
-        {
-            DrawFolderIcon(drawList, itemMin, itemMax);
-        }
-        else if (IsImage(path) && m_Library)
-        {
-            // Kucuk resim = dosyanin KENDISI. Ayri bir ikon setine gerek yok
-            // ve tarayicida gordugun her resim zaten onbellege giriyor.
-            const std::string relative = FX::FileSystem::MakeRelativeToProject(path.string());
-            auto texture = m_Library->Load(relative);
-
-            if (texture)
-            {
-                // Resmi kendi en-boy oraninda, hucreye ORTALAYARAK ciz.
-                // Hucreyi doldursaydik dikdortgen resimler ezik gorunurdu.
-                const float aspect = static_cast<float>(texture->GetWidth()) /
-                                     static_cast<float>(texture->GetHeight());
-                const float inset  = m_ThumbnailSize * 0.08f;
-                const float box    = m_ThumbnailSize - inset * 2.0f;
-
-                const float drawW = (aspect >= 1.0f) ? box : box * aspect;
-                const float drawH = (aspect >= 1.0f) ? box / aspect : box;
-
-                const ImVec2 center{ (itemMin.x + itemMax.x) * 0.5f,
-                                     (itemMin.y + itemMax.y) * 0.5f };
-
-                drawList->AddImage(static_cast<ImTextureID>(texture->GetRendererID()),
-                                   ImVec2(center.x - drawW * 0.5f, center.y - drawH * 0.5f),
-                                   ImVec2(center.x + drawW * 0.5f, center.y + drawH * 0.5f),
-                                   ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
-            }
-            else
-            {
-                DrawFileIcon(drawList, itemMin, itemMax, IM_COL32(180, 60, 60, 255), "?");
-            }
-        }
-        else
-        {
-            std::string ext = path.extension().string();
-            if (!ext.empty())
-                ext.erase(ext.begin());   // bastaki noktayi at
-
-            DrawFileIcon(drawList, itemMin, itemMax, AccentColor(path), ToLower(ext));
-        }
-
-        // Surukleme kaynagi: KLASORLER DAHIL her sey.
-        //
-        // Klasorler de suruklenebiliyor cunku tasima ozelligi (asagida)
-        // onlari da kapsiyor. Viewport'a birakilan bir klasor zaten
-        // hicbir sey yapmaz - HandleContentDrop uzantiya bakiyor ve
-        // klasorun uzantisi yok.
-        if (ImGui::BeginDragDropSource())
-        {
-            const std::string relative = FX::FileSystem::MakeRelativeToProject(path.string());
-
-            // '\0' DAHIL gonderiyoruz: alan tarafi payload'i dogrudan
-            // const char* olarak okuyor, sonlandirici olmazsa tasar.
-            ImGui::SetDragDropPayload(kContentPayload, relative.c_str(), relative.size() + 1);
-            ImGui::Text("%s%s", isDirectory ? "[klasor] " : "", filename.c_str());
-            ImGui::EndDragDropSource();
-        }
-
-        // Birakma hedefi: sadece klasorler. Bir dosyanin uzerine birakmak
-        // anlamsiz - "icine" koyacak bir yeri yok.
-        if (isDirectory)
-            AcceptMoveTarget(path);
-
-        if (ImGui::BeginPopupContextItem("OgeMenu"))
-        {
-            if (ImGui::MenuItem("Yeniden Adlandir..."))
-            {
-                std::strncpy(m_NameBuffer, filename.c_str(), sizeof(m_NameBuffer) - 1);
-                m_NameBuffer[sizeof(m_NameBuffer) - 1] = '\0';
-                m_RenameTarget = path;
-            }
-            if (ImGui::MenuItem("Sil..."))
-                m_DeleteTarget = path;
-            ImGui::Separator();
-            if (ImGui::MenuItem("Explorer'da Goster"))
-                FileDialogs::RevealInFileManager(path.string());
-            if (ImGui::MenuItem("Yolu Kopyala"))
-                ImGui::SetClipboardText(
-                    FX::FileSystem::MakeRelativeToProject(path.string()).c_str());
-            ImGui::EndPopup();
-        }
+        DrawEntryInteractions(path, filename, isDirectory, clicked);
 
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", filename.c_str());
-
-        // Klasore girme dongunun SONUNDA degil burada guvenli: m_Current
-        // degisse bile bu karede listeyi bir daha gezmiyoruz, Refresh
-        // bayragi bir sonraki karede okunuyor.
-        if (clicked && isDirectory)
-        {
-            m_Current = path;
-            Refresh();
-        }
 
         // Isim, hucre genisligini asmayacak sekilde kisaltiliyor.
         ImGui::TextUnformatted(ShortenName(filename, m_ThumbnailSize).c_str());
 
         ImGui::NextColumn();
+        ImGui::PopID();
+    }
+
+    void ContentBrowserPanel::DrawEntryList(const std::filesystem::directory_entry& entry)
+    {
+        const auto& path = entry.path();
+        const std::string filename = path.filename().string();
+        const bool isDirectory = entry.is_directory();
+
+        ImGui::PushID(path.string().c_str());
+        ImGui::TableNextRow();
+
+        // --- Ad sutunu ------------------------------------------------------
+        ImGui::TableNextColumn();
+
+        const float rowHeight = ImGui::GetTextLineHeight() + 6.0f;
+
+        // Selectable TUM SATIRI kapliyor: tiklama alani genis olsun,
+        // kullanici ince bir metin seridini avlamak zorunda kalmasin.
+        const bool clicked = ImGui::Selectable("##satir", false,
+                                               ImGuiSelectableFlags_SpanAllColumns,
+                                               ImVec2(0.0f, rowHeight));
+
+        const ImVec2 rowMin = ImGui::GetItemRectMin();
+
+        // Ikon satirin solunda, kare bir alanda.
+        const ImVec2 iconMin{ rowMin.x + 2.0f, rowMin.y + 1.0f };
+        const ImVec2 iconMax{ iconMin.x + rowHeight - 2.0f, rowMin.y + rowHeight - 1.0f };
+        DrawEntryIcon(path, isDirectory, iconMin, iconMax);
+
+        // Ad, ikonun sagina. Listede KISALTMIYORUZ: liste gorunumunun
+        // varlik sebebi zaten uzun adlari tam gorebilmek.
+        ImGui::GetWindowDrawList()->AddText(
+            ImVec2(iconMax.x + 8.0f, rowMin.y + 3.0f),
+            ImGui::GetColorU32(ImGuiCol_Text), filename.c_str());
+
+        DrawEntryInteractions(path, filename, isDirectory, clicked);
+
+        // --- Tur sutunu -----------------------------------------------------
+        ImGui::TableNextColumn();
+        if (isDirectory)
+        {
+            ImGui::TextDisabled("klasor");
+        }
+        else
+        {
+            std::string ext = path.extension().string();
+            if (!ext.empty())
+                ext.erase(ext.begin());
+            ImGui::TextUnformatted(ext.empty() ? "-" : ToLower(ext).c_str());
+        }
+
+        // --- Boyut sutunu ---------------------------------------------------
+        ImGui::TableNextColumn();
+        if (isDirectory)
+        {
+            ImGui::TextDisabled("-");
+        }
+        else
+        {
+            std::error_code ec;
+            const auto bytes = std::filesystem::file_size(path, ec);
+            if (ec)
+                ImGui::TextDisabled("?");
+            else if (bytes < 1024)
+                ImGui::Text("%llu B", static_cast<unsigned long long>(bytes));
+            else if (bytes < 1024 * 1024)
+                ImGui::Text("%.1f KB", static_cast<double>(bytes) / 1024.0);
+            else
+                ImGui::Text("%.1f MB", static_cast<double>(bytes) / (1024.0 * 1024.0));
+        }
+
         ImGui::PopID();
     }
 

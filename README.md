@@ -58,7 +58,7 @@ fiziksel olarak zorlanır.
 | 2 | Shader + VBO/VAO/EBO + tek renkli quad | ✅ |
 | 3 | stb_image texture + orthographic 2D kamera | ✅ |
 | 4 | Batch renderer (dinamik vertex buffer, texture slot'ları) | ✅ |
-| 5 | EnTT entegrasyonu (Transform, SpriteRenderer, Tag + system'ler) | ⬜ |
+| 5 | EnTT entegrasyonu (Transform, SpriteRenderer, Tag + system'ler) | ✅ |
 | 6 | ImGui docking + Viewport / Hierarchy / Inspector panelleri | ⬜ |
 | 7 | JSON ile sahne kaydet/yükle → MVP | ⬜ |
 
@@ -86,21 +86,26 @@ cmake --build build --config Debug
 > Sonraki configure'lar saniyeler alır. Bağımlılıklar `_deps/` altında
 > cache'lenir, `build/` silinse bile tekrar indirilmez.
 
-### Kontroller (Faz 4)
+### Kontroller (Faz 5)
 
 | Tuş | İş |
 |---|---|
-| `W` `A` `S` `D` | Kamerayı hareket ettir |
+| `W` `A` `S` `D` | Oyuncuyu hareket ettir (`C` ile kameraya geçer) |
+| `C` | Kontrol: oyuncu ↔ kamera |
 | `Q` `E` | Kamerayı döndür |
 | Fare tekerleği | Yakınlaş / uzaklaş |
 | `R` | Kamerayı sıfırla |
-| `1` `2` | Izgarayı küçült / büyüt (batch sınırını görmek için) |
-| `X` | Düz renk ↔ texture |
+| `N` | 10 yeni hareketli entity ekle |
+| `H` | Oyuncunun `SpriteRenderer`'ını ekle/kaldır |
+| `M` | Oyuncunun `Velocity`'sini ekle/kaldır |
 | `T` | Tel kafes (wireframe) aç/kapa |
-| `SPACE` | Animasyonu durdur/başlat |
 | `V` | VSync aç/kapa |
-| `TAB` | İstatistikler (draw call sayısı) |
+| `TAB` | İstatistikler |
 | `ESC` | Çıkış |
+
+`H` ve `M` ECS'in özünü gösterir: component'i çalışma zamanında kaldırınca
+entity görünmez olur ama var olmaya devam eder, ya da sistemin görüş
+alanından tamamen çıkar.
 
 Test dokuları (`Editor/assets/textures/`) repoda hazır gelir; ayrıca
 indirmen gereken bir varlık yoktur.

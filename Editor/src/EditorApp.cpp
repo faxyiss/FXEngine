@@ -4,17 +4,33 @@
 #include <FXEngine/Core/FileSystem.h>
 #include <FXEngine/Renderer/RenderCommand.h>
 #include <FXEngine/Renderer/Renderer2D.h>
+#include <FXEngine/Scene/Components.h>
 
 #include <SDL3/SDL.h>
 
 #include <cmath>
+#include <random>
 
 namespace FXEd
 {
+    namespace
+    {
+        // Tekrarlanabilir rastgelelik. Sabit tohum (seed) kullaniyoruz ki
+        // her calistirmada AYNI sahne olussun - hata ayiklarken "bu sefer
+        // farkli cikti" derdinden kurtulmak icin.
+        std::mt19937 s_Rng{ 12345 };
+
+        float RandFloat(float min, float max)
+        {
+            std::uniform_real_distribution<float> dist(min, max);
+            return dist(s_Rng);
+        }
+    }
+
     EditorApp::EditorApp()
         : FX::Application([]() {
               FX::WindowProps props;
-              props.Title     = "FXEditor - Faz 4 (Batch Renderer)";
+              props.Title     = "FXEditor - Faz 5 (ECS)";
               props.Width     = 1280;
               props.Height    = 720;
               props.VSync     = true;
@@ -27,15 +43,10 @@ namespace FXEd
     void EditorApp::OnInit()
     {
         FX_INFO("=====================================");
-        FX_INFO("  FXEditor - Faz 4: Batch Renderer");
+        FX_INFO("  FXEditor - Faz 5: EnTT / ECS");
         FX_INFO("=====================================");
 
         FX::RenderCommand::Init();
-
-        // Renderer2D kendi shader'ini, buffer'larini ve beyaz texture'ini
-        // kendi kurar. Editor'un artik VAO/VBO/shader bilmesine gerek yok -
-        // Faz 3'te bu dosyada 60 satir GPU kurulumu vardi, simdi tek satir.
-        // Iyi bir soyutlamanin belirtisi budur.
         FX::Renderer2D::Init();
 
         FX::TextureSpec sharpSpec;
@@ -59,22 +70,120 @@ namespace FXEd
         m_Camera = std::make_unique<FX::OrthographicCamera>(-1.0f, 1.0f, -1.0f, 1.0f);
         UpdateCameraProjection();
 
-        FX_INFO("Texture slotu (bu GPU): %u", FX::Renderer2D::GetMaxTextureSlots());
+        BuildScene();
+
         FX_INFO("");
         FX_INFO("Kontroller:");
-        FX_INFO("  W/A/S/D  -> kamera hareket");
-        FX_INFO("  Q/E      -> kamera dondur");
+        FX_INFO("  W/A/S/D  -> OYUNCUYU hareket ettir (C ile kameraya gecer)");
+        FX_INFO("  C        -> kontrol: oyuncu <-> kamera");
+        FX_INFO("  Q/E      -> kamerayi dondur");
         FX_INFO("  Tekerlek -> zoom");
         FX_INFO("  R        -> kamerayi sifirla");
-        FX_INFO("  1 / 2    -> izgarayi kucult / buyut  <-- ASIL TEST");
-        FX_INFO("  X        -> duz renk <-> texture");
+        FX_INFO("  N        -> yeni hareketli entity ekle (10 tane)");
+        FX_INFO("  H        -> oyuncunun SpriteRenderer'ini ekle/kaldir  <-- ECS testi");
+        FX_INFO("  M        -> oyuncunun Velocity'sini ekle/kaldir       <-- ECS testi");
         FX_INFO("  T        -> tel kafes");
-        FX_INFO("  SPACE    -> animasyon dur/devam");
-        FX_INFO("  V        -> VSync (kapatinca gercek FPS gorunur)");
+        FX_INFO("  V        -> VSync");
         FX_INFO("  TAB      -> istatistikler");
         FX_INFO("  ESC      -> cikis");
-        FX_INFO("");
-        FX_INFO("Izgara: %dx%d = %d quad", m_GridSize, m_GridSize, m_GridSize * m_GridSize);
+    }
+
+    void EditorApp::BuildScene()
+    {
+        m_Scene = std::make_unique<FX::Scene>();
+
+        // ===================================================================
+        // DIKKAT: Burada hicbir cizim cagrisi YOK.
+        // Sadece VERI kuruyoruz. Ne zaman ve nasil cizilecegi
+        // SpriteRenderSystem'in isi; nasil hareket edecegi MovementSystem'in.
+        // "Veri component'te, davranis system'de" kurali tam olarak bu.
+        // ===================================================================
+
+        // --- Zemin (hareketsiz) ---------------------------------------------
+        // Velocity component'i YOK -> MovementSystem bu entity'ye
+        // hic dokunmaz, uzerinden gecmez bile.
+        {
+            auto floor = m_Scene->CreateEntity("Zemin");
+
+            auto& tf = floor.GetComponent<FX::TransformComponent>();
+            tf.Translation = { 0.0f, 0.0f, -0.5f };   // arkada
+            tf.Scale       = { 30.0f, 30.0f };
+
+            auto& sprite = floor.AddComponent<FX::SpriteRendererComponent>(m_Checkerboard);
+            sprite.TilingFactor = 15.0f;
+            sprite.Color = { 0.55f, 0.58f, 0.70f, 1.0f };
+        }
+
+        // --- Oyuncu ----------------------------------------------------------
+        {
+            m_PlayerEntity = m_Scene->CreateEntity("Oyuncu");
+
+            auto& tf = m_PlayerEntity.GetComponent<FX::TransformComponent>();
+            tf.Translation = { 0.0f, 0.0f, 0.1f };
+            tf.Scale       = { 1.0f, 1.0f };
+
+            m_PlayerEntity.AddComponent<FX::SpriteRendererComponent>(
+                m_Circle, glm::vec4{ 1.0f, 0.85f, 0.3f, 1.0f });
+
+            // Oyuncuya Velocity ekliyoruz ama sifir - klavye bunu dolduracak.
+            // Boylece MovementSystem oyuncuyu da ISLER; oyuncu ozel bir
+            // durum degil, sadece velocity'si disaridan yazilan bir entity.
+            m_PlayerEntity.AddComponent<FX::VelocityComponent>();
+        }
+
+        // --- Yorungede donen uydular -----------------------------------------
+        // Hepsi ayni component setine sahip; farklari sadece VERI.
+        // OOP olsaydi bunlar icin bir "Satellite" sinifi yazardik.
+        for (int i = 0; i < 8; ++i)
+        {
+            auto e = m_Scene->CreateEntity("Uydu " + std::to_string(i));
+
+            const float angle = static_cast<float>(i) / 8.0f * 6.2831853f;
+            auto& tf = e.GetComponent<FX::TransformComponent>();
+            tf.Translation = { std::cos(angle) * 4.0f, std::sin(angle) * 4.0f, 0.0f };
+            tf.Scale       = { 0.6f, 0.6f };
+            tf.Rotation    = angle;
+
+            e.AddComponent<FX::SpriteRendererComponent>(
+                m_Checkerboard,
+                glm::vec4{ 0.4f + RandFloat(0.0f, 0.6f),
+                           0.4f + RandFloat(0.0f, 0.6f),
+                           0.9f, 1.0f });
+
+            // Sadece donerler, yer degistirmezler.
+            e.AddComponent<FX::VelocityComponent>(glm::vec2{ 0.0f, 0.0f }, 1.2f);
+        }
+
+        // --- Serbest dolasan entity'ler ---------------------------------------
+        for (int i = 0; i < 30; ++i)
+            SpawnMover();
+
+        FX_INFO("Sahne kuruldu: %u entity", m_Scene->GetEntityCount());
+    }
+
+    void EditorApp::SpawnMover()
+    {
+        auto e = m_Scene->CreateEntity("Gezgin");
+
+        auto& tf = e.GetComponent<FX::TransformComponent>();
+        tf.Translation = { RandFloat(-8.0f, 8.0f), RandFloat(-8.0f, 8.0f), 0.0f };
+        const float s = RandFloat(0.2f, 0.6f);
+        tf.Scale = { s, s };
+
+        // Rastgele: yarisi texture'li, yarisi duz renk.
+        // Ikisi de AYNI batch'e girer (Renderer2D beyaz texture kullaniyor).
+        if (RandFloat(0.0f, 1.0f) > 0.5f)
+            e.AddComponent<FX::SpriteRendererComponent>(
+                m_Circle, glm::vec4{ RandFloat(0.3f, 1.0f), RandFloat(0.3f, 1.0f),
+                                     RandFloat(0.3f, 1.0f), 0.9f });
+        else
+            e.AddComponent<FX::SpriteRendererComponent>(
+                glm::vec4{ RandFloat(0.3f, 1.0f), RandFloat(0.3f, 1.0f),
+                           RandFloat(0.3f, 1.0f), 0.9f });
+
+        e.AddComponent<FX::VelocityComponent>(
+            glm::vec2{ RandFloat(-1.5f, 1.5f), RandFloat(-1.5f, 1.5f) },
+            RandFloat(-2.0f, 2.0f));
     }
 
     void EditorApp::UpdateCameraProjection()
@@ -95,13 +204,6 @@ namespace FXEd
     {
         const bool* keys = SDL_GetKeyboardState(nullptr);
 
-        const float move   = m_CameraMoveSpeed   * dt;
-        const float rotate = m_CameraRotateSpeed * dt;
-
-        const float rad = glm::radians(m_CameraRotation);
-        const float cs  = std::cos(rad);
-        const float sn  = std::sin(rad);
-
         float dx = 0.0f, dy = 0.0f;
         if (keys[SDL_SCANCODE_A]) dx -= 1.0f;
         if (keys[SDL_SCANCODE_D]) dx += 1.0f;
@@ -109,14 +211,37 @@ namespace FXEd
         if (keys[SDL_SCANCODE_W]) dy += 1.0f;
 
         const float len = std::sqrt(dx * dx + dy * dy);
-        if (len > 0.0f)
+        if (len > 0.0f) { dx /= len; dy /= len; }
+
+        if (m_PlayerControl)
         {
-            dx /= len;
-            dy /= len;
+            // ===============================================================
+            // ONEMLI: Oyuncunun konumunu DOGRUDAN degistirmiyoruz.
+            // Sadece Velocity component'ine yaziyoruz; hareketi
+            // MovementSystem yapiyor - tipki diger 38 entity gibi.
+            //
+            // Bunun anlami: oyuncu ozel bir sinif DEGIL. Girdi sistemi
+            // veriyi yaziyor, hareket sistemi onu isliyor. Sistemler
+            // birbirini bilmiyor, sadece ayni veriye dokunuyorlar.
+            // ECS'te sistemler arasi iletisim BOYLE olur.
+            // ===============================================================
+            if (m_PlayerEntity && m_PlayerEntity.HasComponent<FX::VelocityComponent>())
+            {
+                auto& vel = m_PlayerEntity.GetComponent<FX::VelocityComponent>();
+                vel.Linear = { dx * 5.0f, dy * 5.0f };
+            }
+        }
+        else
+        {
+            const float move = m_CameraMoveSpeed * dt;
+            const float rad  = glm::radians(m_CameraRotation);
+            const float cs = std::cos(rad), sn = std::sin(rad);
+
             m_CameraPosition.x += (dx * cs - dy * sn) * move;
             m_CameraPosition.y += (dx * sn + dy * cs) * move;
         }
 
+        const float rotate = m_CameraRotateSpeed * dt;
         if (keys[SDL_SCANCODE_Q]) m_CameraRotation += rotate;
         if (keys[SDL_SCANCODE_E]) m_CameraRotation -= rotate;
 
@@ -126,19 +251,18 @@ namespace FXEd
 
     void EditorApp::OnUpdate(float dt)
     {
-        if (m_Animate)
-            m_Time += dt;
+        m_Time += dt;
 
         UpdateCameraMovement(dt);
+
+        // Tum oyun mantigi tek satir. Icinde MovementSystem calisiyor;
+        // ileride Physics, Collision, Script sistemleri de buraya girecek
+        // ve bu satir DEGISMEYECEK - sadece Scene::OnUpdate genisleyecek.
+        m_Scene->OnUpdate(dt);
     }
 
     void EditorApp::OnRender(float /*alpha*/)
     {
-        ++m_FrameCount;
-
-        // --- FPS olcumu --------------------------------------------------------
-        // Gercek zamani olcuyoruz (mantik zamanini degil), cunku batch'in
-        // etkisi CIZIM tarafinda. VSync kapaliyken bu sayi anlamli olur.
         {
             static std::uint64_t s_LastTime = SDL_GetTicksNS();
             const std::uint64_t now = SDL_GetTicksNS();
@@ -154,75 +278,13 @@ namespace FXEd
             }
         }
 
-        FX::RenderCommand::SetClearColor({ 0.08f, 0.09f, 0.12f, 1.0f });
+        FX::RenderCommand::SetClearColor({ 0.07f, 0.08f, 0.11f, 1.0f });
         FX::RenderCommand::Clear();
 
-        // Istatistikleri her karede sifirla ki "bu karede kac draw call"
-        // sorusunu cevaplayabilelim.
         FX::Renderer2D::ResetStats();
 
-        // ===================================================================
-        // BATCH: BeginScene ile EndScene arasindaki HER SEY tek pakete girer
-        // ===================================================================
-        FX::Renderer2D::BeginScene(*m_Camera);
-
-        // --- Izgara ------------------------------------------------------------
-        // m_GridSize^2 kadar quad. 50x50 = 2500.
-        // Faz 3'teki yaklasimla bu 2500 draw call olurdu; simdi 1 (veya
-        // texture kullanirsak yine 1, cunku sadece 2 texture var).
-        const float half = static_cast<float>(m_GridSize) * 0.5f;
-
-        for (int y = 0; y < m_GridSize; ++y)
-        {
-            for (int x = 0; x < m_GridSize; ++x)
-            {
-                const float fx = (static_cast<float>(x) - half) * 0.11f;
-                const float fy = (static_cast<float>(y) - half) * 0.11f;
-
-                // Renk konuma gore degissin - her quad'in AYRI rengi
-                // olabildigini gostermek icin. Faz 3'te renk uniform'du,
-                // yani her farkli renk ayri bir draw call demekti.
-                const glm::vec4 color = {
-                    (static_cast<float>(x) / static_cast<float>(m_GridSize)) * 0.8f + 0.2f,
-                    0.35f,
-                    (static_cast<float>(y) / static_cast<float>(m_GridSize)) * 0.8f + 0.2f,
-                    0.85f
-                };
-
-                if (m_UseTextures)
-                {
-                    // Iki texture'i donusumlu kullaniyoruz. Ikisi de ayni
-                    // batch'te kaliyor cunku 32 slot var, 2 tanesini
-                    // kullaniyoruz -> hala TEK draw call.
-                    const auto& tex = ((x + y) % 2 == 0) ? m_Checkerboard : m_Circle;
-                    FX::Renderer2D::DrawQuad({ fx, fy }, { 0.09f, 0.09f }, tex, 1.0f, color);
-                }
-                else
-                {
-                    FX::Renderer2D::DrawQuad({ fx, fy }, { 0.09f, 0.09f }, color);
-                }
-            }
-        }
-
-        // --- Donen buyuk sprite'lar --------------------------------------------
-        // Izgaranin ustunde, dondurulmus quad'lar. Bunlar da AYNI batch'e
-        // giriyor - farkli texture, farkli aci, farkli renk olmasi
-        // hicbir sey degistirmiyor.
-        for (int i = 0; i < 4; ++i)
-        {
-            const float angle  = m_Time * (0.5f + static_cast<float>(i) * 0.2f);
-            const float radius = 2.5f;
-            const float px = std::cos(m_Time * 0.4f + static_cast<float>(i) * 1.57f) * radius;
-            const float py = std::sin(m_Time * 0.4f + static_cast<float>(i) * 1.57f) * radius;
-
-            FX::Renderer2D::DrawRotatedQuad(
-                { px, py }, { 1.2f, 1.2f }, angle,
-                (i % 2 == 0) ? m_Checkerboard : m_Circle,
-                1.0f,
-                { 1.0f, 1.0f, 1.0f, 0.95f });
-        }
-
-        FX::Renderer2D::EndScene();
+        // Cizim de tek satir. Faz 4'te burada 40 satirlik dongu vardi.
+        m_Scene->OnRender(*m_Camera);
     }
 
     void EditorApp::LogStats()
@@ -230,21 +292,22 @@ namespace FXEd
         const auto stats = FX::Renderer2D::GetStats();
 
         FX_INFO("--- Istatistikler ---");
-        FX_INFO("  Izgara         : %dx%d", m_GridSize, m_GridSize);
-        FX_INFO("  Quad sayisi    : %u", stats.QuadCount);
-        FX_INFO("  Kose sayisi    : %u", stats.GetVertexCount());
-        FX_INFO("  DRAW CALL      : %u   <-- asil sayi bu", stats.DrawCalls);
-
-        if (stats.DrawCalls > 0)
-            FX_INFO("  Quad/draw call : %.0f", static_cast<float>(stats.QuadCount) /
-                                               static_cast<float>(stats.DrawCalls));
-
-        FX_INFO("  Batch'siz olsa : %u draw call olurdu", stats.QuadCount);
+        FX_INFO("  Entity sayisi  : %u", m_Scene->GetEntityCount());
+        FX_INFO("  Cizilen quad   : %u", stats.QuadCount);
+        FX_INFO("  Draw call      : %u", stats.DrawCalls);
         FX_INFO("  FPS            : %.0f%s", m_CurrentFps,
-                GetWindow().IsVSync() ? "  (VSync ACIK - V ile kapat, gercek FPS'i gor)" : "");
-        FX_INFO("  Mod            : %s", m_UseTextures ? "TEXTURE'LI" : "DUZ RENK");
-        FX_INFO("  Kamera         : (%.1f, %.1f) zoom %.1f",
-                m_CameraPosition.x, m_CameraPosition.y, m_ZoomLevel);
+                GetWindow().IsVSync() ? "  (VSync acik)" : "");
+        FX_INFO("  Kontrol        : %s", m_PlayerControl ? "OYUNCU" : "KAMERA");
+
+        if (m_PlayerEntity)
+        {
+            const auto& tf = m_PlayerEntity.GetComponent<FX::TransformComponent>();
+            FX_INFO("  Oyuncu konum   : (%.2f, %.2f)", tf.Translation.x, tf.Translation.y);
+            FX_INFO("  Oyuncu sprite  : %s",
+                    m_PlayerEntity.HasComponent<FX::SpriteRendererComponent>() ? "VAR" : "YOK");
+            FX_INFO("  Oyuncu velocity: %s",
+                    m_PlayerEntity.HasComponent<FX::VelocityComponent>() ? "VAR" : "YOK");
+        }
     }
 
     void EditorApp::OnEvent(const SDL_Event& event)
@@ -252,86 +315,122 @@ namespace FXEd
         if (event.type == SDL_EVENT_MOUSE_WHEEL)
         {
             m_ZoomLevel *= (event.wheel.y > 0) ? 0.9f : 1.1f;
-            m_ZoomLevel = glm::clamp(m_ZoomLevel, 0.5f, 60.0f);
+            m_ZoomLevel = glm::clamp(m_ZoomLevel, 1.0f, 40.0f);
             UpdateCameraProjection();
             return;
         }
 
-        if (event.type == SDL_EVENT_KEY_DOWN)
+        if (event.type != SDL_EVENT_KEY_DOWN || event.key.repeat)
+            return;
+
+        switch (event.key.key)
         {
-            if (event.key.repeat)
-                return;
+            case SDLK_ESCAPE:
+                Close();
+                break;
 
-            switch (event.key.key)
-            {
-                case SDLK_ESCAPE:
-                    Close();
-                    break;
-
-                case SDLK_1:
-                    m_GridSize = std::max(10, m_GridSize - 20);
-                    FX_INFO("Izgara: %dx%d = %d quad", m_GridSize, m_GridSize,
-                            m_GridSize * m_GridSize);
-                    break;
-
-                case SDLK_2:
-                    // 150x150 = 22.500 quad -> MAX_QUADS (10.000) asiliyor
-                    // ve renderer OTOMATIK olarak birden fazla batch'e boluyor.
-                    // TAB ile draw call sayisinin 1'den 3'e ciktigini gorursun.
-                    // Batch'in sinirini gozle gormek icin bu test onemli.
-                    m_GridSize = std::min(200, m_GridSize + 20);
-                    FX_INFO("Izgara: %dx%d = %d quad%s", m_GridSize, m_GridSize,
-                            m_GridSize * m_GridSize,
-                            (m_GridSize * m_GridSize > 10000)
-                                ? "  (10.000 siniri asildi - TAB'a bas, draw call artmis olmali)"
-                                : "");
-                    break;
-
-                case SDLK_X:
-                    m_UseTextures = !m_UseTextures;
-                    FX_INFO("Mod -> %s", m_UseTextures ? "TEXTURE'LI" : "DUZ RENK");
-                    break;
-
-                case SDLK_R:
-                    m_CameraPosition = { 0.0f, 0.0f, 0.0f };
-                    m_CameraRotation = 0.0f;
-                    m_ZoomLevel      = 12.0f;
-                    UpdateCameraProjection();
-                    break;
-
-                case SDLK_T:
-                    m_Wireframe = !m_Wireframe;
-                    FX::RenderCommand::SetWireframe(m_Wireframe);
-                    break;
-
-                case SDLK_SPACE:
-                    m_Animate = !m_Animate;
-                    break;
-
-                case SDLK_V:
+            case SDLK_C:
+                m_PlayerControl = !m_PlayerControl;
+                // Kameraya gecerken oyuncuyu durdur, yoksa son hizla
+                // sonsuza kadar kayar.
+                if (!m_PlayerControl && m_PlayerEntity &&
+                    m_PlayerEntity.HasComponent<FX::VelocityComponent>())
                 {
-                    const bool s = !GetWindow().IsVSync();
-                    GetWindow().SetVSync(s);
-                    FX_INFO("VSync -> %s", s ? "ACIK" : "KAPALI");
-                    break;
+                    m_PlayerEntity.GetComponent<FX::VelocityComponent>().Linear = { 0.0f, 0.0f };
                 }
+                FX_INFO("Kontrol -> %s", m_PlayerControl ? "OYUNCU" : "KAMERA");
+                break;
 
-                case SDLK_TAB:
-                    LogStats();
-                    break;
+            case SDLK_N:
+                // 10'ar ekliyoruz ki entity sayisini hizlica buyutup
+                // batch renderer'in davranisini gozleyebilelim.
+                for (int i = 0; i < 10; ++i)
+                    SpawnMover();
+                FX_INFO("10 entity eklendi. Toplam: %u", m_Scene->GetEntityCount());
+                break;
 
-                default:
-                    break;
+            case SDLK_H:
+            {
+                // ===========================================================
+                // ECS'IN KALBI BU TEST:
+                // Bir component'i CALISMA ZAMANINDA ekleyip kaldiriyoruz.
+                // Sprite kaldirilinca entity GORUNMEZ olur ama VAR OLMAYA
+                // devam eder - hareket etmeyi surdurur (Velocity duruyor).
+                //
+                // OOP'de bunun karsiligi, nesnenin SINIFINI calisirken
+                // degistirmek olurdu ki mumkun degildir.
+                // ===========================================================
+                if (!m_PlayerEntity) break;
+
+                if (m_PlayerEntity.HasComponent<FX::SpriteRendererComponent>())
+                {
+                    m_PlayerEntity.RemoveComponent<FX::SpriteRendererComponent>();
+                    FX_INFO("Oyuncunun SpriteRenderer'i KALDIRILDI -> gorunmez oldu");
+                    FX_INFO("  ama hala var ve hareket ediyor (TAB ile konumuna bak)");
+                }
+                else
+                {
+                    m_PlayerEntity.AddComponent<FX::SpriteRendererComponent>(
+                        m_Circle, glm::vec4{ 1.0f, 0.85f, 0.3f, 1.0f });
+                    FX_INFO("Oyuncunun SpriteRenderer'i EKLENDI -> tekrar gorunur");
+                }
+                break;
             }
+
+            case SDLK_M:
+            {
+                if (!m_PlayerEntity) break;
+
+                if (m_PlayerEntity.HasComponent<FX::VelocityComponent>())
+                {
+                    m_PlayerEntity.RemoveComponent<FX::VelocityComponent>();
+                    FX_INFO("Oyuncunun Velocity'si KALDIRILDI -> MovementSystem");
+                    FX_INFO("  artik bu entity'yi hic gormuyor, WASD etkisiz");
+                }
+                else
+                {
+                    m_PlayerEntity.AddComponent<FX::VelocityComponent>();
+                    FX_INFO("Velocity EKLENDI -> WASD tekrar calisiyor");
+                }
+                break;
+            }
+
+            case SDLK_R:
+                m_CameraPosition = { 0.0f, 0.0f, 0.0f };
+                m_CameraRotation = 0.0f;
+                m_ZoomLevel      = 8.0f;
+                UpdateCameraProjection();
+                break;
+
+            case SDLK_T:
+                m_Wireframe = !m_Wireframe;
+                FX::RenderCommand::SetWireframe(m_Wireframe);
+                break;
+
+            case SDLK_V:
+            {
+                const bool s = !GetWindow().IsVSync();
+                GetWindow().SetVSync(s);
+                FX_INFO("VSync -> %s", s ? "ACIK" : "KAPALI");
+                break;
+            }
+
+            case SDLK_TAB:
+                LogStats();
+                break;
+
+            default:
+                break;
         }
     }
 
     void EditorApp::OnShutdown()
     {
-        // Renderer2D'yi GL context olmeden once kapat.
-        FX::Renderer2D::Shutdown();
+        // Sahneyi renderer'dan ONCE yikiyoruz: entity'ler texture
+        // shared_ptr'lari tutuyor, once onlar birakilsin.
+        m_Scene.reset();
 
-        FX_INFO("Editor kapaniyor. Toplam %llu kare.",
-                static_cast<unsigned long long>(m_FrameCount));
+        FX::Renderer2D::Shutdown();
+        FX_INFO("Editor kapaniyor.");
     }
 }

@@ -9,8 +9,8 @@ Kural: aynı anda tek faz. Ben "test ettim, çalışıyor" demeden sonraki faza 
 | 1 | SDL3 pencere + GL 3.3 context + glad + fixed-timestep loop | ✅ onaylandı |
 | 2 | Shader sınıfı + VBO/VAO/EBO + tek renkli quad | ✅ onaylandı |
 | 3 | stb_image texture + texture'lı quad + ortho 2D kamera | ✅ onaylandı |
-| 4 | Batch renderer (dinamik VB, texture slot'ları) | 🟡 test bekliyor |
-| 5 | EnTT (Transform, SpriteRenderer, Tag + Movement/Render system) | ⬜ |
+| 4 | Batch renderer (dinamik VB, texture slot'ları) | ✅ onaylandı |
+| 5 | EnTT (Transform, SpriteRenderer, Tag + Movement/Render system) | 🟡 test bekliyor |
 | 6 | ImGui docking + framebuffer→Viewport + Hierarchy + Inspector | ⬜ |
 | 7 | JSON sahne kaydet/yükle → MVP | ⬜ |
 

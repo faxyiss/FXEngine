@@ -4,6 +4,7 @@
 #include <FXEngine/Core/Log.h>
 #include <FXEngine/Core/FileSystem.h>
 #include <FXEngine/Core/Project.h>
+#include <FXEngine/Asset/AssetManager.h>
 #include <FXEngine/Renderer/RenderCommand.h>
 #include <FXEngine/Renderer/Renderer2D.h>
 #include <FXEngine/Scene/Components.h>

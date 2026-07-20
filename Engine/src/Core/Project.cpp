@@ -1,6 +1,7 @@
 #include "FXEngine/Core/Project.h"
 #include "FXEngine/Core/FileSystem.h"
 #include "FXEngine/Core/Log.h"
+#include "FXEngine/Asset/AssetManager.h"
 
 #include <nlohmann/json.hpp>
 
@@ -41,6 +42,10 @@ namespace FX
     {
         s_Active.reset();
         FileSystem::SetProjectDirectory("");
+
+        // Tablo eski projenin yollarini tutuyor; birakmak "GUID var ama
+        // dosya baska projede" durumuna yol acardi.
+        AssetManager::Clear();
     }
 
     std::shared_ptr<Project> Project::Load(const std::string& filepath)
@@ -86,6 +91,10 @@ namespace FX
 
         SetActive(project);
 
+        // Tarama SetActive'den SONRA: AssetManager yollari aktif projenin
+        // kokune gore cozuyor.
+        AssetManager::ScanProject();
+
         FX_CORE_INFO("Proje acildi: '%s'", cfg.Name.c_str());
         FX_CORE_INFO("  kok    : %s", project->m_Directory.c_str());
         FX_CORE_INFO("  varlik : %s", cfg.AssetDirectory.c_str());
@@ -125,6 +134,7 @@ namespace FX
             return nullptr;
 
         SetActive(project);
+        AssetManager::ScanProject();
 
         FX_CORE_INFO("Proje olusturuldu: '%s' -> %s",
                      name.c_str(), project->m_FilePath.c_str());

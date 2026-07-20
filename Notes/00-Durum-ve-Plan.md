@@ -4,7 +4,7 @@
 > projenin nerede olduğunu, nelerin neden böyle yapıldığını ve sıradaki
 > işi buradan öğrenirsin.
 >
-> Son güncelleme: 2026-07-20 · Son commit: `5d2b18a`
+> Son güncelleme: 2026-07-20 · Son commit: `759e1b6`
 
 ---
 
@@ -125,69 +125,66 @@ Derleme: `cmake --build build --config Debug`
 
 ## 5. Faz planı
 
-### Sıradaki: **Faz 13 — Girdi soyutlaması**
-Küçük ve Faz 16'nın önkoşulu.
-- `FX::Input` (`IsKeyPressed`, `GetMousePosition`), SDL'den bağımsız
-  `KeyCode`/`MouseButton` enum'ları
-- Motor içi `Event` sınıfları, SDL → motor olayı çeviri katmanı
-- `Layer`/`LayerStack`
-- Girdi eşlemesi ("Zıpla" = Space **veya** gamepad A)
+Fazlar 2026-07-20'de **alt fazlara bölündü** ve önlerine bir borç
+kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 
-> **Öğrenilecek:** platform soyutlaması nerede biter, aşırı soyutlamanın
-> maliyeti.
+### Güncel sıra
 
-### Sonra: **Faz 16 — Native script component**
-Motorun ilk defa gerçekten *oyun* çalıştırdığı yer. Önkoşulları (Faz 10
-play modu, Faz 13 input) hazır olacak.
-- `NativeScriptComponent` (`OnCreate`/`OnUpdate`/`OnDestroy`)
-- `ScriptableEntity` taban sınıfı
-- `ScriptSystem` — Play'de çalışır, Edit'te çalışmaz
-- Örnek: `PlayerController`, `FollowTarget`
+```
+0.1 ✅ → 0.4 → 0.2 → 0.3 → 0.5
+      → 13a-d → 16a-c → 0.6
+      → 14 → 15 → 17a-d → 18b-d → 19 → 23 → 20a-d
+```
 
-### Sonra sırasıyla
-| Faz | İş | Not |
+### Borç turu (0.x)
+
+| # | İş | Durum |
 |---|---|---|
-| 14 | Sprite sheet / `SubTexture2D` | 15'in önkoşulu |
-| 15 | Animasyon (`AnimationClip`, `AnimatorComponent`) | |
-| 17 | Fizik (Box2D), `Simulate` modu buraya | Faz 10'da `Simulate` bilerek ertelendi |
-| 18 | Kalan render: `DrawCircle`, sıralama katmanı, shader hot reload | çizgi/ızgara kısmı yapıldı |
-| 19 | Metin (font atlası) ve ses (miniaudio) | |
-| 20 | Undo/Redo, profiling, testler, CI | Undo'yu geciktirme, pahalılaşıyor |
+| 0.1 | Faz 22'nin gerçek veriyle doğrulanması | ✅ sahne v4, GUID eşleşiyor, eksik `.meta` eklendi |
+| 0.4 | Dosya izleyici (`ReadDirectoryChangesW`) | **sıradaki** |
+| 0.2 | `SelectionContext` — seçimi panelden çıkar | |
+| 0.3 | Entity çoklu seçimi | |
+| 0.5 | Catch2 + `UUID`/`SceneSerializer`/`AssetManager` testleri | |
+| 0.6 | Faz 22 artıkları (Inspector doku ayarları, prefab GUID, `AssetDirectory`) | 16'dan sonra |
+
+### Bölünmüş fazlar
+
+| Faz | Parçalar |
+|---|---|
+| 13 | 13a enum+`Input` · 13b `Event`+SDL çevirisi · 13c `Layer`/`LayerStack` · 13d action mapping |
+| 16 | 16a `ScriptSystem` çekirdeği · 16b editör entegrasyonu · 16c örnekler + küçük oyun |
+| 14, 15 | bölünmedi (zaten küçük) |
+| 17 | 17a Box2D+`Rigidbody2D` · 17b collider'lar · 17c `Simulate`+debug çizim · 17d çarpışma geri çağrımı |
+| 18 | 18b `DrawCircle`+debug katmanı · 18c sıralama katmanı · 18d shader hot reload |
+| 19 / 23 | metin ve ses **ayrıldı** — birbiriyle ilgisiz iki iş |
+| 20 | 20a Undo çekirdeği · 20b komutların yayılması · 20c profiling · 20d CI+tema |
 
 ### Sıralamada dikkat
 
-- **Undo/Redo'dan (Faz 20) önce entity çoklu seçimi yapılmalı.** Undo
-  komutları "hangi entity'ler üzerinde?" sorusunu cevaplar; tek-seçim
-  varsayımıyla yazılırsa her komut yeniden yazılır.
-- **Entity çoklu seçiminden önce `SelectionContext`** ayrılmalı (seçim
-  panelden çıkarılmalı). İçerik panelindeki dosya çoklu seçimi bitti,
-  entity tarafı yapılmadı.
-- `Simulate` modu fizik gelmeden anlamsız — Faz 17'ye bırakıldı.
+- **Undo/Redo'dan (20) önce 0.2 → 0.3 zinciri.** Undo komutları "hangi
+  entity'ler üzerinde?" sorusunu cevaplar; tek-seçim varsayımıyla
+  yazılırsa her komut yeniden yazılır.
+- `Simulate` modu fizik gelmeden anlamsız — 17c'ye bırakıldı.
+- 17c'nin collider debug çizimi 18b'nin `DrawCircle`'ını bekliyor;
+  18d ise 0.4'ün dosya izleyicisini kullanacak.
 
 ---
 
 ## 6. Öneriler
 
-**Bir sonraki oturumda ilk yapılacak:** kullanıcının `Game1` projesini
-(`Desktop/FXEngineProjects/FxProject/`) açıp sürüm ≤3 sahnelerin sorunsuz
-geldiğini doğrula. Faz 22'de sahne formatı 4'e çıktı; dönüşüm test
-projesiyle doğrulandı ama gerçek veriyle değil.
-
-**`.meta` dosyaları sürüm kontrolüne girmeli.** `.gitignore`'da `*.meta`
-varsa kaldır — `.meta` kaybolursa varlık yeni GUID alır ve tüm referanslar
-kopar.
-
-**Dosya izleyiciyi erken yap.** Küçük bir iş (bir thread + `ReadDirectoryChangesW`)
-ama varlık tablosu artık diskle senkron olmak zorunda; şu an bu tutarlılık
-tamamen içerik panelinin doğru çağrı yapmasına bağlı ve bu kırılgan.
+**Motor varlıklarının `.meta`'ları kaynakta durmalı.** `.meta` dosyaları
+`build/bin/assets` altında üretiliyor ve kaynağa geri yazılmıyor; kaynakta
+yoksa her temiz derlemede varlık **yeni GUID** alıyor. 0.1'de
+`circle.png.meta` bu yüzden elle kaynağa alındı. Motora yeni bir varlık
+eklerken `.meta`'sını da commit et.
 
 **Faz 16'dan önce küçük bir örnek oyun yaz.** Motor artık sahne
 düzenleyip çalıştırabiliyor; basit bir şey (topla-kaç) yapmak hangi
 API'lerin eksik olduğunu tasarım tartışmasından daha hızlı gösterir.
+Bu yüzden 16c'ye eklendi.
 
-**Birim testleri (Catch2) Faz 20'yi beklemesin.** `SceneSerializer`,
-`AssetManager` ve `UUID` en çok fayda sağlayacak yerler; ikisi de artık
-karmaşık ve elle test etmesi pahalı.
+**İçerik paneli görünüm tercihi kaydedilmiyor** — proje her açılışta
+Izgara'ya dönüyor. `editor.json`'a bir satır; 0.6'da halledilebilir.
 
 ---
 

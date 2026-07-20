@@ -127,17 +127,49 @@ Ayrıntı: `Faz-12-Notlar.md`
 
 ---
 
+## Faz 0.x — Borç kapatma (fazlardan önce)
+
+Bunlar faz değil; **ilerledikçe pahalılaşan** borçlar. Faz 13'e girmeden
+kapatılıyorlar çünkü ikisi (0.2, 0.3) Faz 20'nin ön koşulu, biri (0.4)
+Faz 22'nin bıraktığı tutarlılık açığı.
+
+- [x] **0.1 — Faz 22 doğrulaması.** Gerçek `Game1` projesi açıldı, sahne
+      sürüm 4'e dönüşmüş, `TextureHandle` ile `.meta` GUID'i eşleşiyor.
+      `.gitignore`'da `*.meta` yok. Kaynakta eksik olan
+      `circle.png.meta` eklendi — yoksa her temiz derlemede motor
+      varlığı yeni GUID alıyordu.
+- [ ] **0.2 — `SelectionContext`.** Seçim `SceneHierarchyPanel`'den
+      çıkarılıp ayrı bir nesneye taşınacak. Viewport, gizmo, inspector,
+      prefab hepsi tüketici olacak.
+- [ ] **0.3 — Entity çoklu seçimi.** Ctrl/Shift, gizmoyla toplu
+      dönüşüm, toplu silme.
+- [ ] **0.4 — Dosya izleyici.** `ReadDirectoryChangesW` + tek thread +
+      debounce; `AssetManager` ve içerik paneli diskle senkron kalacak.
+- [ ] **0.5 — Catch2 iskeleti.** `UUID`, `SceneSerializer`,
+      `AssetManager` testleri.
+- [ ] **0.6 — Faz 22 artıkları.** Inspector'da doku ayarları arayüzü,
+      prefab / `StartScene` referanslarının GUID'e geçmesi,
+      `AssetDirectory`'nin gerçekten kullanılması.
+
+> **Neden 0.2 ve 0.3 Faz 20'den önce?** Undo komutları "hangi entity'ler
+> üzerinde?" sorusunu cevaplar. Tek seçim varsayımıyla yazılan her komut,
+> çoklu seçim gelince yeniden yazılır.
+
+---
+
 ## Faz 13 — Girdi soyutlaması + olay sistemi
 
 Şu an `EditorApp` doğrudan `SDL_GetKeyboardState` çağırıyor. Motor
 kullanıcısının SDL bilmesi gerekmemeli.
 
-- [ ] `FX::Input` — `IsKeyPressed(KeyCode)`, `GetMousePosition()`
-- [ ] `FX::KeyCode` / `MouseButton` — SDL'den bağımsız enum'lar
-- [ ] Motor içi `Event` sınıfları (`WindowResize`, `KeyPressed`, `MouseMoved`)
-- [ ] SDL olayları → motor olaylarına çeviren katman
-- [ ] `Layer` / `LayerStack` — olayların katmanlar arası akışı
-- [ ] Girdi eşlemesi (action mapping): "Zıpla" = Space **veya** gamepad A
+- [ ] **13a** `FX::KeyCode` / `MouseButton` enum'ları + `FX::Input`
+      (`IsKeyPressed`, `GetMousePosition`) — sorgu tabanlı katman
+- [ ] **13b** Motor içi `Event` sınıfları (`WindowResize`, `KeyPressed`,
+      `MouseMoved`) + SDL → motor olayı çeviri katmanı
+- [ ] **13c** `Layer` / `LayerStack` — olayların katmanlar arası akışı
+      ve tüketilmesi
+- [ ] **13d** Girdi eşlemesi (action mapping): "Zıpla" = Space **veya**
+      gamepad A
 
 **Öğrenilecek:** Platform soyutlaması nerede biter. Aşırı soyutlamanın
 maliyeti (her SDL enum'unu kopyalamak gerçekten değer mi?).
@@ -174,10 +206,12 @@ Tek tek PNG yerine tek atlas kullanmak hem batch'i hem belleği iyileştirir.
 
 ## Faz 16 — Native script component
 
-- [ ] `NativeScriptComponent` — `OnCreate / OnUpdate / OnDestroy`
-- [ ] `ScriptableEntity` taban sınıfı (`GetComponent` erişimi)
-- [ ] `ScriptSystem` — Play modunda çalışır, Edit'te çalışmaz
-- [ ] Örnek: `PlayerController`, `FollowTarget` (Faz 8'in `EntityRef`'ini kullanır)
+- [ ] **16a** `ScriptableEntity` taban sınıfı + `NativeScriptComponent`
+      (`OnCreate / OnUpdate / OnDestroy`) + `ScriptSystem` (yalnız Play)
+- [ ] **16b** Editör tarafı: script kaydı (factory), Inspector'da script
+      seçimi, serileştirme
+- [ ] **16c** Örnekler: `PlayerController`, `FollowTarget` (Faz 8'in
+      `EntityRef`'ini kullanır) + küçük bir örnek oyun
 
 **Önkoşul:** Faz 10 (play modu) + Faz 13 (input).
 
@@ -191,12 +225,14 @@ component'lerin kendisi değil, onları **düzenleyen** nesnelerdir.
 
 ## Faz 17 — Çarpışma ve fizik
 
-- [ ] `BoxCollider2D`, `CircleCollider2D` component'leri
-- [ ] `Rigidbody2D` (Static / Dynamic / Kinematic)
-- [ ] **Box2D** entegrasyonu (kendi fiziğini yazmak ayrı bir proje)
-- [ ] `PhysicsSystem` — Play modunda dünyayı adımlar, Transform'ları günceller
-- [ ] Debug çizim: collider sınırlarını göster
-- [ ] Çarpışma geri çağrımları → script'e ulaşsın
+- [ ] **17a** **Box2D** entegrasyonu + `Rigidbody2D` (Static / Dynamic /
+      Kinematic) + `PhysicsSystem` — sabit adımda dünyayı adımlar,
+      Transform'ları günceller
+- [ ] **17b** `BoxCollider2D`, `CircleCollider2D` + malzeme (sürtünme,
+      esneklik)
+- [ ] **17c** `Simulate` modu + collider debug çizimi (18b'nin
+      `DrawCircle`'ını kullanır)
+- [ ] **17d** Çarpışma geri çağrımları → script'e ulaşsın (16a'ya bağlı)
 
 **Dikkat:** Fizik **sabit adımda** çalışmalı — Faz 1'deki fixed timestep'in
 gerçek karşılığını burada göreceksin.
@@ -215,11 +251,12 @@ oturtmak için). Kalanı duruyor.
 - [x] Sonsuz ızgara (editör zemini) — 1-2-5-10 serisinde adaptif aralık
 - [x] Seçim çerçevesi (dünya matrisiyle, döndürülmüş nesnede doğru)
 - [x] `F` ile seçiliye odaklan, `G` ile ızgara aç/kapa
-- [ ] Daire primitifi (`DrawCircle`) — collider debug'ı için gerekecek
-- [ ] Debug çizim katmanı (collider, kamera sınırı)
-- [ ] Sıralama katmanı (`SortingLayer` + `OrderInLayer`)
-- [ ] Saydam nesneler için doğru sıralama (arkadan öne)
-- [ ] Shader hot reload — dosya değişince yeniden derle
+- [ ] **18b** Daire primitifi (`DrawCircle`) + debug çizim katmanı
+      (collider, kamera sınırı)
+- [ ] **18c** Sıralama katmanı (`SortingLayer` + `OrderInLayer`) +
+      saydam nesneler için arkadan öne sıralama
+- [ ] **18d** Shader hot reload — dosya değişince yeniden derle
+      (0.4'ün dosya izleyicisini kullanır)
 
 Ayrıntılar: [Faz-18-Notlar.md](Faz-18-Notlar.md)
 
@@ -227,17 +264,23 @@ Ayrıntılar: [Faz-18-Notlar.md](Faz-18-Notlar.md)
 
 ---
 
-## Faz 19 — Metin ve ses
+## Faz 19 — Metin
 
 - [ ] Font atlası (stb_truetype veya msdf-atlas-gen)
 - [ ] `Renderer2D::DrawString`
 - [ ] `TextComponent`
-- [ ] Ses: **miniaudio** (tek başlık, kolay) veya SDL_audio
-- [ ] `AudioSourceComponent`, `AudioListenerComponent`
-- [ ] `AudioSystem`
 
 **Not:** Metin render, göründüğünden çok daha zordur (kerning, satır sarma,
-ölçek bağımsız keskinlik). Bir fazı hak ediyor.
+ölçek bağımsız keskinlik). Tek başına bir fazı hak ediyor — bu yüzden ses
+ayrıldı (Faz 23), ikisinin birbiriyle hiçbir ilgisi yok.
+
+---
+
+## Faz 23 — Ses
+
+- [ ] **miniaudio** (tek başlık, kolay) veya SDL_audio
+- [ ] `AudioSourceComponent`, `AudioListenerComponent`
+- [ ] `AudioSystem` — Play'de çalar, Stop'ta susar
 
 ---
 
@@ -290,12 +333,15 @@ Faz 21 proje, Faz 22 varlık).
 
 ## Faz 20 — Kalite ve araçlar
 
-- [ ] **Undo / Redo** — komut deseni (command pattern)
-- [ ] Profiling: kapsam zamanlayıcıları, Chrome tracing çıktısı
-- [ ] Birim testleri (Catch2) — özellikle `SceneSerializer`, `UUID`, matematik
-- [ ] CI (GitHub Actions): Windows + Linux derleme
-- [ ] Editör teması / stil ayarları
-- [ ] Kilitlenme raporlama
+- [ ] **20a** Undo / Redo çekirdeği — komut deseni, `CommandStack`
+- [ ] **20b** Komutların editöre yayılması: transform, component
+      ekle/sil, hiyerarşi değişikliği, silme (0.2 + 0.3 ön koşul)
+- [ ] **20c** Profiling: kapsam zamanlayıcıları, Chrome tracing çıktısı
+- [ ] **20d** CI (GitHub Actions, Windows + Linux), editör teması,
+      kilitlenme raporlama
+
+> Birim testleri (Catch2) bu fazdan **0.5'e alındı** — `SceneSerializer`
+> ve `AssetManager` elle test edilemeyecek kadar karmaşıklaştı.
 
 > **Undo/Redo'yu hafife alma.** Her düzenleme işlemini geri alınabilir bir
 > komuta çevirmek, editörün tamamına dokunan bir mimari değişikliktir.
@@ -329,13 +375,20 @@ MVP sırasında bilinçli olarak bıraktıklarımız:
 
 ---
 
-# Önerilen başlangıç
+# Güncel sıra
 
-Sırayla gitmek istersen: **Faz 8 → 9 → 10 → 11**.
+```
+0.1 ✅ → 0.4 → 0.2 → 0.3 → 0.5
+      → 13a-d → 16a-c → 0.6
+      → 14 → 15 → 17a-d → 18b-d → 19 → 23 → 20a-d
+```
 
-Bu dördü birlikte motoru "oyuncak" olmaktan çıkarıp gerçek bir editöre
-dönüştürür: kalıcı kimlik, hiyerarşi, oyunu çalıştırma, viewport'ta
-doğrudan düzenleme.
-
-Görsel sonuç en hızlı gelen: **Faz 11** (gizmo ile nesne sürüklemek).
-En çok kavram öğreten: **Faz 8** ve **Faz 10**.
+**Neden bu sıra:**
+- 0.4 önce, çünkü küçük ve varlık tablosunun diskle tutarlılığı şu an
+  tamamen içerik panelinin doğru çağrı yapmasına bağlı — kırılgan.
+- 0.2 → 0.3 → (…) → 20 zinciri kırılmamalı; Undo'yu tek seçim
+  varsayımıyla yazmak tüm komutları çöpe atar.
+- 0.6 (Faz 22 artıkları) Faz 16'dan sonraya bırakıldı: acil değil ve
+  script fazı motoru gerçekten *oyun* çalıştırır hale getiriyor.
+- 18b, 17c'nin ön koşulu (collider debug çizimi daire istiyor);
+  18d, 0.4'ün dosya izleyicisini kullanıyor.

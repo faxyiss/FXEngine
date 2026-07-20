@@ -1,0 +1,19 @@
+# Build ciktilari
+build/
+out/
+_deps/
+
+# IDE
+.vs/
+.vscode/
+*.user
+CMakeSettings.json
+compile_commands.json
+
+# Derleyici artiklari
+*.obj
+*.pdb
+*.ilk
+*.exe
+*.dll
+*.lib

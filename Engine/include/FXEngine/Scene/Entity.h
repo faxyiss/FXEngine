@@ -24,7 +24,9 @@
 
 #include <entt/entt.hpp>
 
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace FX
 {
@@ -74,12 +76,40 @@ namespace FX
             return m_Scene->m_Registry.all_of<T>(m_EntityHandle);
         }
 
+        // Yoksa ekler, varsa mevcuduna referans doner.
+        template<typename T, typename... Args>
+        T& AddOrReplaceIfMissing(Args&&... args)
+        {
+            if (HasComponent<T>())
+                return GetComponent<T>();
+            return AddComponent<T>(std::forward<Args>(args)...);
+        }
+
         template<typename T>
         void RemoveComponent()
         {
             FX_ASSERT(HasComponent<T>(), "Kaldirilacak component yok!");
             m_Scene->m_Registry.remove<T>(m_EntityHandle);
         }
+
+        // --- Hiyerarsi ------------------------------------------------------
+        // Tanimlar Entity.cpp'de: Scene'in tam tanimina ve component
+        // basliklarina ihtiyac duyuyorlar.
+
+        UUID GetUUID() const;
+        const std::string& GetName() const;
+
+        Entity GetParent() const;
+
+        // Gecersiz bir Entity vererek koke tasinir.
+        // Dongusel baglanti (kendi torununun cocugu olmak) reddedilir.
+        void SetParent(Entity parent);
+
+        std::vector<Entity> GetChildren() const;
+        bool HasChildren() const;
+
+        // this, other'in ustunde bir yerde mi? Dongu kontrolu icin.
+        bool IsAncestorOf(Entity other) const;
 
         // --- Gecerlilik ----------------------------------------------------
         // explicit: kazara bool'a donusmesini engeller.

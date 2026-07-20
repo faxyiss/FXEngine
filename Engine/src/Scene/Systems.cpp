@@ -1,4 +1,4 @@
-#include "FXEngine/Scene/Systems.h"
+﻿#include "FXEngine/Scene/Systems.h"
 #include "FXEngine/Scene/Scene.h"
 #include "FXEngine/Scene/Entity.h"
 #include "FXEngine/Scene/Components.h"
@@ -8,6 +8,40 @@
 
 namespace FX
 {
+    namespace
+    {
+        void UpdateWorldRecursive(Entity entity, const glm::mat4& parentWorld)
+        {
+            auto& tc = entity.GetComponent<TransformComponent>();
+            const glm::mat4 world = parentWorld * tc.GetTransform();
+
+            entity.AddOrReplaceIfMissing<WorldTransformComponent>().Matrix = world;
+
+            for (Entity child : entity.GetChildren())
+                UpdateWorldRecursive(child, world);
+        }
+    }
+
+    void TransformSystem::Update(Scene& scene)
+    {
+        auto& registry = scene.GetRegistry();
+
+        // Sadece KOKLERDEN basliyoruz; cocuklara ozyineleme ile iniyoruz.
+        // Tum entity'ler uzerinde duz gezseydik bir cocugu parent'indan
+        // once isleyebilirdik ve dunya matrisi bir kare geride kalirdi.
+        auto view = registry.view<TransformComponent>();
+        for (auto id : view)
+        {
+            Entity e{ id, &scene };
+
+            const bool isRoot = !e.HasComponent<RelationshipComponent>() ||
+                                !e.GetComponent<RelationshipComponent>().Parent.IsValid();
+
+            if (isRoot)
+                UpdateWorldRecursive(e, glm::mat4(1.0f));
+        }
+    }
+
     void FollowSystem::Update(Scene& scene, float /*dt*/)
     {
         auto& registry = scene.GetRegistry();
@@ -97,47 +131,22 @@ namespace FX
     {
         Renderer2D::BeginScene(camera);
 
-        auto view = registry.view<TransformComponent, SpriteRendererComponent>();
+        // WorldTransformComponent'i TransformSystem dolduruyor; burada
+        // yerel transform'a hic bakmiyoruz.
+        auto view = registry.view<WorldTransformComponent, SpriteRendererComponent>();
 
         for (auto entity : view)
         {
-            auto [transform, sprite] = view.get<TransformComponent, SpriteRendererComponent>(entity);
+            auto [world, sprite] =
+                view.get<WorldTransformComponent, SpriteRendererComponent>(entity);
 
-            // Donme yoksa hizli yolu sec: sin/cos ve fazladan matris
-            // carpimi atlanir. Cogu sprite dondurulmez, bu ayrim
-            // binlerce entity'de olculebilir fark yaratir.
-            //
-            // Not: "== 0.0f" ile float karsilastirmasi genelde kotu bir
-            // aliskanliktir, ama burada dogru: donmenin TAM OLARAK sifir
-            // olup olmadigini soruyoruz, bir hesabin sonucunu degil.
-            // Kucuk bir aci (0.0001) hizli yola girmezse zarari da yok.
-            const bool rotated = (transform.Rotation != 0.0f);
-            const int  id      = static_cast<int>(entity);
+            const int id = static_cast<int>(entity);
 
             if (sprite.Texture)
-            {
-                if (rotated)
-                    Renderer2D::DrawRotatedQuad(glm::vec2(transform.Translation),
-                                                transform.Scale, transform.Rotation,
-                                                sprite.Texture, sprite.TilingFactor,
-                                                sprite.Color, id);
-                else
-                    Renderer2D::DrawQuad(transform.Translation, transform.Scale,
-                                         sprite.Texture, sprite.TilingFactor,
-                                         sprite.Color, id);
-            }
+                Renderer2D::DrawQuad(world.Matrix, sprite.Texture,
+                                     sprite.TilingFactor, sprite.Color, id);
             else
-            {
-                // Texture yok -> duz renk. Renderer2D iceride beyaz
-                // texture kullaniyor, yani bu da AYNI batch'e giriyor.
-                if (rotated)
-                    Renderer2D::DrawRotatedQuad(glm::vec2(transform.Translation),
-                                                transform.Scale, transform.Rotation,
-                                                sprite.Color, id);
-                else
-                    Renderer2D::DrawQuad(transform.Translation, transform.Scale,
-                                         sprite.Color, id);
-            }
+                Renderer2D::DrawQuad(world.Matrix, sprite.Color, id);
         }
 
         Renderer2D::EndScene();

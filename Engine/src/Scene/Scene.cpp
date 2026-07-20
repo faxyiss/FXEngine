@@ -3,6 +3,8 @@
 #include "FXEngine/Scene/Components.h"
 #include "FXEngine/Scene/Systems.h"
 
+#include <algorithm>
+
 namespace FX
 {
     Entity Scene::CreateEntity(const std::string& name)
@@ -34,6 +36,26 @@ namespace FX
     {
         if (!entity)
             return;
+
+        // Cocuklar da silinir. Alternatifi onlari koke tasimakti; birlikte
+        // silmek daha sezgisel (bir tankin namlusu tank olunce kalmamali)
+        // ve Unity/Godot da boyle yapar.
+        //
+        // Listeyi KOPYALIYORUZ: ozyineleme sirasinda parent'in Children
+        // dizisi degisiyor, uzerinde gezerken degistirmek gecersiz
+        // yineleyiciye yol acardi.
+        const auto children = entity.GetChildren();
+        for (Entity child : children)
+            DestroyEntity(child);
+
+        // Parent'in cocuk listesinden kendimizi cikar.
+        if (Entity parent = entity.GetParent())
+        {
+            auto& prc = parent.GetComponent<RelationshipComponent>();
+            const UUID myID = entity.GetComponent<IDComponent>().ID;
+            prc.Children.erase(std::remove(prc.Children.begin(), prc.Children.end(), myID),
+                               prc.Children.end());
+        }
 
         // ONCE haritadan cikar, SONRA registry'den sil.
         // Ters yapsaydik, silinmis entity'nin IDComponent'ini okumaya
@@ -94,16 +116,23 @@ namespace FX
         // SISTEM SIRASI BURADA TANIMLIDIR ve bu, Scene sinifinin
         // varlik sebebidir.
         //
-        //   Follow -> Movement
-        // Sira onemli: FollowSystem hedefe dogru bir HIZ yaziyor,
-        // MovementSystem o hizi konuma uyguluyor. Ters olsaydi takip
-        // her zaman bir kare gecikmeli calisirdi.
+        //   Follow -> Movement -> Transform
+        // FollowSystem hedefe dogru bir HIZ yaziyor, MovementSystem o hizi
+        // konuma uyguluyor, TransformSystem de nihai dunya matrislerini
+        // hesapliyor. TransformSystem EN SONDA olmali: ondan once calisan
+        // her sey yerel konumu degistirebilir.
         FollowSystem::Update(*this, dt);
         MovementSystem::Update(m_Registry, dt);
+        TransformSystem::Update(*this);
     }
 
     void Scene::OnRender(const OrthographicCamera& camera)
     {
+        // Editorde sahne duraklatilmis olabilir; o zaman OnUpdate hic
+        // calismaz ama Inspector'dan yapilan degisikliklerin gorunmesi
+        // gerekir. Bu yuzden dunya matrislerini burada da tazeliyoruz.
+        TransformSystem::Update(*this);
+
         SpriteRenderSystem::Render(m_Registry, camera);
     }
 }

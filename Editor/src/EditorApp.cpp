@@ -154,6 +154,36 @@ namespace FXEd
             fc.StopDistance = 1.0f + static_cast<float>(i) * 0.6f;
         }
 
+        // --- Hiyerarsi ornegi ---------------------------------------------------
+        // Govde doner; kule ve namlu onun cocugu oldugu icin birlikte doner.
+        // Kule kendi de doner -> namlu iki donmeyi birden alir.
+        {
+            auto body = m_Scene->CreateEntity("Tank Govde");
+            auto& btf = body.GetComponent<FX::TransformComponent>();
+            btf.Translation = { -6.0f, 4.0f, 0.2f };
+            btf.Scale       = { 2.0f, 2.0f };
+            body.AddComponent<FX::SpriteRendererComponent>(
+                m_Checkerboard, glm::vec4{ 0.45f, 0.75f, 0.45f, 1.0f });
+            body.AddComponent<FX::VelocityComponent>(glm::vec2{ 0.0f, 0.0f }, 0.4f);
+
+            auto turret = m_Scene->CreateEntity("Tank Kule");
+            auto& ttf = turret.GetComponent<FX::TransformComponent>();
+            ttf.Translation = { 0.0f, 0.0f, 0.05f };
+            ttf.Scale       = { 0.55f, 0.55f };
+            turret.AddComponent<FX::SpriteRendererComponent>(
+                m_Circle, glm::vec4{ 1.0f, 0.9f, 0.4f, 1.0f });
+            turret.AddComponent<FX::VelocityComponent>(glm::vec2{ 0.0f, 0.0f }, 1.5f);
+            turret.SetParent(body);
+
+            auto barrel = m_Scene->CreateEntity("Tank Namlu");
+            auto& natf = barrel.GetComponent<FX::TransformComponent>();
+            natf.Translation = { 0.9f, 0.0f, 0.05f };
+            natf.Scale       = { 1.4f, 0.35f };
+            barrel.AddComponent<FX::SpriteRendererComponent>(
+                glm::vec4{ 0.9f, 0.35f, 0.25f, 1.0f });
+            barrel.SetParent(turret);
+        }
+
         for (int i = 0; i < 8; ++i)
         {
             auto e = m_Scene->CreateEntity("Uydu " + std::to_string(i));
@@ -597,7 +627,17 @@ namespace FXEd
         const glm::mat4& proj = m_Camera->GetProjectionMatrix();
 
         auto& tc = selected.GetComponent<FX::TransformComponent>();
-        glm::mat4 transform = tc.GetTransform();
+
+        // Gizmo DUNYA uzayinda calisir. Parent'i olan bir entity'nin
+        // yerel matrisini verirsek tutamaklar yanlis yerde cikar.
+        glm::mat4 parentWorld{ 1.0f };
+        if (FX::Entity parent = selected.GetParent())
+        {
+            if (parent.HasComponent<FX::WorldTransformComponent>())
+                parentWorld = parent.GetComponent<FX::WorldTransformComponent>().Matrix;
+        }
+
+        glm::mat4 transform = parentWorld * tc.GetTransform();
 
         // Ctrl basiliyken kademeli hareket (snap).
         const bool* keys = SDL_GetKeyboardState(nullptr);
@@ -616,8 +656,11 @@ namespace FXEd
 
         if (ImGuizmo::IsUsing())
         {
+            // Dunya -> yerel: parent'in tersiyle carp.
+            const glm::mat4 local = glm::inverse(parentWorld) * transform;
+
             float translation[3], rotation[3], scale[3];
-            ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(transform),
+            ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(local),
                                                   translation, rotation, scale);
 
             tc.Translation = { translation[0], translation[1], translation[2] };

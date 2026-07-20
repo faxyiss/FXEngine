@@ -25,6 +25,7 @@ set(FXENGINE_SOURCES
     src/Renderer/Framebuffer.cpp
     src/Renderer/TextureLibrary.cpp
     src/Scene/Scene.cpp
+    src/Scene/Entity.cpp
     src/Scene/Systems.cpp
     src/Scene/SceneSerializer.cpp
 )

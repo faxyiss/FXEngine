@@ -21,6 +21,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -93,6 +94,25 @@ namespace FX
                    glm::rotate(glm::mat4(1.0f), Rotation, { 0.0f, 0.0f, 1.0f }) *
                    glm::scale(glm::mat4(1.0f), { Scale.x, Scale.y, 1.0f });
         }
+    };
+
+    // -----------------------------------------------------------------------
+    // RelationshipComponent - hiyerarsi baglantilari
+    // -----------------------------------------------------------------------
+    // UUID tutuyoruz, entt::entity degil: yuklemeden sag cikmasi gerekiyor
+    // (Faz 8'in sebebi). Cocuklari vector olarak saklamak bagli listeden
+    // daha basit ve serilestirmesi dogrudan.
+    struct RelationshipComponent
+    {
+        UUID              Parent{ 0 };
+        std::vector<UUID> Children;
+    };
+
+    // Parent zinciri uygulanmis nihai matris. TransformSystem her karede
+    // hesaplar; hicbir yerde elle yazilmaz.
+    struct WorldTransformComponent
+    {
+        glm::mat4 Matrix{ 1.0f };
     };
 
     // -----------------------------------------------------------------------

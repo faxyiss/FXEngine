@@ -1,4 +1,4 @@
-#include "FXEngine/Scene/SceneSerializer.h"
+﻿#include "FXEngine/Scene/SceneSerializer.h"
 #include "FXEngine/Scene/Entity.h"
 #include "FXEngine/Scene/Components.h"
 #include "FXEngine/Core/Log.h"
@@ -7,6 +7,8 @@
 #include <nlohmann/json.hpp>
 
 #include <filesystem>
+#include <utility>
+#include <vector>
 #include <fstream>
 #include <iomanip>
 
@@ -70,6 +72,16 @@ namespace FX
 
             if (entity.HasComponent<TagComponent>())
                 e["Tag"] = entity.GetComponent<TagComponent>().Tag;
+
+            // Sadece PARENT'i yaziyoruz, cocuk listesini degil: cocuklar
+            // parent bilgisinden yeniden kurulabilir. Iki yonu de yazmak,
+            // ikisinin tutarsiz kalabilecegi bir dosya formati demektir.
+            if (entity.HasComponent<RelationshipComponent>())
+            {
+                const auto& rc = entity.GetComponent<RelationshipComponent>();
+                if (rc.Parent.IsValid())
+                    e["Parent"] = static_cast<std::uint64_t>(rc.Parent);
+            }
 
             if (entity.HasComponent<TransformComponent>())
             {
@@ -153,7 +165,7 @@ namespace FX
         // Surum 1 dosyalari hala aciliyor (ID alani yoksa yeni uretiliyor) -
         // Faz 7'de bu alani "bugun kullanmiyoruz ama sonradan eklemek zor"
         // diye koymustuk; ilk faydasini simdi goruyoruz.
-        root["Version"] = 2;
+        root["Version"] = 3;
         root["Scene"]   = "Untitled";
 
         json entities = json::array();
@@ -249,8 +261,8 @@ namespace FX
         if (version == 1)
             FX_CORE_WARN("Sahne surumu 1 (Faz 7). UUID'ler yeniden uretilecek, "
                          "entity referanslari kaybolabilir.");
-        else if (version != 2)
-            FX_CORE_WARN("Sahne surumu %d, beklenen 2. Yine de denenecek.", version);
+        else if (version != 2 && version != 3)
+            FX_CORE_WARN("Sahne surumu %d, beklenen 3. Yine de denenecek.", version);
 
         if (!root.contains("Entities") || !root["Entities"].is_array())
         {
@@ -268,6 +280,10 @@ namespace FX
         m_Scene->Clear();
 
         std::size_t loaded = 0;
+
+        // Parent baglantilari IKINCI GECISTE kuruluyor: dosyada bir cocuk
+        // parent'indan once gelebilir ve o an parent henuz olusturulmamis olur.
+        std::vector<std::pair<Entity, UUID>> pendingParents;
 
         for (const auto& e : root["Entities"])
         {
@@ -351,10 +367,29 @@ namespace FX
                 fc.StopDistance = f.value("StopDistance", 1.0f);
             }
 
+            if (e.contains("Parent"))
+            {
+                const UUID parentID{ e["Parent"].get<std::uint64_t>() };
+                if (parentID.IsValid())
+                    pendingParents.emplace_back(entity, parentID);
+            }
+
             ++loaded;
         }
 
-        FX_CORE_INFO("Sahne yuklendi: %s (%zu entity)", fullPath.c_str(), loaded);
+        for (auto& [child, parentID] : pendingParents)
+        {
+            Entity parent = m_Scene->FindEntityByUUID(parentID);
+            if (parent)
+                child.SetParent(parent);
+            else
+                FX_CORE_WARN("Entity '%s': parent bulunamadi (%llu), koke birakildi.",
+                             child.GetName().c_str(),
+                             static_cast<unsigned long long>(parentID));
+        }
+
+        FX_CORE_INFO("Sahne yuklendi: %s (%zu entity, %zu hiyerarsi bagi)",
+                     fullPath.c_str(), loaded, pendingParents.size());
         return true;
     }
 }

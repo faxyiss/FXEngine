@@ -24,6 +24,17 @@ namespace FX
     class Scene;
 
     // -----------------------------------------------------------------------
+    // TransformSystem - hiyerarsiyi gezip dunya matrislerini hesaplar
+    // -----------------------------------------------------------------------
+    // Kokten yapraga (top-down) gider: bir cocugun dunya matrisi
+    // parent'inki hesaplanmadan bulunamaz.
+    class TransformSystem
+    {
+    public:
+        static void Update(Scene& scene);
+    };
+
+    // -----------------------------------------------------------------------
     // FollowSystem - FollowComponent'in hedefine dogru hiz yazar
     // -----------------------------------------------------------------------
     // Faz 8'in kanit sistemi: UUID ile kurulmus referanslarin gercekten

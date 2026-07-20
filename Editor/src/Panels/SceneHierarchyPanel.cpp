@@ -4,6 +4,7 @@
 #include <FXEngine/Core/Log.h>
 
 #include <imgui.h>
+#include <imgui_internal.h>
 
 #include <glm/gtc/type_ptr.hpp>
 
@@ -52,21 +53,34 @@ namespace FXEd
         // NOT: view uzerinde gezerken entity SILMEK tehlikelidir -
         // dizi altimizdan degisir. Bu yuzden silme istegini bir
         // degiskende biriktirip dongu BITTIKTEN SONRA uyguluyoruz.
-        FX::Entity toDelete{};
+        m_ToDelete = {};
+        m_ReparentChild  = {};
+        m_ReparentTarget = {};
+        m_ReparentToRoot = false;
 
+        // Sadece KOKLERI geziyoruz; cocuklar DrawEntityNode icinde
+        // ozyineleme ile ciziliyor.
         auto view = registry.view<FX::TagComponent>();
         for (auto entityID : view)
         {
             FX::Entity entity{ entityID, m_Scene };
-            DrawEntityNode(entity);
 
-            // Sag tik menusu, satirin hemen ustunde acilir.
-            if (ImGui::BeginPopupContextItem())
+            const bool isRoot = !entity.HasComponent<FX::RelationshipComponent>() ||
+                                !entity.GetComponent<FX::RelationshipComponent>().Parent.IsValid();
+            if (isRoot)
+                DrawEntityNode(entity);
+        }
+
+        // Bos alana birakma: koke tasi.
+        if (ImGui::BeginDragDropTargetCustom(ImGui::GetCurrentWindow()->Rect(), ImGui::GetID("HierarchyRoot")))
+        {
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("FX_ENTITY"))
             {
-                if (ImGui::MenuItem("Entity'yi Sil"))
-                    toDelete = entity;
-                ImGui::EndPopup();
+                const auto handle = *static_cast<const entt::entity*>(payload->Data);
+                m_ReparentChild  = FX::Entity{ handle, m_Scene };
+                m_ReparentToRoot = true;
             }
+            ImGui::EndDragDropTarget();
         }
 
         // Bos alana sol tik -> secimi kaldir.
@@ -85,12 +99,23 @@ namespace FXEd
 
         ImGui::End();
 
-        // Silme islemi dongu disinda, guvenli noktada.
-        if (toDelete)
+        // Yapiyi degistiren islemler dongu DISINDA: agac uzerinde
+        // gezerken parent/child listelerini degistirmek yineleyicileri
+        // gecersiz kilardi.
+        if (m_ReparentChild)
         {
-            if (m_Selection == toDelete)
+            if (m_ReparentToRoot)
+                m_ReparentChild.SetParent({});
+            else if (m_ReparentTarget)
+                m_ReparentChild.SetParent(m_ReparentTarget);
+        }
+
+        if (m_ToDelete)
+        {
+            // Secili entity silinenin ALTINDA olabilir; o da yok olacak.
+            if (m_Selection && (m_Selection == m_ToDelete || m_ToDelete.IsAncestorOf(m_Selection)))
                 m_Selection = {};
-            m_Scene->DestroyEntity(toDelete);
+            m_Scene->DestroyEntity(m_ToDelete);
         }
 
         // ===================================================================
@@ -109,24 +134,74 @@ namespace FXEd
     void SceneHierarchyPanel::DrawEntityNode(FX::Entity entity)
     {
         const auto& tag = entity.GetComponent<FX::TagComponent>().Tag;
+        const bool hasChildren = entity.HasChildren();
 
         ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanAvailWidth |
-                                   ImGuiTreeNodeFlags_Leaf |          // alt entity yok (henuz)
-                                   ImGuiTreeNodeFlags_NoTreePushOnOpen;
+                                   ImGuiTreeNodeFlags_OpenOnArrow;
 
+        if (!hasChildren)
+            flags |= ImGuiTreeNodeFlags_Leaf;
         if (m_Selection == entity)
             flags |= ImGuiTreeNodeFlags_Selected;
 
         // ImGui bir "ID yigini" tutar. Ayni isimde iki entity varsa
         // ikisi de ayni ID'yi alir ve birine tiklayinca digeri secilir.
-        // Entity kimligini ID olarak vererek bunu onluyoruz.
-        // (void* cast'i ImGui'nin ID API'sinin bir tuhafligi.)
-        const auto id = static_cast<std::uint32_t>(entity.GetHandle());
-        ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<std::uintptr_t>(id)),
-                          flags, "%s", tag.c_str());
+        const auto handle = entity.GetHandle();
+        const auto rawID  = static_cast<std::uint32_t>(handle);
+        const bool opened = ImGui::TreeNodeEx(
+            reinterpret_cast<void*>(static_cast<std::uintptr_t>(rawID)),
+            flags, "%s", tag.c_str());
 
-        if (ImGui::IsItemClicked())
+        if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
             m_Selection = entity;
+
+        if (ImGui::BeginPopupContextItem())
+        {
+            if (ImGui::MenuItem("Alt Entity Ekle"))
+            {
+                FX::Entity child = m_Scene->CreateEntity("Yeni Entity");
+                m_ReparentChild  = child;
+                m_ReparentTarget = entity;
+                m_Selection      = child;
+            }
+            if (ImGui::MenuItem("Koke Tasi", nullptr, false, static_cast<bool>(entity.GetParent())))
+            {
+                m_ReparentChild  = entity;
+                m_ReparentToRoot = true;
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Entity'yi Sil"))
+                m_ToDelete = entity;
+            ImGui::EndPopup();
+        }
+
+        // Surukle: entt kimligini tasiyoruz (ayni kare icinde gecerli).
+        if (ImGui::BeginDragDropSource())
+        {
+            ImGui::SetDragDropPayload("FX_ENTITY", &handle, sizeof(handle));
+            ImGui::Text("%s", tag.c_str());
+            ImGui::EndDragDropSource();
+        }
+
+        // Birak: suruklenen entity bunun cocugu olsun.
+        if (ImGui::BeginDragDropTarget())
+        {
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("FX_ENTITY"))
+            {
+                const auto dropped = *static_cast<const entt::entity*>(payload->Data);
+                m_ReparentChild  = FX::Entity{ dropped, m_Scene };
+                m_ReparentTarget = entity;
+                m_ReparentToRoot = false;
+            }
+            ImGui::EndDragDropTarget();
+        }
+
+        if (opened)
+        {
+            for (FX::Entity child : entity.GetChildren())
+                DrawEntityNode(child);
+            ImGui::TreePop();
+        }
     }
 
     namespace
@@ -209,6 +284,16 @@ namespace FXEd
                 tag = std::string(buffer);
         }
 
+        if (FX::Entity parent = entity.GetParent())
+        {
+            ImGui::TextDisabled("Parent");
+            ImGui::SameLine(110.0f);
+            ImGui::TextDisabled("%s", parent.GetName().c_str());
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Ayir"))
+                m_ReparentChild = entity, m_ReparentToRoot = true;
+        }
+
         ImGui::Separator();
 
         // --- Transform ---------------------------------------------------------
@@ -217,6 +302,9 @@ namespace FXEd
             if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
             {
                 auto& tc = entity.GetComponent<FX::TransformComponent>();
+
+                if (entity.GetParent())
+                    ImGui::TextDisabled("(parent'a gore yerel)");
 
                 DrawVec3Control("Konum", tc.Translation);
 

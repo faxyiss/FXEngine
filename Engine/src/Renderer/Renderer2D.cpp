@@ -442,6 +442,19 @@ namespace FX
                    tint, texIndex, tilingFactor, entityID);
     }
 
+    void Renderer2D::DrawQuad(const glm::mat4& transform, const glm::vec4& color, int entityID)
+    {
+        SubmitQuad(transform, color, 0.0f, 1.0f, entityID);
+    }
+
+    void Renderer2D::DrawQuad(const glm::mat4& transform,
+                              const std::shared_ptr<Texture2D>& texture,
+                              float tilingFactor, const glm::vec4& tint, int entityID)
+    {
+        const float texIndex = ResolveTextureSlot(texture);
+        SubmitQuad(transform, tint, texIndex, tilingFactor, entityID);
+    }
+
     Renderer2D::Statistics Renderer2D::GetStats() { return s_Data.Stats; }
     void Renderer2D::ResetStats()                 { s_Data.Stats = Statistics{}; }
 }

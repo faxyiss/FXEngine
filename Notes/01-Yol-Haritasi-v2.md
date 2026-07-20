@@ -45,23 +45,20 @@ Ayrıntılar: [Faz-08-Notlar.md](Faz-08-Notlar.md)
 
 ---
 
-## Faz 9 — Parent / Child hiyerarşisi
+## Faz 9 — Parent / Child hiyerarşisi ✅ TAMAM
 
-Şu an tüm entity'ler düz bir liste. Bir tank + top namlusu yapmak istersen
-namlunun tanka bağlı olması gerekir.
+- [x] `RelationshipComponent` — parent UUID + çocuk UUID listesi
+- [x] `Entity::SetParent / GetChildren / IsAncestorOf`
+- [x] **Dünya transform'u = parent zinciri × yerel transform**
+- [x] `TransformSystem` — kökten yaprağa, `WorldTransformComponent`
+- [x] `Renderer2D::DrawQuad(mat4, …)` aşırı yükleri
+- [x] Hierarchy ağaç görünümü + sürükle-bırak ile parent değiştirme
+- [x] Parent silinince çocuklar da silinir (Unity/Godot davranışı)
+- [x] Döngü koruması, gizmo dünya↔yerel dönüşümü
+- [x] Sürüm 3 dosya formatı, iki geçişli yükleme
+- [ ] Dirty flag optimizasyonu → gerekirse ileride
 
-- [ ] `RelationshipComponent` — parent UUID, ilk çocuk, kardeş bağlantıları
-- [ ] `Entity::SetParent / AddChild / GetChildren`
-- [ ] **Dünya transform'u = parent zinciri × yerel transform**
-- [ ] `TransformSystem` — hiyerarşiyi gezip dünya matrislerini hesaplar
-- [ ] Hierarchy paneli ağaç olarak çizsin, sürükle-bırak ile parent değiştirme
-- [ ] Parent silinince çocuklara ne olacak? (birlikte sil / köke taşı — **karar ver**)
-
-**Öğrenilecek:** Yerel/dünya uzay ayrımı. Neden her karede zinciri
-yeniden hesaplamak yerine "kirli bayrağı" (dirty flag) kullanılır.
-
-**Dikkat:** Döngüsel parent (A'nın parent'ı B, B'nin parent'ı A) kontrolü şart —
-sonsuz döngüye girer.
+Ayrıntılar: [Faz-09-Notlar.md](Faz-09-Notlar.md)
 
 ---
 

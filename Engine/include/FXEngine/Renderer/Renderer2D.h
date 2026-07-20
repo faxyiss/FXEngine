@@ -84,6 +84,16 @@ namespace FX
                                     float tilingFactor = 1.0f,
                                     const glm::vec4& tint = glm::vec4(1.0f), int entityID = -1);
 
+        // Hazir donusum matrisiyle cizim. Hiyerarsi (Faz 9) dunya matrisini
+        // zaten hesapliyor; pozisyon/olcek/aciya geri ayristirmak hem
+        // gereksiz hem kayipli olurdu.
+        static void DrawQuad(const glm::mat4& transform, const glm::vec4& color,
+                             int entityID = -1);
+        static void DrawQuad(const glm::mat4& transform,
+                             const std::shared_ptr<Texture2D>& texture,
+                             float tilingFactor = 1.0f,
+                             const glm::vec4& tint = glm::vec4(1.0f), int entityID = -1);
+
         // --- Istatistik --------------------------------------------------------
         // Batch renderer'in ISE YARADIGINI OLCEBILMEK icin. Sayilari
         // gormeden "optimize ettim" demek anlamsizdir.

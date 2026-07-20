@@ -111,8 +111,8 @@ namespace FXEd
         FX_INFO("");
         FX_INFO("Editor hazir. Panelleri surukleyerek yeniden duzenleyebilirsin;");
         FX_INFO("duzen imgui.ini'ye kaydedilir.");
-        FX_INFO("Viewport kamerasi: W/A/S/D veya orta tus / Space+sol tus ile kaydir,");
-        FX_INFO("tekerlek ile imlece dogru zoom, Q/E dondur.");
+        FX_INFO("Viewport kamerasi: sag tus (veya Space+sol tus) ile kaydir,");
+        FX_INFO("W/A/S/D ile de kaydirabilirsin, tekerlek imlece dogru zoom yapar.");
         FX_INFO("Ctrl+N yeni, Ctrl+O ac, Ctrl+S kaydet, Ctrl+Shift+S farkli kaydet.");
         FX_INFO("Icerik panelinden viewport'a resim/prefab/sahne surukleyebilirsin.");
         FX_INFO("Disaridan dosya: pencereye surukle-birak veya Ctrl+I.");
@@ -574,22 +574,14 @@ namespace FXEd
         const float len = std::sqrt(dx * dx + dy * dy);
         if (len > 0.0f)
         {
-            dx /= len;
-            dy /= len;
-
-            const float move = m_CameraMoveSpeed * dt;
-            const float rad  = glm::radians(m_CameraRotation);
-            const float cs = std::cos(rad), sn = std::sin(rad);
-
-            m_CameraPosition.x += (dx * cs - dy * sn) * move;
-            m_CameraPosition.y += (dx * sn + dy * cs) * move;
+            // Kamera donmuyor (Q/E kaldirildi), o yuzden ekran ekseni ile
+            // dunya ekseni ayni: donus matrisi uygulamaya gerek yok.
+            const float move = m_CameraMoveSpeed * dt / len;
+            m_CameraPosition.x += dx * move;
+            m_CameraPosition.y += dy * move;
         }
 
-        if (keys[SDL_SCANCODE_Q]) m_CameraRotation += 90.0f * dt;
-        if (keys[SDL_SCANCODE_E]) m_CameraRotation -= 90.0f * dt;
-
         m_Camera->SetPosition(m_CameraPosition);
-        m_Camera->SetRotation(m_CameraRotation);
     }
 
     void EditorApp::UpdateCameraPan()
@@ -599,8 +591,8 @@ namespace FXEd
             if (!m_ViewportHovered || ImGuizmo::IsUsing() || ImGuizmo::IsOver())
                 return;
 
-            if (ImGui::IsMouseClicked(ImGuiMouseButton_Middle))
-                m_PanButton = ImGuiMouseButton_Middle;
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+                m_PanButton = ImGuiMouseButton_Right;
             else if (ImGui::IsKeyDown(ImGuiKey_Space) &&
                      !m_ImGuiLayer.WantsKeyboard() &&
                      ImGui::IsMouseClicked(ImGuiMouseButton_Left))
@@ -871,8 +863,8 @@ namespace FXEd
                 if (ImGui::MenuItem("Kamerayi Sifirla"))
                 {
                     m_CameraPosition = { 0.0f, 0.0f, 0.0f };
-                    m_CameraRotation = 0.0f;
                     m_ZoomLevel      = 8.0f;
+                    m_Camera->SetPosition(m_CameraPosition);
                     UpdateCameraProjection();
                 }
                 if (ImGui::MenuItem("Panel Duzenini Sifirla"))
@@ -1200,20 +1192,30 @@ namespace FXEd
             return;
         }
 
-        // ImGui once gorsun. true donerse olayi tuketmis demektir.
-        if (m_ImGuiLayer.OnEvent(event))
-            return;
-
+        // TEKERLEK, WantCaptureMouse'a TABI DEGIL.
+        //
+        // Viewport'un kendisi de bir ImGui penceresi oldugu icin fare
+        // uzerindeyken WantCaptureMouse HEP true doner. Asagidaki genel
+        // kontrole biraksaydik zoom hicbir zaman calismazdi - nitekim
+        // calismiyordu da.
+        //
+        // ImGui olayi yine gorsun (ic durumu guncellensin) ama karari biz
+        // verelim: olcut "ImGui fareyi istiyor mu" degil, "fare viewport'ta
+        // mi". Diger panellerde tekerlek kaydirmaya kaliyor.
         if (event.type == SDL_EVENT_MOUSE_WHEEL)
         {
-            // Zoom sadece viewport uzerindeyken. Panellerde tekerlek
-            // kaydirma icin kullanilmali.
+            m_ImGuiLayer.OnEvent(event);
+
             // Koordinat olayin kendisinden: SDL pencere-goreli verir,
             // tek viewport'ta bu ImGui'nin ekran koordinatiyla ayni.
             if (m_ViewportHovered)
                 ZoomAtCursor(event.wheel.y, event.wheel.mouse_x, event.wheel.mouse_y);
             return;
         }
+
+        // ImGui once gorsun. true donerse olayi tuketmis demektir.
+        if (m_ImGuiLayer.OnEvent(event))
+            return;
 
         if (event.type != SDL_EVENT_KEY_DOWN || event.key.repeat)
             return;

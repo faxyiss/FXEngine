@@ -69,7 +69,7 @@ namespace FXEd
         void UpdateCameraMovement(float dt);
         void UpdateCameraProjection();
 
-        // Orta tus (veya Space + sol tus) ile suruklerken kamerayi kaydirir.
+        // Sag tus (veya Space + sol tus) ile suruklerken kamerayi kaydirir.
         void UpdateCameraPan();
 
         // Tekerlek zoom'u: imlecin altindaki dunya noktasi sabit kalir.
@@ -175,8 +175,11 @@ namespace FXEd
         // --- Kamera ------------------------------------------------------------
         std::unique_ptr<FX::OrthographicCamera> m_Camera;
 
+        // Kamera DONMUYOR. Bu bir sahne duzenleme viewport'u; egik bir
+        // kamera duzenlemeyi zorlastirmaktan baska ise yaramiyordu.
+        // Ekran ekseni = dunya ekseni oldugu icin kaydirma ve
+        // ScreenToWorld de sadeleşti.
         glm::vec3 m_CameraPosition{ 0.0f, 0.0f, 0.0f };
-        float     m_CameraRotation = 0.0f;
         float     m_ZoomLevel      = 8.0f;
         float     m_CameraMoveSpeed = 8.0f;
 

@@ -141,7 +141,7 @@ gizmo seçenekleri menünün içinde gömülüydü.
 
 ## 1. Pan: piksel deltasını dünyaya çevirmenin ucuz yolu
 
-Orta tuş (veya Space + sol tuş) sürüklemesi kamerayı kaydırıyor.
+Sağ tuş (veya Space + sol tuş) sürüklemesi kamerayı kaydırıyor.
 
 Doğrudan `delta_piksel * ölçek` yazmak cazip ama zoom **ve** kamera dönüşünü
 elle telafi etmek gerekirdi. Bunun yerine aynı karede iki ekran noktasını
@@ -208,10 +208,65 @@ bunu temsil edemez (ayrık translation/rotation/scale tutuyor).
 Bu yüzden mod seçimi ölçeklemede yok sayılıyor. Sessizce yok saymak yerine
 tooltip'te yazılı.
 
+## 5. 🐞 Tekerlek zoom'u hiç çalışmıyordu
+
+`EditorApp::OnEvent` şununla başlıyordu:
+
+```cpp
+if (m_ImGuiLayer.OnEvent(event)) return;   // ImGui tuketti mi?
+```
+
+`ImGuiLayer::OnEvent` fare olayları için `io.WantCaptureMouse` döndürüyor.
+**Viewport'un kendisi de bir ImGui penceresi** — fare üzerindeyken bu bayrak
+her zaman true. Yani tekerlek olayı `EditorApp`'e hiçbir zaman ulaşmıyordu.
+
+Bu, gizmo/pan gibi sonradan eklenen şeylerin değil, en baştan beri duran
+bir hataydı; klavye kısayolları çalıştığı için fark edilmedi.
+
+Ölçüt yanlıştı. Doğrusu **"ImGui fareyi istiyor mu"** değil,
+**"fare viewport'ta mı"**:
+
+```cpp
+if (event.type == SDL_EVENT_MOUSE_WHEEL)
+{
+    m_ImGuiLayer.OnEvent(event);        // ic durumu yine guncellensin
+    if (m_ViewportHovered) ZoomAtCursor(...);
+    return;
+}
+if (m_ImGuiLayer.OnEvent(event)) return;
+```
+
+ImGui olayı yine görüyor (aksi halde kendi kaydırma durumu bozulurdu), ama
+kararı biz veriyoruz. Diğer panellerde tekerlek kaydırmaya kalıyor.
+
+> Genel kural: `WantCaptureMouse` "başka bir panel fareyi kullanıyor" demek
+> için iyidir. Ama **kendi içeriğin de bir ImGui penceresindeyse** bayrak
+> seni de kapsar. Sahnesini `ImGui::Image` olarak çizen her editör bu
+> tuzağa düşer.
+
+**Doğrulama:** `mouse_event(MOUSEEVENTF_WHEEL)` ile tekerlek simüle edildi.
+```
+zoom=8.000 -> 7.200 -> 6.480 -> 5.832 ...   (yakinlasma)
+... -> 38.069 -> 40.000                      (clamp calisiyor)
+```
+
+## 6. Q/E döndürme kaldırıldı
+
+Kamera artık dönmüyor. Bir sahne düzenleme viewport'unda eğik kamera
+düzenlemeyi zorlaştırmaktan başka işe yaramıyordu — Blender'ın 2D
+görünümlerinde de yoktur.
+
+Yan kazanç: ekran ekseni = dünya ekseni olduğu için W/A/S/D hareketindeki
+dönüş matrisi (`cos/sin` ile bileşen karıştırma) tamamen gitti.
+`m_CameraRotation` üyesi de kaldırıldı; kullanılmayan bir alanı "belki
+lazım olur" diye tutmak, sonraki okuyucuya var olmayan bir özellik
+vaat etmek olurdu.
+
 ## Onay
 - [x] Derlendi (uyarısız)
 - [x] Çalıştırıldı, GL hatası yok, temiz kapanış
-- [ ] Pan / zoom / toolbar elle test edilecek
+- [x] Tekerlek zoom'u simüle edilerek doğrulandı
+- [ ] Pan / toolbar elle test edilecek
 
 ## Not
 Kamera hâlâ `EditorApp` içinde. `EditorCamera` sınıfına ayırma Faz 10'da

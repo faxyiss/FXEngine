@@ -59,7 +59,7 @@ fiziksel olarak zorlanır.
 | 3 | stb_image texture + orthographic 2D kamera | ✅ |
 | 4 | Batch renderer (dinamik vertex buffer, texture slot'ları) | ✅ |
 | 5 | EnTT entegrasyonu (Transform, SpriteRenderer, Tag + system'ler) | ✅ |
-| 6 | ImGui docking + Viewport / Hierarchy / Inspector panelleri | ⬜ |
+| 6 | ImGui docking + Viewport / Hierarchy / Inspector panelleri | ✅ |
 | 7 | JSON ile sahne kaydet/yükle → MVP | ⬜ |
 
 ## Derleme
@@ -86,26 +86,30 @@ cmake --build build --config Debug
 > Sonraki configure'lar saniyeler alır. Bağımlılıklar `_deps/` altında
 > cache'lenir, `build/` silinse bile tekrar indirilmez.
 
-### Kontroller (Faz 5)
+### Kullanım (Faz 6)
 
-| Tuş | İş |
+Editör dört panelden oluşur — hepsi sürüklenip yeniden düzenlenebilir,
+düzen `imgui.ini`'ye kaydedilir.
+
+| Panel | İş |
 |---|---|
-| `W` `A` `S` `D` | Oyuncuyu hareket ettir (`C` ile kameraya geçer) |
-| `C` | Kontrol: oyuncu ↔ kamera |
+| **Viewport** | Sahne (framebuffer texture'ı olarak) |
+| **Hierarchy** | Entity listesi, seçim, sağ tıkla oluştur/sil |
+| **Inspector** | Seçili entity'nin component'lerini düzenle |
+| **İstatistikler** | Draw call, quad, FPS, kamera, VSync |
+
+| Tuş / Eylem | İş |
+|---|---|
+| `W` `A` `S` `D` | Kamerayı hareket ettir (fare Viewport üzerindeyken) |
 | `Q` `E` | Kamerayı döndür |
 | Fare tekerleği | Yakınlaş / uzaklaş |
-| `R` | Kamerayı sıfırla |
-| `N` | 10 yeni hareketli entity ekle |
-| `H` | Oyuncunun `SpriteRenderer`'ını ekle/kaldır |
-| `M` | Oyuncunun `Velocity`'sini ekle/kaldır |
-| `T` | Tel kafes (wireframe) aç/kapa |
-| `V` | VSync aç/kapa |
-| `TAB` | İstatistikler |
+| `SPACE` | Sahneyi duraklat / devam ettir |
 | `ESC` | Çıkış |
+| Hierarchy'de sağ tık | Entity oluştur / sil |
+| Inspector'da `X` | Component'i kaldır |
 
-`H` ve `M` ECS'in özünü gösterir: component'i çalışma zamanında kaldırınca
-entity görünmez olur ama var olmaya devam eder, ya da sistemin görüş
-alanından tamamen çıkar.
+Component'ler çalışma zamanında eklenip kaldırılabilir — Inspector'da bir
+`SpriteRenderer`'ı kaldır, entity görünmez olur ama hareket etmeyi sürdürür.
 
 Test dokuları (`Editor/assets/textures/`) repoda hazır gelir; ayrıca
 indirmen gereken bir varlık yoktur.

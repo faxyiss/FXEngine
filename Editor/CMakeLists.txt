@@ -7,7 +7,11 @@
 add_executable(FXEditor
     src/main.cpp
     src/EditorApp.cpp
-    src/EditorApp.h)
+    src/EditorApp.h
+    src/ImGuiLayer.cpp
+    src/ImGuiLayer.h
+    src/Panels/SceneHierarchyPanel.cpp
+    src/Panels/SceneHierarchyPanel.h)
 
 target_include_directories(FXEditor PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 

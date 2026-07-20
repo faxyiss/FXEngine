@@ -7,11 +7,14 @@
 #include <FXEngine/Core/Application.h>
 #include <FXEngine/Renderer/Texture.h>
 #include <FXEngine/Renderer/OrthographicCamera.h>
+#include <FXEngine/Renderer/Framebuffer.h>
 #include <FXEngine/Scene/Scene.h>
 #include <FXEngine/Scene/Entity.h>
 
+#include "ImGuiLayer.h"
+#include "Panels/SceneHierarchyPanel.h"
+
 #include <memory>
-#include <vector>
 
 namespace FXEd
 {
@@ -29,24 +32,38 @@ namespace FXEd
         void OnWindowResize(std::uint32_t width, std::uint32_t height) override;
 
     private:
+        void BuildScene();
+        void SpawnMover();
+
         void UpdateCameraMovement(float dt);
         void UpdateCameraProjection();
-        void LogStats();
 
-        // Test sahnesini kurar. Entity'leri OLUSTURUR ama nasil
-        // cizileceklerini/hareket edeceklerini BILMEZ - o sistemlerin isi.
-        void BuildScene();
-
-        // Rastgele bir yerde hareketli bir entity uretir.
-        void SpawnMover();
+        // ImGui panellerini cizer.
+        void DrawMenuBar();
+        void DrawViewportPanel();
+        void DrawStatsPanel();
 
         // --- Sahne -------------------------------------------------------------
         std::unique_ptr<FX::Scene> m_Scene;
-
-        // Ozel bir entity'ye referans tutmak: tutamak kopyalamak ucuz,
-        // isaretci tutmaya gerek yok. Bu, Entity'nin "handle" olmasinin
-        // pratik faydasi.
         FX::Entity m_PlayerEntity;
+
+        // --- Editor arayuzu ----------------------------------------------------
+        ImGuiLayer          m_ImGuiLayer;
+        SceneHierarchyPanel m_HierarchyPanel;
+
+        // Sahne artik dogrudan ekrana degil, BUNA ciziliyor.
+        // Sonra texture'i ImGui panelinde gosteriyoruz.
+        std::unique_ptr<FX::Framebuffer> m_Framebuffer;
+
+        // Viewport panelinin PIKSEL boyutu. Pencere boyutundan farklidir:
+        // paneller yer kapladigi icin viewport her zaman daha kucuktur.
+        // Kamera en-boy orani BUNA gore hesaplanmali, pencereye gore degil.
+        glm::vec2 m_ViewportSize{ 0.0f, 0.0f };
+
+        // Fare viewport panelinin uzerinde mi? Kamera kisayollarini
+        // sadece o zaman calistiracagiz.
+        bool m_ViewportHovered = false;
+        bool m_ViewportFocused = false;
 
         // --- Kaynaklar ---------------------------------------------------------
         std::shared_ptr<FX::Texture2D> m_Checkerboard;
@@ -58,18 +75,16 @@ namespace FXEd
         glm::vec3 m_CameraPosition{ 0.0f, 0.0f, 0.0f };
         float     m_CameraRotation = 0.0f;
         float     m_ZoomLevel      = 8.0f;
-
-        float m_CameraMoveSpeed   = 8.0f;
-        float m_CameraRotateSpeed = 90.0f;
+        float     m_CameraMoveSpeed = 8.0f;
 
         // --- Durum -------------------------------------------------------------
         float m_Time = 0.0f;
+        bool  m_ScenePaused = false;
 
         float m_FpsTimer   = 0.0f;
         int   m_FpsFrames  = 0;
         float m_CurrentFps = 0.0f;
 
-        bool m_Wireframe = false;
-        bool m_PlayerControl = true;   // WASD kamerayi mi oyuncuyu mu surer
+        bool m_ShowDemoWindow = false;
     };
 }

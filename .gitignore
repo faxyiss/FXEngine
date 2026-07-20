@@ -11,6 +11,9 @@ _deps/
 CMakeSettings.json
 compile_commands.json
 
+# ImGui panel duzeni - makineye/kullaniciya ozel
+imgui.ini
+
 # Derleyici artiklari
 *.obj
 *.pdb

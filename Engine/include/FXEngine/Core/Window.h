@@ -71,6 +71,11 @@ namespace FX
         // ama tam da bu sebeple gerekli - kontrollu bir kacis kapisi.
         SDL_Window* GetNativeWindow() const { return m_Window; }
 
+        // OpenGL context tutamaci. ImGui'nin SDL3+OpenGL backend'i
+        // baslatilirken bunu ister (Faz 6). Tipi void* cunku SDL_GLContext
+        // zaten void* takma adidir ve header'a SDL sokmak istemiyoruz.
+        void* GetNativeContext() const { return m_GLContext; }
+
         // Olusturma basarili miydi? Yapici hata firlatmiyor (motorlarda
         // istisnalar genelde kapalidir), o yuzden durumu boyle sorguluyoruz.
         bool IsValid() const { return m_Window != nullptr && m_GLContext != nullptr; }

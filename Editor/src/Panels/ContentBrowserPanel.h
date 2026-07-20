@@ -69,10 +69,31 @@ namespace FXEd
         std::vector<std::filesystem::directory_entry> m_Files;
         bool m_NeedsRefresh = true;
 
+        // Bir ogeyi baska bir klasore TASIR (kopyalamaz). Kaynak proje
+        // icindeki bir dosya/klasor; hedef bir klasor.
+        void MoveItem(const std::filesystem::path& source,
+                      const std::filesystem::path& targetDir);
+
+        // Surukleme yukunu kabul edip tasimayi baslatan yardimci.
+        // Klasor ogesi, "ust klasor" dugmesi ve kirinti yolu parcalari
+        // ayni davranisi paylasiyor.
+        void AcceptMoveTarget(const std::filesystem::path& targetDir);
+
+        void SetMessage(const std::string& text);
+
         // Islemler dongu DISINDA uygulanir: uzerinde gezdigimiz listeyi
         // gezerken degistirmek yineleyicileri bozar.
         std::filesystem::path m_RenameTarget;
         std::filesystem::path m_DeleteTarget;
+
+        // Tasima da dongu disinda: rename cagrisi dizin listesini
+        // gecersiz kilar.
+        std::filesystem::path m_MoveSource;
+        std::filesystem::path m_MoveTarget;
+
+        // Kullaniciya geri bildirim (tasima hatasi, referans uyarisi).
+        std::string m_Message;
+        float       m_MessageTimer = 0.0f;
         bool m_OpenNewFolderPopup = false;
         bool m_ImportRequest      = false;
 

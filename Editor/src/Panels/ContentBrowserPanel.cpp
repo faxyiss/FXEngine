@@ -248,6 +248,15 @@ namespace FXEd
         const float width    = ImGui::GetContentRegionAvail().x;
         const int   columns  = std::max(1, static_cast<int>(width / cellSize));
 
+        // Geri bildirim satiri IZGARADAN ONCE: izgara cocuk penceresi
+        // kalan tum alani kapliyor, altina yazilan hicbir sey gorunmez.
+        if (m_MessageTimer > 0.0f)
+        {
+            m_MessageTimer -= ImGui::GetIO().DeltaTime;
+            ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.35f, 1.0f), "%s", m_Message.c_str());
+            ImGui::Separator();
+        }
+
         ImGui::BeginChild("IcerikIzgara", ImVec2(0.0f, 0.0f), false);
 
         ImGui::Columns(columns, nullptr, false);
@@ -285,6 +294,17 @@ namespace FXEd
 
         ImGui::EndChild();
 
+        // Tasima cerceve SONUNDA: rename cagrisi dizin listesini
+        // gecersiz kilar, listeyi gezerken cagrilamaz.
+        if (!m_MoveSource.empty() && !m_MoveTarget.empty())
+        {
+            const auto src = m_MoveSource;
+            const auto dst = m_MoveTarget;
+            m_MoveSource.clear();
+            m_MoveTarget.clear();
+            MoveItem(src, dst);
+        }
+
         DrawModals();
 
         ImGui::End();
@@ -301,8 +321,15 @@ namespace FXEd
             Refresh();
         }
         ImGui::EndDisabled();
+
+        // Ust klasore tasima: kokte degilken "<" bir birakma hedefi.
+        // Bu olmadan bir dosyayi yukari cikarmanin yolu olmazdi -
+        // yukarisi ekranda gorunmuyor.
+        if (!atRoot)
+            AcceptMoveTarget(m_Current.parent_path());
+
         if (ImGui::IsItemHovered() && !atRoot)
-            ImGui::SetTooltip("Ust klasor");
+            ImGui::SetTooltip("Ust klasor (buraya birakarak tasiyabilirsin)");
 
         ImGui::SameLine();
         if (ImGui::Button("Yenile"))
@@ -337,6 +364,11 @@ namespace FXEd
             ImGui::PushID(walk.string().c_str());
             if (ImGui::SmallButton(part.string().c_str()))
                 jumpTo = m_Root.parent_path() / walk;
+
+            // Kirinti yolunun her parcasi da birakma hedefi: birkac
+            // seviye yukari tasimak icin tek tek geri gitmek gerekmiyor.
+            AcceptMoveTarget(m_Root.parent_path() / walk);
+
             ImGui::PopID();
         }
 
@@ -427,17 +459,27 @@ namespace FXEd
             DrawFileIcon(drawList, itemMin, itemMax, AccentColor(path), ToLower(ext));
         }
 
-        // Surukleme kaynagi: klasorler haric her sey.
-        if (!isDirectory && ImGui::BeginDragDropSource())
+        // Surukleme kaynagi: KLASORLER DAHIL her sey.
+        //
+        // Klasorler de suruklenebiliyor cunku tasima ozelligi (asagida)
+        // onlari da kapsiyor. Viewport'a birakilan bir klasor zaten
+        // hicbir sey yapmaz - HandleContentDrop uzantiya bakiyor ve
+        // klasorun uzantisi yok.
+        if (ImGui::BeginDragDropSource())
         {
             const std::string relative = FX::FileSystem::MakeRelativeToProject(path.string());
 
             // '\0' DAHIL gonderiyoruz: alan tarafi payload'i dogrudan
             // const char* olarak okuyor, sonlandirici olmazsa tasar.
             ImGui::SetDragDropPayload(kContentPayload, relative.c_str(), relative.size() + 1);
-            ImGui::Text("%s", filename.c_str());
+            ImGui::Text("%s%s", isDirectory ? "[klasor] " : "", filename.c_str());
             ImGui::EndDragDropSource();
         }
+
+        // Birakma hedefi: sadece klasorler. Bir dosyanin uzerine birakmak
+        // anlamsiz - "icine" koyacak bir yeri yok.
+        if (isDirectory)
+            AcceptMoveTarget(path);
 
         if (ImGui::BeginPopupContextItem("OgeMenu"))
         {
@@ -475,6 +517,108 @@ namespace FXEd
 
         ImGui::NextColumn();
         ImGui::PopID();
+    }
+
+    void ContentBrowserPanel::SetMessage(const std::string& text)
+    {
+        m_Message      = text;
+        m_MessageTimer = 6.0f;
+    }
+
+    void ContentBrowserPanel::AcceptMoveTarget(const std::filesystem::path& targetDir)
+    {
+        if (!ImGui::BeginDragDropTarget())
+            return;
+
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(kContentPayload))
+        {
+            // Yuk GORECELI yol tasiyor (viewport'a birakma da ayni yuku
+            // kullaniyor); tasima icin mutlak yola cevirmemiz gerekiyor.
+            const std::string relative(static_cast<const char*>(payload->Data));
+
+            // Tasimayi BURADA yapmiyoruz: dizin listesini gezerken
+            // rename cagirmak yineleyicileri bozar. Istegi biriktirip
+            // cerceve sonunda isliyoruz - Faz 9'daki kuralin aynisi.
+            m_MoveSource = std::filesystem::path(
+                FX::FileSystem::ResolveProjectAsset(relative));
+            m_MoveTarget = targetDir;
+        }
+
+        ImGui::EndDragDropTarget();
+    }
+
+    void ContentBrowserPanel::MoveItem(const std::filesystem::path& source,
+                                       const std::filesystem::path& targetDir)
+    {
+        std::error_code ec;
+
+        // weakly_canonical: "..\" parcalarini duzler. Duzlemezsek
+        // "a/b/../b" ile "a/b" farkli gorunur ve asagidaki
+        // karsilastirmalar yanlis sonuc verir.
+        const auto src = std::filesystem::weakly_canonical(source, ec);
+        const auto dst = std::filesystem::weakly_canonical(targetDir, ec);
+
+        if (ec || src.empty() || dst.empty())
+        {
+            SetMessage("Yol cozulemedi.");
+            return;
+        }
+
+        // Zaten o klasorde: sessizce vazgec. Kullanici bir seyi ayni
+        // yere birakti, bu bir hata degil.
+        if (src.parent_path() == dst)
+            return;
+
+        // Bir klasoru kendi icine (veya kendi alt agacina) tasimak
+        // dosya sistemini bozar. Isletim sistemi bunu genelde
+        // reddeder ama davranis platforma gore degisir; kendimiz
+        // engelliyoruz.
+        if (std::filesystem::is_directory(src, ec))
+        {
+            for (auto p = dst; !p.empty(); p = p.parent_path())
+            {
+                if (p == src)
+                {
+                    SetMessage("Bir klasor kendi icine tasinamaz.");
+                    return;
+                }
+                if (p == p.parent_path())
+                    break;   // koke ulasildi
+            }
+        }
+
+        const auto target = dst / src.filename();
+
+        // UZERINE YAZMIYORUZ. Ice aktarmada (Faz 12) ayni durumda
+        // numaralandiriyoruz cunku orada dosya disaridan geliyor ve adi
+        // kullanici icin onemli degil. Tasimada ise ad onemli: sessizce
+        // "x (1).png" uretmek kafa karistirir. Reddedip soyluyoruz.
+        if (std::filesystem::exists(target, ec))
+        {
+            SetMessage("Hedefte ayni isimde bir oge zaten var: " +
+                       src.filename().string());
+            return;
+        }
+
+        std::filesystem::rename(src, target, ec);
+        if (ec)
+        {
+            SetMessage("Tasinamadi: " + ec.message());
+            FX_ERROR("Tasima basarisiz: %s -> %s (%s)",
+                     src.string().c_str(), target.string().c_str(), ec.message().c_str());
+            return;
+        }
+
+        // Varlik kimligi hala DOSYA YOLU (bkz. teknik borc): tasinan
+        // dosyaya isaret eden sahneler onu bulamayacak. Yeniden
+        // adlandirmada bunu modal ile soyluyoruz; burada surukleme
+        // akisini modal ile kesmek yerine mesaj olarak veriyoruz.
+        SetMessage(src.filename().string() + " tasindi -> " +
+                   dst.filename().string() +
+                   "  (bu ogeyi kullanan sahneler onu bulamayacak)");
+
+        FX_INFO("Tasindi: %s -> %s", src.string().c_str(), target.string().c_str());
+        Refresh();
     }
 
     void ContentBrowserPanel::DrawModals()

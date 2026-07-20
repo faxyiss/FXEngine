@@ -63,7 +63,7 @@ namespace FX
         doc["Root"]     = static_cast<std::uint64_t>(root.GetUUID());
         doc["Entities"] = entities;
 
-        const std::string fullPath = FileSystem::ResolveAsset(filepath);
+        const std::string fullPath = FileSystem::ResolveProjectAsset(filepath);
 
         {
             std::error_code ec;
@@ -90,7 +90,7 @@ namespace FX
         if (!m_Scene)
             return {};
 
-        const std::string fullPath = FileSystem::ResolveAsset(filepath);
+        const std::string fullPath = FileSystem::ResolveProjectAsset(filepath);
 
         std::ifstream in(fullPath);
         if (!in)

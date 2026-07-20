@@ -41,22 +41,69 @@ namespace FX
         return s_BaseDir;
     }
 
-    std::string FileSystem::ResolveAsset(const std::string& relativePath)
+    namespace
     {
-        // Zaten mutlak yol verilmisse dokunma.
-        // Windows'ta "C:\..." veya "\\sunucu\...", POSIX'te "/..."
-        if (!relativePath.empty())
+        // Bos = proje acilmadi. O durumda proje koku base dizine dusuyor,
+        // yani Faz 21 oncesi davranis aynen korunuyor.
+        std::string s_ProjectDir;
+
+        bool IsAbsolute(const std::string& p)
         {
-            if (relativePath[0] == '/' || relativePath[0] == '\\')
-                return relativePath;
-            if (relativePath.size() > 1 && relativePath[1] == ':')
-                return relativePath;
+            if (p.empty())
+                return false;
+            if (p[0] == '/' || p[0] == '\\')
+                return true;
+            return p.size() > 1 && p[1] == ':';
         }
 
-        return GetBaseDirectory() + relativePath;
+        std::string Resolve(const std::string& root, const std::string& relativePath)
+        {
+            if (IsAbsolute(relativePath))
+                return relativePath;
+            return root + relativePath;
+        }
     }
 
-    std::string FileSystem::MakeRelativeToBase(const std::string& absolutePath)
+    const std::string& FileSystem::GetProjectDirectory()
+    {
+        return s_ProjectDir.empty() ? GetBaseDirectory() : s_ProjectDir;
+    }
+
+    void FileSystem::SetProjectDirectory(const std::string& path)
+    {
+        if (path.empty())
+        {
+            s_ProjectDir.clear();
+            FX_CORE_INFO("Proje koku sifirlandi, exe klasoru kullanilacak.");
+            return;
+        }
+
+        s_ProjectDir = path;
+
+        // Sonda ayirici GARANTI olmali: cozumleme duz birlestirme yapiyor.
+        const char last = s_ProjectDir.back();
+        if (last != '/' && last != '\\')
+            s_ProjectDir += '/';
+
+        FX_CORE_INFO("Proje koku: %s", s_ProjectDir.c_str());
+    }
+
+    bool FileSystem::HasProject()
+    {
+        return !s_ProjectDir.empty();
+    }
+
+    std::string FileSystem::ResolveEngineAsset(const std::string& relativePath)
+    {
+        return Resolve(GetBaseDirectory(), relativePath);
+    }
+
+    std::string FileSystem::ResolveProjectAsset(const std::string& relativePath)
+    {
+        return Resolve(GetProjectDirectory(), relativePath);
+    }
+
+    std::string FileSystem::MakeRelativeToProject(const std::string& absolutePath)
     {
         if (absolutePath.empty())
             return absolutePath;
@@ -64,10 +111,10 @@ namespace FX
         std::error_code ec;
 
         // weakly_canonical: sembolik baglari ve "..\" parcalarini duzler.
-        // Duzlemezsek "C:/x/build/bin/../bin/assets" ile "C:/x/build/bin/assets"
+        // Duzlemezsek "C:/x/proje/../proje/assets" ile "C:/x/proje/assets"
         // farkli iki yol gibi gorunur ve goreceli hesap tutmaz.
         const auto base = std::filesystem::weakly_canonical(
-            std::filesystem::path(GetBaseDirectory()), ec);
+            std::filesystem::path(GetProjectDirectory()), ec);
         const auto full = std::filesystem::weakly_canonical(
             std::filesystem::path(absolutePath), ec);
 
@@ -76,11 +123,11 @@ namespace FX
 
         const auto rel = std::filesystem::relative(full, base, ec);
 
-        // Bos sonuc veya ".." ile baslamasi: dosya base'in disinda.
+        // Bos sonuc veya ".." ile baslamasi: dosya proje kokunun disinda.
         if (ec || rel.empty() || rel.native().rfind(
                 std::filesystem::path("..").native(), 0) == 0)
         {
-            FX_CORE_WARN("Varlik exe klasorunun disinda, mutlak yol saklanacak: %s",
+            FX_CORE_WARN("Varlik proje klasorunun disinda, mutlak yol saklanacak: %s",
                          absolutePath.c_str());
             return absolutePath;
         }

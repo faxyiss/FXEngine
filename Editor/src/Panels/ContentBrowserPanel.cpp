@@ -126,7 +126,7 @@ namespace FXEd
     {
         m_Library = library;
 
-        m_Root    = std::filesystem::path(FX::FileSystem::ResolveAsset("assets"));
+        m_Root    = std::filesystem::path(FX::FileSystem::ResolveProjectAsset("assets"));
         m_Current = m_Root;
 
         std::error_code ec;
@@ -214,7 +214,7 @@ namespace FXEd
 
         Refresh();
 
-        const std::string relative = FX::FileSystem::MakeRelativeToBase(target.string());
+        const std::string relative = FX::FileSystem::MakeRelativeToProject(target.string());
         FX_INFO("Ice aktarildi: %s", relative.c_str());
         return relative;
     }
@@ -390,7 +390,7 @@ namespace FXEd
         {
             // Kucuk resim = dosyanin KENDISI. Ayri bir ikon setine gerek yok
             // ve tarayicida gordugun her resim zaten onbellege giriyor.
-            const std::string relative = FX::FileSystem::MakeRelativeToBase(path.string());
+            const std::string relative = FX::FileSystem::MakeRelativeToProject(path.string());
             auto texture = m_Library->Load(relative);
 
             if (texture)
@@ -430,7 +430,7 @@ namespace FXEd
         // Surukleme kaynagi: klasorler haric her sey.
         if (!isDirectory && ImGui::BeginDragDropSource())
         {
-            const std::string relative = FX::FileSystem::MakeRelativeToBase(path.string());
+            const std::string relative = FX::FileSystem::MakeRelativeToProject(path.string());
 
             // '\0' DAHIL gonderiyoruz: alan tarafi payload'i dogrudan
             // const char* olarak okuyor, sonlandirici olmazsa tasar.
@@ -454,7 +454,7 @@ namespace FXEd
                 FileDialogs::RevealInFileManager(path.string());
             if (ImGui::MenuItem("Yolu Kopyala"))
                 ImGui::SetClipboardText(
-                    FX::FileSystem::MakeRelativeToBase(path.string()).c_str());
+                    FX::FileSystem::MakeRelativeToProject(path.string()).c_str());
             ImGui::EndPopup();
         }
 

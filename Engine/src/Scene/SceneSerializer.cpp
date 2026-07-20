@@ -56,7 +56,7 @@ namespace FX
 
         root["Entities"] = entities;
 
-        const std::string fullPath = FileSystem::ResolveAsset(filepath);
+        const std::string fullPath = FileSystem::ResolveProjectAsset(filepath);
 
         // std::ofstream KLASOR OLUSTURMAZ; klasor yoksa kaydetme sessizce
         // basarisiz olur.
@@ -91,7 +91,7 @@ namespace FX
         if (!m_Scene)
             return false;
 
-        const std::string fullPath = FileSystem::ResolveAsset(filepath);
+        const std::string fullPath = FileSystem::ResolveProjectAsset(filepath);
 
         std::ifstream in(fullPath);
         if (!in)

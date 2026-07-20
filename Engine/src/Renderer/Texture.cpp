@@ -43,7 +43,7 @@ namespace FX
     Texture2D::Texture2D(const std::string& path, const TextureSpec& spec)
         : m_Path(path)
     {
-        const std::string fullPath = FileSystem::ResolveAsset(path);
+        const std::string fullPath = FileSystem::ResolveProjectAsset(path);
 
         // ---------------------------------------------------------------
         // stb_image'in dikey cevirme ayari

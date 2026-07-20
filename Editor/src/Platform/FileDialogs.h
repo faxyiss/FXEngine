@@ -37,5 +37,6 @@ namespace FXEd
         static const char* SceneFilter();
         static const char* PrefabFilter();
         static const char* AssetFilter();
+        static const char* ProjectFilter();
     };
 }

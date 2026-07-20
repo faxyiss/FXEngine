@@ -241,18 +241,24 @@ Ayrıntılar: [Faz-18-Notlar.md](Faz-18-Notlar.md)
 
 ---
 
-## Faz 21 — Proje sistemi
+## Faz 21 — Proje sistemi ✅ TAMAM (AssetManager hariç)
 
 Şu an editör `<exe>/assets`'i kök alıyor: varlıklar `build/` altında yaşıyor
 ve sürüm kontrolüne girmiyor. **Bilinçli bir karar** — kalıcılık şimdilik
 gerekmiyor, doğru çözüm ayrı bir faz.
 
-- [ ] `.fxproject` dosyası: proje adı, varlık klasörü, başlangıç sahnesi
-- [ ] "Proje Oluştur / Proje Aç" akışı, açılışta proje seçme ekranı
-- [ ] Content browser kökü = **proje** klasörü, exe'nin yanı değil
-- [ ] `FileSystem`: motor varlıkları (shader) ile proje varlıkları ayrımı
-- [ ] Son açılan **projeler** (bugünkü son açılan sahnelerin yerini alır)
-- [ ] Bunun üstüne: `.meta` dosyaları + GUID tabanlı `AssetManager`
+- [x] `.fxproject` dosyası: proje adı, varlık klasörü, başlangıç sahnesi
+- [x] "Proje Oluştur / Proje Aç" akışı
+- [x] Content browser kökü = **proje** klasörü, exe'nin yanı değil
+- [x] `FileSystem`: motor varlıkları (shader) ile proje varlıkları ayrımı
+      — `ResolveEngineAsset` / `ResolveProjectAsset`
+- [x] Son açılan **projeler**
+- [x] Projesiz mod hâlâ çalışıyor ama artık uyarıyor
+- [ ] Açılışta proje seçme ekranı (launcher) — şimdilik son proje otomatik açılıyor
+- [ ] `AssetDirectory` gerçekten kullanılsın (şimdilik `assets` varsayılıyor)
+- [ ] **`.meta` dosyaları + GUID tabanlı `AssetManager`** → kendi fazı olmalı
+
+Ayrıntılar: [Faz-21-Notlar.md](Faz-21-Notlar.md)
 
 **Öğrenilecek:** Bir editörün "kurulu olduğu yer" ile "üzerinde çalıştığı
 yer" farklı şeylerdir. Bu ayrımı yapmayan araçlar taşınabilir olmaz.
@@ -292,7 +298,7 @@ MVP sırasında bilinçli olarak bıraktıklarımız:
 | Doku ayarı dosya başına saklanamıyor | Filtre/sarma yalnızca ilk yüklemede belirleniyor; sahne dosyası sadece *yolu* saklıyor. Kalıcı ayar `.fxmeta` gerektiriyor → Faz 21. Şimdilik farklı spec istenirse uyarı basılıyor. | `TextureLibrary.cpp` (Faz 12) |
 | **Varlık kimliği = dosya yolu** | Dosyayı taşımak/yeniden adlandırmak tüm referansları koparır. Çözüm: `.meta` dosyaları + GUID tabanlı `AssetManager`. | `SceneSerializer`, `TextureLibrary` (Faz 12) |
 | Dosya diyalogları sadece Win32 | Linux/macOS'ta boş gövde derleniyor; `nfd` veya portal gerekli. | `Editor/src/Platform/FileDialogs.cpp` |
-| Proje klasörü kavramı yok | Editör `<exe>/assets`'i kök alıyor; içe aktarılan varlıklar `build/` altında kalıyor. **Bilinçli:** Faz 21'e bırakıldı. | `ContentBrowserPanel.cpp` (Faz 12) |
+| ~~Proje klasörü kavramı yok~~ | ✅ Faz 21'de `.fxproject` + iki ayrı kök ile çözüldü. | — |
 | Dosya izleyici yok | Klasör dışarıdan değişirse panel fark etmiyor; elle "Yenile" gerekiyor. | `ContentBrowserPanel.cpp` (Faz 12) |
 | Prefab bağlantısı yok | Örnek kaynağından bağımsız; kaynak değişince örnekler güncellenmiyor (override sistemi yok). | `PrefabSerializer.cpp` (Faz 12) |
 | `GetRegistry()` çok açık | Registry'ye doğrudan `create`/`destroy` çağırmak UUID haritasını bozar. Daha dar bir erişim gerekebilir. | `Scene.h` (Faz 8) |

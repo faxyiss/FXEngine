@@ -14,6 +14,7 @@ set(FXENGINE_SOURCES
     src/Core/Window.cpp
     src/Core/Application.cpp
     src/Core/FileSystem.cpp
+    src/Core/Project.cpp
     src/Core/UUID.cpp
     src/Renderer/Shader.cpp
     src/Renderer/Buffer.cpp
@@ -38,6 +39,7 @@ set(FXENGINE_HEADERS
     include/FXEngine/Core/Window.h
     include/FXEngine/Core/Application.h
     include/FXEngine/Core/FileSystem.h
+    include/FXEngine/Core/Project.h
     include/FXEngine/Core/UUID.h
     include/FXEngine/Renderer/Shader.h
     include/FXEngine/Renderer/Buffer.h

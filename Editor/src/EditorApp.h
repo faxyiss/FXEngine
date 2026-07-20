@@ -41,6 +41,15 @@ namespace FXEd
         void BuildScene();
         void SpawnMover();
 
+        // --- Proje islemleri (Faz 21) -----------------------------------------
+        void NewProject();                              // diyalog acar
+        void OpenProject();                             // diyalog acar
+        bool OpenProject(const std::string& filepath);  // dogrudan yukler
+        void PushRecentProject(const std::string& path);
+
+        // Acilista son projeyi acar; yoksa projesiz devam eder.
+        void LoadStartupProject();
+
         // --- Sahne dosyasi islemleri (Faz 12) ---------------------------------
         void NewScene();
         void SaveScene();                              // yol yoksa SaveSceneAs
@@ -168,6 +177,12 @@ namespace FXEd
         float m_SnapRotate    = 15.0f;
         float m_SnapScale     = 0.25f;
 
+        // Proje diyaloglari da modal: ayni sebeple cerceve sonuna
+        // birakiliyor (bkz. m_ImportRequested).
+        bool        m_NewProjectRequested  = false;
+        bool        m_OpenProjectRequested = false;
+        std::string m_PendingProjectPath;
+
         // Menuden gelen ice aktarma istegi. Yerel diyalog modaldir ve
         // ImGui cercevesinin ortasinda acilamaz; cerceve bittikten sonra
         // isleniyor.
@@ -190,6 +205,12 @@ namespace FXEd
         // atiyoruz; vector'de bas ekleme her seferinde tum diziyi kaydirirdi.
         std::deque<std::string> m_RecentScenes;
         static constexpr std::size_t kMaxRecentScenes = 8;
+
+        // Son acilan projeler. Sahnelerin aksine bunlar MUTLAK yol
+        // tasiyor: proje kokunun kendisi soz konusu oldugunda "neye
+        // goreceli?" sorusunun cevabi yok.
+        std::deque<std::string> m_RecentProjects;
+        static constexpr std::size_t kMaxRecentProjects = 8;
 
         // Son islemin sonucu - menude kullaniciya geri bildirim icin.
         std::string m_StatusMessage;

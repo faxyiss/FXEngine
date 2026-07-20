@@ -3,6 +3,7 @@
 
 #include <FXEngine/Core/Log.h>
 #include <FXEngine/Core/FileSystem.h>
+#include <FXEngine/Core/Project.h>
 #include <FXEngine/Renderer/RenderCommand.h>
 #include <FXEngine/Renderer/Renderer2D.h>
 #include <FXEngine/Scene/Components.h>
@@ -74,38 +75,49 @@ namespace FXEd
         };
         m_Framebuffer = std::make_unique<FX::Framebuffer>(fbSpec);
 
-        // Filtre artik varsayilan olarak Nearest; burada sadece SARMA
-        // farkli: zemin dosemesi TilingFactor ile tekrarlaniyor.
-        FX::TextureSpec tilingSpec;
-        tilingSpec.WrapS = FX::TextureWrap::Repeat;
-        tilingSpec.WrapT = FX::TextureWrap::Repeat;
-
-        // ARTIK KUTUPHANE UZERINDEN yukluyoruz.
-        // Onemli: sahne yuklerken serializer de ayni kutuphaneyi kullanacak.
-        // Boylece "assets/textures/circle.png" yolu her iki yolda da AYNI
-        // texture nesnesine cozulur - Inspector'daki texture secimi
-        // isaretci karsilastirmasiyla calistigi icin bu sart.
-        m_Checkerboard = m_TextureLibrary.Load("assets/textures/checkerboard.png", tilingSpec);
-        m_Circle       = m_TextureLibrary.Load("assets/textures/circle.png");
-
-        if (!m_Checkerboard || !m_Circle)
-        {
-            FX_ERROR("Texture'lar yuklenemedi. Aranan klasor: %s",
-                     FX::FileSystem::GetBaseDirectory().c_str());
-            Close();
-            return;
-        }
-
-
-        BuildScene();
-
-        m_HierarchyPanel.SetContext(m_Scene);
         m_HierarchyPanel.SetTextureLibrary(&m_TextureLibrary);
-        m_HierarchyPanel.SetSelectedEntity(GetPlayer());
-
         m_ContentBrowser.SetContext(&m_TextureLibrary);
 
         LoadEditorConfig();
+
+        // SIRA KRITIK: proje HER SEYDEN once acilmali. Varlik yollari ve
+        // texture kutuphanesi projeye goreli cozuluyor; once yukleyip
+        // sonra proje acsaydik eski kokten gelen dokular onbellekte
+        // kalirdi.
+        LoadStartupProject();
+
+        m_HierarchyPanel.SetContext(m_Scene);
+
+        // Demo sahne SADECE projesiz modda kuruluyor. Bir proje aciksa
+        // onun kendi sahnesi (veya bos sahne) gecerlidir - kullanicinin
+        // projesine bizim ornek nesnelerimizi doldurmak yanlis olurdu.
+        if (!FX::Project::HasActive())
+        {
+            // Filtre artik varsayilan olarak Nearest; burada sadece SARMA
+            // farkli: zemin dosemesi TilingFactor ile tekrarlaniyor.
+            FX::TextureSpec tilingSpec;
+            tilingSpec.WrapS = FX::TextureWrap::Repeat;
+            tilingSpec.WrapT = FX::TextureWrap::Repeat;
+
+            // Kutuphane uzerinden yukluyoruz: sahne yuklerken serializer
+            // de ayni kutuphaneyi kullanacak, boylece ayni yol her iki
+            // yolda da AYNI texture nesnesine cozulur - Inspector'daki
+            // texture secimi isaretci karsilastirmasiyla calisiyor.
+            m_Checkerboard = m_TextureLibrary.Load("assets/textures/checkerboard.png", tilingSpec);
+            m_Circle       = m_TextureLibrary.Load("assets/textures/circle.png");
+
+            if (!m_Checkerboard || !m_Circle)
+            {
+                FX_ERROR("Ornek dokular yuklenemedi. Aranan klasor: %s",
+                         FX::FileSystem::GetProjectDirectory().c_str());
+                Close();
+                return;
+            }
+
+            BuildScene();
+            m_HierarchyPanel.SetContext(m_Scene);
+            m_HierarchyPanel.SetSelectedEntity(GetPlayer());
+        }
 
         FX_INFO("");
         FX_INFO("Editor hazir. Panelleri surukleyerek yeniden duzenleyebilirsin;");
@@ -272,6 +284,119 @@ namespace FXEd
         m_StatusTimer   = 4.0f;
     }
 
+    // -----------------------------------------------------------------------
+    // Proje islemleri (Faz 21)
+    // -----------------------------------------------------------------------
+    void EditorApp::NewProject()
+    {
+        // KLASOR diyalogu yerine "farkli kaydet" kullaniyoruz: kullanici
+        // .fxproject dosyasinin adini ve yerini seciyor, projenin koku de
+        // o dosyanin klasoru oluyor. Win32'nin klasor secme diyalogu ayri
+        // bir API (SHBrowseForFolder/IFileDialog) ve daha kotu bir
+        // kullanici deneyimi sunuyor - burada ikinci bir API'ye gerek yok.
+        const std::string path = FileDialogs::SaveFile(GetWindow(),
+                                                       FileDialogs::ProjectFilter());
+        if (path.empty())
+            return;
+
+        const auto file = std::filesystem::path(path);
+        const std::string dir  = file.parent_path().string();
+        const std::string name = file.stem().string();
+
+        if (auto project = FX::Project::Create(dir, name))
+        {
+            PushRecentProject(project->GetFilePath());
+
+            NewScene();
+            m_ContentBrowser.SetContext(&m_TextureLibrary);   // kok degisti
+            SetStatus("Proje olusturuldu: " + name);
+        }
+        else
+        {
+            SetStatus("PROJE OLUSTURULAMADI");
+        }
+    }
+
+    void EditorApp::OpenProject()
+    {
+        const std::string path = FileDialogs::OpenFile(GetWindow(),
+                                                       FileDialogs::ProjectFilter());
+        if (!path.empty())
+            OpenProject(path);
+    }
+
+    bool EditorApp::OpenProject(const std::string& filepath)
+    {
+        auto project = FX::Project::Load(filepath);
+        if (!project)
+        {
+            SetStatus("PROJE ACILAMADI: " + filepath);
+            return false;
+        }
+
+        PushRecentProject(project->GetFilePath());
+
+        // Doku onbellegi ESKI projenin yollarini tutuyor. Temizlemezsek
+        // yeni projedeki "assets/textures/x.png" eski projenin ayni
+        // isimli dosyasini dondururdu - izi surulmesi cok zor bir hata.
+        m_TextureLibrary.Clear();
+        m_Checkerboard.reset();
+        m_Circle.reset();
+
+        // Sahne listesi de eski projeye aitti.
+        m_RecentScenes.clear();
+
+        m_ContentBrowser.SetContext(&m_TextureLibrary);
+
+        const auto& startScene = project->GetConfig().StartScene;
+        if (!startScene.empty() &&
+            FX::FileSystem::Exists(FX::FileSystem::ResolveProjectAsset(startScene)))
+        {
+            OpenScene(startScene);
+        }
+        else
+        {
+            NewScene();
+        }
+
+        SetStatus("Proje acildi: " + project->GetConfig().Name);
+        return true;
+    }
+
+    void EditorApp::PushRecentProject(const std::string& path)
+    {
+        if (path.empty())
+            return;
+
+        m_RecentProjects.erase(
+            std::remove(m_RecentProjects.begin(), m_RecentProjects.end(), path),
+            m_RecentProjects.end());
+
+        m_RecentProjects.push_front(path);
+
+        while (m_RecentProjects.size() > kMaxRecentProjects)
+            m_RecentProjects.pop_back();
+
+        SaveEditorConfig();
+    }
+
+    void EditorApp::LoadStartupProject()
+    {
+        for (const auto& path : m_RecentProjects)
+        {
+            if (FX::FileSystem::Exists(path) && OpenProject(path))
+                return;
+        }
+
+        // Proje yok: FileSystem exe klasorune dusuyor, yani Faz 21
+        // oncesi davranis. Editor calisir ama ice aktarilan varliklar
+        // build/ altinda kalir - kullaniciya bunu SOYLUYORUZ, sessizce
+        // eski davranisa donmek tam da bu fazin cozdugu sorunu geri
+        // getirirdi.
+        FX_WARN("Acik proje yok. Varliklar exe klasorunde tutulacak;");
+        FX_WARN("kalici calisma icin Dosya > Yeni Proje.");
+    }
+
     void EditorApp::NewScene()
     {
         m_EditorScene = std::make_unique<FX::Scene>();
@@ -317,7 +442,7 @@ namespace FXEd
 
         // Mutlak degil GORECELI yol sakliyoruz: proje baska bir makineye
         // kopyalandiginda "C:/Users/..." hicbir sey ifade etmez.
-        m_ScenePath = FX::FileSystem::MakeRelativeToBase(absolute);
+        m_ScenePath = FX::FileSystem::MakeRelativeToProject(absolute);
         SaveScene();
     }
 
@@ -329,7 +454,7 @@ namespace FXEd
         if (absolute.empty())
             return;
 
-        OpenScene(FX::FileSystem::MakeRelativeToBase(absolute));
+        OpenScene(FX::FileSystem::MakeRelativeToProject(absolute));
     }
 
     void EditorApp::OpenScene(const std::string& path)
@@ -390,18 +515,31 @@ namespace FXEd
                 // Silinmis dosyalari listeye alma: tiklandiginda hata
                 // verecek bir menu ogesi gostermenin anlami yok.
                 const std::string scene = item.get<std::string>();
-                if (FX::FileSystem::Exists(FX::FileSystem::ResolveAsset(scene)))
+                if (FX::FileSystem::Exists(FX::FileSystem::ResolveProjectAsset(scene)))
                     m_RecentScenes.push_back(scene);
             }
         }
 
-        FX_INFO("editor.json okundu (%zu son sahne).", m_RecentScenes.size());
+        // Projeler MUTLAK yol tasiyor: proje kokunun kendisi soz konusu
+        // oldugunda "neye goreceli?" sorusunun cevabi yok.
+        if (doc.contains("RecentProjects") && doc["RecentProjects"].is_array())
+        {
+            for (const auto& item : doc["RecentProjects"])
+            {
+                if (item.is_string())
+                    m_RecentProjects.push_back(item.get<std::string>());
+            }
+        }
+
+        FX_INFO("editor.json okundu (%zu son sahne, %zu son proje).",
+                m_RecentScenes.size(), m_RecentProjects.size());
     }
 
     void EditorApp::SaveEditorConfig()
     {
         nlohmann::json doc;
-        doc["RecentScenes"] = m_RecentScenes;
+        doc["RecentScenes"]   = m_RecentScenes;
+        doc["RecentProjects"] = m_RecentProjects;
 
         std::ofstream out(FX::FileSystem::GetBaseDirectory() + "editor.json");
         if (out)
@@ -722,6 +860,16 @@ namespace FXEd
             ImportAssets();
         }
 
+        if (m_NewProjectRequested)  { m_NewProjectRequested  = false; NewProject();  }
+        if (m_OpenProjectRequested) { m_OpenProjectRequested = false; OpenProject(); }
+
+        if (!m_PendingProjectPath.empty())
+        {
+            const std::string path = m_PendingProjectPath;
+            m_PendingProjectPath.clear();
+            OpenProject(path);
+        }
+
         if (FX::Entity prefabRoot = m_HierarchyPanel.TakePrefabRequest())
         {
             const std::string absolute =
@@ -730,7 +878,7 @@ namespace FXEd
             if (!absolute.empty())
             {
                 FX::PrefabSerializer prefab(m_Scene, &m_TextureLibrary);
-                const std::string rel = FX::FileSystem::MakeRelativeToBase(absolute);
+                const std::string rel = FX::FileSystem::MakeRelativeToProject(absolute);
 
                 SetStatus(prefab.Save(prefabRoot, rel)
                               ? "Prefab kaydedildi: " + rel
@@ -750,6 +898,37 @@ namespace FXEd
         {
             if (ImGui::BeginMenu("Dosya"))
             {
+                // Proje bolumu EN USTE: sahne islemleri bir projenin
+                // icinde anlam kazanir, tersi degil.
+                if (ImGui::MenuItem("Yeni Proje..."))
+                    m_NewProjectRequested = true;
+                if (ImGui::MenuItem("Proje Ac..."))
+                    m_OpenProjectRequested = true;
+
+                if (ImGui::BeginMenu("Son Projeler", !m_RecentProjects.empty()))
+                {
+                    std::string toOpen;
+                    for (const auto& proj : m_RecentProjects)
+                    {
+                        if (ImGui::MenuItem(proj.c_str()))
+                            toOpen = proj;
+                    }
+
+                    ImGui::Separator();
+                    if (ImGui::MenuItem("Listeyi Temizle"))
+                    {
+                        m_RecentProjects.clear();
+                        SaveEditorConfig();
+                    }
+
+                    ImGui::EndMenu();
+
+                    if (!toOpen.empty())
+                        m_PendingProjectPath = toOpen;
+                }
+
+                ImGui::Separator();
+
                 if (ImGui::MenuItem("Yeni Sahne", "Ctrl+N"))
                     NewScene();
                 if (ImGui::MenuItem("Sahne Ac...", "Ctrl+O"))
@@ -1424,6 +1603,21 @@ namespace FXEd
         ImGui::Text("FPS         : %.0f", m_CurrentFps);
 
         ImGui::Spacing();
+        ImGui::Text("Proje");
+        ImGui::Separator();
+        if (auto project = FX::Project::GetActive())
+        {
+            ImGui::Text("Ad          : %s", project->GetConfig().Name.c_str());
+            ImGui::TextWrapped("Kok: %s", project->GetDirectory().c_str());
+        }
+        else
+        {
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "Acik proje yok");
+            ImGui::TextWrapped("Varliklar exe klasorunde. Kalici calisma icin "
+                               "Dosya > Yeni Proje.");
+        }
+        ImGui::Spacing();
+
         ImGui::Text("Sahne");
         ImGui::Separator();
         ImGui::Text("Entity      : %u", m_Scene->GetEntityCount());

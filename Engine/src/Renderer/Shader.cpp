@@ -100,8 +100,8 @@ namespace FX
     {
         // Yollari EXE KLASORUNE gore cozuyoruz, calisma dizinine gore degil.
         // Boylece program nereden baslatilirsa baslatilsin shader'lari bulur.
-        const std::string vFull = FileSystem::ResolveAsset(vertexPath);
-        const std::string fFull = FileSystem::ResolveAsset(fragmentPath);
+        const std::string vFull = FileSystem::ResolveEngineAsset(vertexPath);
+        const std::string fFull = FileSystem::ResolveEngineAsset(fragmentPath);
 
         bool okV = false, okF = false;
         const std::string vSrc = ReadFile(vFull, okV);

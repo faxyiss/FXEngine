@@ -198,6 +198,11 @@ namespace FX
         glUniform1i(GetUniformLocation(name), value);
     }
 
+    void Shader::SetIntArray(const std::string& name, const int* values, std::uint32_t count)
+    {
+        glUniform1iv(GetUniformLocation(name), static_cast<GLsizei>(count), values);
+    }
+
     void Shader::SetFloat(const std::string& name, float value)
     {
         glUniform1f(GetUniformLocation(name), value);

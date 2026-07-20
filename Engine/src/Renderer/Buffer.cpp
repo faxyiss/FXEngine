@@ -109,9 +109,34 @@ namespace FX
         glBufferData(GL_ARRAY_BUFFER, size, data, GL_STATIC_DRAW);
     }
 
+    VertexBuffer::VertexBuffer(std::uint32_t size)
+    {
+        glGenBuffers(1, &m_RendererID);
+        glBindBuffer(GL_ARRAY_BUFFER, m_RendererID);
+
+        // data = nullptr -> "bu kadar yer ayir ama icini doldurma".
+        //
+        // GL_DYNAMIC_DRAW ipucu: "cok kez yazacagim, cok kez okunacak".
+        // Surucu bunu gorunce tamponu CPU'nun hizlica yazabilecegi bir
+        // bellege koyar. GL_STATIC_DRAW deseydik surucu onu GPU'nun uzak
+        // bellegine koyar, her karede yazmak yavas olurdu.
+        glBufferData(GL_ARRAY_BUFFER, size, nullptr, GL_DYNAMIC_DRAW);
+    }
+
     VertexBuffer::~VertexBuffer()
     {
         glDeleteBuffers(1, &m_RendererID);
+    }
+
+    void VertexBuffer::SetData(const void* data, std::uint32_t size)
+    {
+        glBindBuffer(GL_ARRAY_BUFFER, m_RendererID);
+
+        // glBufferSubData: mevcut tamponun BIR KISMINI gunceller.
+        // glBufferData kullansaydik her karede tamponu yeniden TAHSIS ederdik -
+        // surucu eski bellegi bosaltip yenisini ayirir, bu pahalidir.
+        // SubData ise ayni bellege yazar.
+        glBufferSubData(GL_ARRAY_BUFFER, 0, size, data);
     }
 
     void VertexBuffer::Bind() const

@@ -89,6 +89,15 @@ namespace FX
     public:
         // Statik veri: bir kez yuklenir, degismez (GL_STATIC_DRAW).
         VertexBuffer(const void* data, std::uint32_t size);
+
+        // DINAMIK tampon: sadece YER AYIRIR, veri yuklemez (GL_DYNAMIC_DRAW).
+        // Icerik her karede SetData ile degistirilir.
+        //
+        // Neden ayri bir yapici? Cunku batch renderer'da veri her karede
+        // farklidir; onceden bilinen bir icerik yoktur, sadece "en fazla
+        // su kadar bayt gelecek" bilgisi vardir.
+        explicit VertexBuffer(std::uint32_t size);
+
         ~VertexBuffer();
 
         VertexBuffer(const VertexBuffer&)            = delete;
@@ -96,6 +105,10 @@ namespace FX
 
         void Bind() const;
         void Unbind() const;
+
+        // Tamponun icerigini gunceller (dinamik kullanim icin).
+        // size, yapicida ayrilan yerden buyuk OLMAMALI.
+        void SetData(const void* data, std::uint32_t size);
 
         const BufferLayout& GetLayout() const { return m_Layout; }
         void SetLayout(const BufferLayout& layout) { m_Layout = layout; }

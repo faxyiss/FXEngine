@@ -56,6 +56,11 @@ namespace FX
         // ugrayanlar "varying/in-out" olarak adlandirilir.)
         // Ornek: nesnenin rengi bir uniform'dur; nesnenin kose pozisyonu degildir.
         void SetInt(const std::string& name, int value);
+
+        // Tamsayi DIZISI. Batch renderer'da sampler2D u_Textures[32]
+        // uniform'una [0,1,2,...,31] yazmak icin gerekiyor.
+        void SetIntArray(const std::string& name, const int* values, std::uint32_t count);
+
         void SetFloat(const std::string& name, float value);
         void SetFloat2(const std::string& name, const glm::vec2& value);
         void SetFloat3(const std::string& name, const glm::vec3& value);

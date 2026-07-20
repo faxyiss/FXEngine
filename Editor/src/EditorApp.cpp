@@ -3,8 +3,7 @@
 #include <FXEngine/Core/Log.h>
 #include <FXEngine/Core/FileSystem.h>
 #include <FXEngine/Renderer/RenderCommand.h>
-
-#include <glm/gtc/matrix_transform.hpp>
+#include <FXEngine/Renderer/Renderer2D.h>
 
 #include <SDL3/SDL.h>
 
@@ -15,7 +14,7 @@ namespace FXEd
     EditorApp::EditorApp()
         : FX::Application([]() {
               FX::WindowProps props;
-              props.Title     = "FXEditor - Faz 3";
+              props.Title     = "FXEditor - Faz 4 (Batch Renderer)";
               props.Width     = 1280;
               props.Height    = 720;
               props.VSync     = true;
@@ -28,175 +27,77 @@ namespace FXEd
     void EditorApp::OnInit()
     {
         FX_INFO("=====================================");
-        FX_INFO("  FXEditor - Faz 3");
+        FX_INFO("  FXEditor - Faz 4: Batch Renderer");
         FX_INFO("=====================================");
 
         FX::RenderCommand::Init();
 
-        // ===================================================================
-        // 1) KOSE VERISI - artik UV koordinatlari da var
-        // ===================================================================
-        // Her kose 5 float: 3 pozisyon + 2 UV.
-        //
-        // Koordinatlar artik NDC degil, DUNYA BIRIMI. Kamera 5.0 zoom ile
-        // dikeyde -5..+5 gosterecek, yani 1x1'lik bu quad ekranin onda biri
-        // kadar yer kaplayacak. Artik "0.5" gibi soyut sayilarla degil,
-        // anlamli birimlerle dusunebiliyoruz.
-        //
-        // UV yerlesimi:
-        //   (0,1) ---- (1,1)      sol alt kose  = (0,0)
-        //     |          |        sag ust kose  = (1,1)
-        //   (0,0) ---- (1,0)
-        const float vertices[] = {
-            // x      y     z      u     v
-            -0.5f, -0.5f, 0.0f,  0.0f, 0.0f,   // 0: sol alt
-            -0.5f,  0.5f, 0.0f,  0.0f, 1.0f,   // 1: sol ust
-             0.5f,  0.5f, 0.0f,  1.0f, 1.0f,   // 2: sag ust
-             0.5f, -0.5f, 0.0f,  1.0f, 0.0f    // 3: sag alt
-        };
+        // Renderer2D kendi shader'ini, buffer'larini ve beyaz texture'ini
+        // kendi kurar. Editor'un artik VAO/VBO/shader bilmesine gerek yok -
+        // Faz 3'te bu dosyada 60 satir GPU kurulumu vardi, simdi tek satir.
+        // Iyi bir soyutlamanin belirtisi budur.
+        FX::Renderer2D::Init();
 
-        const std::uint32_t indices[] = { 0, 1, 2,  2, 3, 0 };
+        FX::TextureSpec sharpSpec;
+        sharpSpec.MinFilter = FX::TextureFilter::Nearest;
+        sharpSpec.MagFilter = FX::TextureFilter::Nearest;
+        sharpSpec.WrapS     = FX::TextureWrap::Repeat;
+        sharpSpec.WrapT     = FX::TextureWrap::Repeat;
 
-        // ===================================================================
-        // 2) GPU NESNELERI
-        // ===================================================================
-        m_QuadVA = std::make_shared<FX::VertexArray>();
-        m_QuadVA->Bind();
+        m_Checkerboard = std::make_shared<FX::Texture2D>(
+            "assets/textures/checkerboard.png", sharpSpec);
+        m_Circle = std::make_shared<FX::Texture2D>("assets/textures/circle.png");
 
-        auto vbo = std::make_shared<FX::VertexBuffer>(vertices, sizeof(vertices));
-
-        // LAYOUT ARTIK IKI ELEMANLI.
-        // BufferLayout offset/stride'i kendisi hesapliyor:
-        //   a_Position -> offset 0,  boyut 12
-        //   a_TexCoord -> offset 12, boyut 8
-        //   stride = 20
-        // Bunu elle yazsaydik "12" sayisini bir yerde unutup goruntuyu
-        // bozmak cok kolay olurdu. Faz 2'de bu soyutlamayi bu yuzden kurmustuk.
-        //
-        // Ekleme SIRASI, shader'daki layout(location=N) ile eslesir:
-        // ilk eleman -> location 0, ikinci -> location 1.
-        vbo->SetLayout({
-            { FX::ShaderDataType::Float3, "a_Position" },
-            { FX::ShaderDataType::Float2, "a_TexCoord" }
-        });
-
-        m_QuadVA->AddVertexBuffer(vbo);
-
-        auto ebo = std::make_shared<FX::IndexBuffer>(
-            indices, static_cast<std::uint32_t>(sizeof(indices) / sizeof(std::uint32_t)));
-        m_QuadVA->SetIndexBuffer(ebo);
-        m_QuadVA->Unbind();
-
-        // ===================================================================
-        // 3) SHADER
-        // ===================================================================
-        m_TextureShader.reset(FX::Shader::FromFiles("Texture",
-                                                    "assets/shaders/Texture.vert",
-                                                    "assets/shaders/Texture.frag"));
-        if (!m_TextureShader || !m_TextureShader->IsValid())
+        if (!m_Checkerboard->IsValid() || !m_Circle->IsValid())
         {
-            FX_ERROR("Shader yuklenemedi. Aranan klasor: %s",
+            FX_ERROR("Texture'lar yuklenemedi. Aranan klasor: %s",
                      FX::FileSystem::GetBaseDirectory().c_str());
             Close();
             return;
         }
 
-        // sampler2D'ye "0 numarali slotu oku" diyoruz.
-        // Bunu bir kez yapmak yeterli; uniform degeri programda saklanir.
-        m_TextureShader->Bind();
-        m_TextureShader->SetInt("u_Texture", 0);
-
-        // ===================================================================
-        // 4) TEXTURE'LAR
-        // ===================================================================
-        // Dama tahtasi: Nearest filtre ile yukluyoruz ki kareler KESKIN cikssin.
-        // Linear olsaydi zoom yapinca kenarlar bulanik olurdu - pixel-art
-        // tarzi icin istemedigimiz sey. Farki gormek icin F tusuyla
-        // degistirebiliyoruz.
-        FX::TextureSpec sharpSpec;
-        sharpSpec.MinFilter = FX::TextureFilter::Nearest;
-        sharpSpec.MagFilter = FX::TextureFilter::Nearest;
-        sharpSpec.WrapS     = FX::TextureWrap::Repeat;   // tiling testi icin
-        sharpSpec.WrapT     = FX::TextureWrap::Repeat;
-
-        m_Checkerboard = std::make_unique<FX::Texture2D>(
-            "assets/textures/checkerboard.png", sharpSpec);
-
-        // Daire: alfa kanalli, saydamlik testi icin. Linear filtre uygun
-        // cunku yuvarlak kenarlarin yumusak olmasini istiyoruz.
-        m_Circle = std::make_unique<FX::Texture2D>("assets/textures/circle.png");
-
-        if (!m_Checkerboard->IsValid() || !m_Circle->IsValid())
-        {
-            FX_ERROR("Texture'lar yuklenemedi. assets/textures/ klasorunu kontrol et.");
-            Close();
-            return;
-        }
-
-        // ===================================================================
-        // 5) KAMERA
-        // ===================================================================
-        // Baslangicta 1:1 ile kuruyoruz, hemen ardindan gercek pencere
-        // oranina gore duzeltiyoruz.
         m_Camera = std::make_unique<FX::OrthographicCamera>(-1.0f, 1.0f, -1.0f, 1.0f);
         UpdateCameraProjection();
 
+        FX_INFO("Texture slotu (bu GPU): %u", FX::Renderer2D::GetMaxTextureSlots());
+        FX_INFO("");
         FX_INFO("Kontroller:");
-        FX_INFO("  W/A/S/D  -> kamerayi hareket ettir");
-        FX_INFO("  Q/E      -> kamerayi dondur");
-        FX_INFO("  Tekerlek -> yakinlas/uzaklas");
+        FX_INFO("  W/A/S/D  -> kamera hareket");
+        FX_INFO("  Q/E      -> kamera dondur");
+        FX_INFO("  Tekerlek -> zoom");
         FX_INFO("  R        -> kamerayi sifirla");
-        FX_INFO("  T        -> tel kafes ac/kapa");
+        FX_INFO("  1 / 2    -> izgarayi kucult / buyut  <-- ASIL TEST");
+        FX_INFO("  X        -> duz renk <-> texture");
+        FX_INFO("  T        -> tel kafes");
         FX_INFO("  SPACE    -> animasyon dur/devam");
-        FX_INFO("  V        -> VSync");
+        FX_INFO("  V        -> VSync (kapatinca gercek FPS gorunur)");
         FX_INFO("  TAB      -> istatistikler");
         FX_INFO("  ESC      -> cikis");
+        FX_INFO("");
+        FX_INFO("Izgara: %dx%d = %d quad", m_GridSize, m_GridSize, m_GridSize * m_GridSize);
     }
 
     void EditorApp::UpdateCameraProjection()
     {
         const float w = static_cast<float>(GetWindow().GetWidth());
         const float h = static_cast<float>(GetWindow().GetHeight());
-
-        // Sifira bolme korumasi: pencere simge durumuna kucultuldugunde
-        // yukseklik 0 gelebilir. Sonuc NaN olur ve TUM matris bozulur -
-        // ekran tamamen kararir. Bulunmasi zor bir hatadir.
         if (h <= 0.0f)
             return;
-
         m_Camera->SetProjectionFromAspect(w / h, m_ZoomLevel);
     }
 
-    void EditorApp::OnWindowResize(std::uint32_t /*width*/, std::uint32_t /*height*/)
+    void EditorApp::OnWindowResize(std::uint32_t, std::uint32_t)
     {
-        // Pencere boyutu degisti -> en-boy orani degisti -> projeksiyon yenilenmeli.
-        // Bunu yapmazsak kareler dikdortgene doner (Faz 2'deki sorun).
         UpdateCameraProjection();
     }
 
     void EditorApp::UpdateCameraMovement(float dt)
     {
-        // KLAVYE DURUMU vs KLAVYE OLAYI - onemli bir ayrim:
-        //
-        // OnEvent (olay) "tusa BASILDI" anini yakalar - bir kez tetiklenir.
-        //   Uygun: menu acma, zipla, ates et.
-        //
-        // SDL_GetKeyboardState (durum) "tus SU AN basili mi" der.
-        //   Uygun: surekli hareket. Cunku hareketin her karede, dt ile
-        //   olceklenerek uygulanmasi gerekir.
-        //
-        // Hareketi OnEvent'e yazsaydik, isletim sisteminin tus tekrar
-        // hizina bagimli ve tutuk bir hareket elde ederdik.
         const bool* keys = SDL_GetKeyboardState(nullptr);
 
-        // dt ile carpiyoruz: "saniyede 5 birim" -> kare hizindan bagimsiz.
         const float move   = m_CameraMoveSpeed   * dt;
         const float rotate = m_CameraRotateSpeed * dt;
 
-        // Kamera dondurulmusse, "yukari" tusu ekranda yukari gitmeli -
-        // dunyanin Y ekseninde degil. Bu yuzden hareket yonunu kameranin
-        // acisiyla donduruyoruz. Dondurmeseydik kamera egikken kontroller
-        // ters gelirdi.
         const float rad = glm::radians(m_CameraRotation);
         const float cs  = std::cos(rad);
         const float sn  = std::sin(rad);
@@ -207,15 +108,11 @@ namespace FXEd
         if (keys[SDL_SCANCODE_S]) dy -= 1.0f;
         if (keys[SDL_SCANCODE_W]) dy += 1.0f;
 
-        // Capraz giderken hizlanmayi onlemek icin normalize.
-        // (1,1) vektorunun uzunlugu 1.41'dir; duzeltmezsek capraz hareket
-        // duz hareketten %41 hizli olur. Klasik bir oyun hatasi.
         const float len = std::sqrt(dx * dx + dy * dy);
         if (len > 0.0f)
         {
             dx /= len;
             dy /= len;
-
             m_CameraPosition.x += (dx * cs - dy * sn) * move;
             m_CameraPosition.y += (dx * sn + dy * cs) * move;
         }
@@ -233,111 +130,129 @@ namespace FXEd
             m_Time += dt;
 
         UpdateCameraMovement(dt);
-        ++m_UpdateCount;
     }
 
     void EditorApp::OnRender(float /*alpha*/)
     {
         ++m_FrameCount;
 
-        FX::RenderCommand::SetClearColor({ 0.08f, 0.09f, 0.12f, 1.0f });
-        FX::RenderCommand::Clear();
-
-        m_TextureShader->Bind();
-
-        // Kameranin matrisi TUM nesneler icin ayni -> kare basina bir kez set.
-        m_TextureShader->SetMat4("u_ViewProjection", m_Camera->GetViewProjectionMatrix());
-
-        // -------------------------------------------------------------------
-        // 1) Zemin: buyuk, tiled dama tahtasi
-        // -------------------------------------------------------------------
-        // TilingFactor 10 -> UV'ler 10 ile carpilir -> desen 10x10 tekrarlanir.
-        // Bu, texture'in WrapS/T = Repeat olmasi sayesinde calisir.
-        // ClampToEdge olsaydi kenar pikseli uzardi ve cirkin cizgiler olurdu.
+        // --- FPS olcumu --------------------------------------------------------
+        // Gercek zamani olcuyoruz (mantik zamanini degil), cunku batch'in
+        // etkisi CIZIM tarafinda. VSync kapaliyken bu sayi anlamli olur.
         {
-            m_Checkerboard->Bind(0);
-            m_TextureShader->SetFloat("u_TilingFactor", 10.0f);
-            m_TextureShader->SetFloat4("u_Color", { 1.0f, 1.0f, 1.0f, 1.0f });
+            static std::uint64_t s_LastTime = SDL_GetTicksNS();
+            const std::uint64_t now = SDL_GetTicksNS();
+            m_FpsTimer += static_cast<float>(now - s_LastTime) / 1.0e9f;
+            s_LastTime = now;
 
-            glm::mat4 transform =
-                glm::translate(glm::mat4(1.0f), { 0.0f, 0.0f, -0.1f }) *   // hafif arkada
-                glm::scale(glm::mat4(1.0f), { 20.0f, 20.0f, 1.0f });
-
-            m_TextureShader->SetMat4("u_Transform", transform);
-            FX::RenderCommand::DrawIndexed(m_QuadVA);
-        }
-
-        // -------------------------------------------------------------------
-        // 2) Donen dama tahtasi karesi - UV yonelimini gormek icin
-        // -------------------------------------------------------------------
-        {
-            m_Checkerboard->Bind(0);
-            m_TextureShader->SetFloat("u_TilingFactor", 1.0f);
-            m_TextureShader->SetFloat4("u_Color", { 1.0f, 1.0f, 1.0f, 1.0f });
-
-            glm::mat4 transform =
-                glm::translate(glm::mat4(1.0f), { -2.0f, 0.0f, 0.0f }) *
-                glm::rotate(glm::mat4(1.0f), m_Time * 0.5f, { 0.0f, 0.0f, 1.0f }) *
-                glm::scale(glm::mat4(1.0f), { 2.0f, 2.0f, 1.0f });
-
-            m_TextureShader->SetMat4("u_Transform", transform);
-            FX::RenderCommand::DrawIndexed(m_QuadVA);
-        }
-
-        // -------------------------------------------------------------------
-        // 3) Saydam daireler - blending ve tint testi
-        // -------------------------------------------------------------------
-        // Ayni texture, farkli u_Color ile 3 kez ciziliyor. Tek bir gri
-        // sprite'i istedigin renkte kullanabilmenin yolu budur -
-        // 3 ayri PNG tutmak yerine 1 tane tutup renklendiriyorsun.
-        {
-            m_Circle->Bind(0);
-            m_TextureShader->SetFloat("u_TilingFactor", 1.0f);
-
-            const glm::vec4 colors[3] = {
-                { 1.0f, 0.4f, 0.4f, 0.85f },
-                { 0.4f, 1.0f, 0.5f, 0.85f },
-                { 0.5f, 0.6f, 1.0f, 0.85f }
-            };
-
-            for (int i = 0; i < 3; ++i)
+            ++m_FpsFrames;
+            if (m_FpsTimer >= 0.5f)
             {
-                // Her daire farkli fazda salinsin.
-                const float offset = static_cast<float>(i) * 2.0f;
-                const float y = std::sin(m_Time * 1.5f + offset) * 1.2f;
-
-                m_TextureShader->SetFloat4("u_Color", colors[i]);
-
-                glm::mat4 transform =
-                    glm::translate(glm::mat4(1.0f), { 2.0f + static_cast<float>(i) * 1.3f, y, 0.0f }) *
-                    glm::scale(glm::mat4(1.0f), { 1.5f, 1.5f, 1.0f });
-
-                m_TextureShader->SetMat4("u_Transform", transform);
-                FX::RenderCommand::DrawIndexed(m_QuadVA);
+                m_CurrentFps = static_cast<float>(m_FpsFrames) / m_FpsTimer;
+                m_FpsFrames  = 0;
+                m_FpsTimer   = 0.0f;
             }
         }
 
-        // NOT: Burada 5 ayri cizim cagrisi (draw call) yaptik. Her biri
-        // CPU-GPU arasinda ayri bir iletisim demek. 5 icin sorun degil,
-        // ama 5000 sprite icin felaket olur. Faz 4'te batch renderer ile
-        // bunlarin hepsini TEK cagriya indirecegiz - iste o zaman bu
-        // dosyadaki tekrar da ortadan kalkacak.
+        FX::RenderCommand::SetClearColor({ 0.08f, 0.09f, 0.12f, 1.0f });
+        FX::RenderCommand::Clear();
+
+        // Istatistikleri her karede sifirla ki "bu karede kac draw call"
+        // sorusunu cevaplayabilelim.
+        FX::Renderer2D::ResetStats();
+
+        // ===================================================================
+        // BATCH: BeginScene ile EndScene arasindaki HER SEY tek pakete girer
+        // ===================================================================
+        FX::Renderer2D::BeginScene(*m_Camera);
+
+        // --- Izgara ------------------------------------------------------------
+        // m_GridSize^2 kadar quad. 50x50 = 2500.
+        // Faz 3'teki yaklasimla bu 2500 draw call olurdu; simdi 1 (veya
+        // texture kullanirsak yine 1, cunku sadece 2 texture var).
+        const float half = static_cast<float>(m_GridSize) * 0.5f;
+
+        for (int y = 0; y < m_GridSize; ++y)
+        {
+            for (int x = 0; x < m_GridSize; ++x)
+            {
+                const float fx = (static_cast<float>(x) - half) * 0.11f;
+                const float fy = (static_cast<float>(y) - half) * 0.11f;
+
+                // Renk konuma gore degissin - her quad'in AYRI rengi
+                // olabildigini gostermek icin. Faz 3'te renk uniform'du,
+                // yani her farkli renk ayri bir draw call demekti.
+                const glm::vec4 color = {
+                    (static_cast<float>(x) / static_cast<float>(m_GridSize)) * 0.8f + 0.2f,
+                    0.35f,
+                    (static_cast<float>(y) / static_cast<float>(m_GridSize)) * 0.8f + 0.2f,
+                    0.85f
+                };
+
+                if (m_UseTextures)
+                {
+                    // Iki texture'i donusumlu kullaniyoruz. Ikisi de ayni
+                    // batch'te kaliyor cunku 32 slot var, 2 tanesini
+                    // kullaniyoruz -> hala TEK draw call.
+                    const auto& tex = ((x + y) % 2 == 0) ? m_Checkerboard : m_Circle;
+                    FX::Renderer2D::DrawQuad({ fx, fy }, { 0.09f, 0.09f }, tex, 1.0f, color);
+                }
+                else
+                {
+                    FX::Renderer2D::DrawQuad({ fx, fy }, { 0.09f, 0.09f }, color);
+                }
+            }
+        }
+
+        // --- Donen buyuk sprite'lar --------------------------------------------
+        // Izgaranin ustunde, dondurulmus quad'lar. Bunlar da AYNI batch'e
+        // giriyor - farkli texture, farkli aci, farkli renk olmasi
+        // hicbir sey degistirmiyor.
+        for (int i = 0; i < 4; ++i)
+        {
+            const float angle  = m_Time * (0.5f + static_cast<float>(i) * 0.2f);
+            const float radius = 2.5f;
+            const float px = std::cos(m_Time * 0.4f + static_cast<float>(i) * 1.57f) * radius;
+            const float py = std::sin(m_Time * 0.4f + static_cast<float>(i) * 1.57f) * radius;
+
+            FX::Renderer2D::DrawRotatedQuad(
+                { px, py }, { 1.2f, 1.2f }, angle,
+                (i % 2 == 0) ? m_Checkerboard : m_Circle,
+                1.0f,
+                { 1.0f, 1.0f, 1.0f, 0.95f });
+        }
+
+        FX::Renderer2D::EndScene();
+    }
+
+    void EditorApp::LogStats()
+    {
+        const auto stats = FX::Renderer2D::GetStats();
+
+        FX_INFO("--- Istatistikler ---");
+        FX_INFO("  Izgara         : %dx%d", m_GridSize, m_GridSize);
+        FX_INFO("  Quad sayisi    : %u", stats.QuadCount);
+        FX_INFO("  Kose sayisi    : %u", stats.GetVertexCount());
+        FX_INFO("  DRAW CALL      : %u   <-- asil sayi bu", stats.DrawCalls);
+
+        if (stats.DrawCalls > 0)
+            FX_INFO("  Quad/draw call : %.0f", static_cast<float>(stats.QuadCount) /
+                                               static_cast<float>(stats.DrawCalls));
+
+        FX_INFO("  Batch'siz olsa : %u draw call olurdu", stats.QuadCount);
+        FX_INFO("  FPS            : %.0f%s", m_CurrentFps,
+                GetWindow().IsVSync() ? "  (VSync ACIK - V ile kapat, gercek FPS'i gor)" : "");
+        FX_INFO("  Mod            : %s", m_UseTextures ? "TEXTURE'LI" : "DUZ RENK");
+        FX_INFO("  Kamera         : (%.1f, %.1f) zoom %.1f",
+                m_CameraPosition.x, m_CameraPosition.y, m_ZoomLevel);
     }
 
     void EditorApp::OnEvent(const SDL_Event& event)
     {
-        // Fare tekerlegi ile zoom.
         if (event.type == SDL_EVENT_MOUSE_WHEEL)
         {
-            // Tekerlek CARPARAK olcekleniyor, cikararak degil.
-            // Sebep: zoom logaritmik algilanir. Sabit cikarma yapsaydik
-            // yakinken cok hizli, uzaktayken cok yavas hissedilirdi.
             m_ZoomLevel *= (event.wheel.y > 0) ? 0.9f : 1.1f;
-
-            // Sinirlar: 0'a ulasirsa projeksiyon cokerdi (sifir genislik),
-            // cok buyurse hicbir sey gorunmezdi.
-            m_ZoomLevel = glm::clamp(m_ZoomLevel, 0.5f, 30.0f);
-
+            m_ZoomLevel = glm::clamp(m_ZoomLevel, 0.5f, 60.0f);
             UpdateCameraProjection();
             return;
         }
@@ -353,23 +268,44 @@ namespace FXEd
                     Close();
                     break;
 
+                case SDLK_1:
+                    m_GridSize = std::max(10, m_GridSize - 20);
+                    FX_INFO("Izgara: %dx%d = %d quad", m_GridSize, m_GridSize,
+                            m_GridSize * m_GridSize);
+                    break;
+
+                case SDLK_2:
+                    // 150x150 = 22.500 quad -> MAX_QUADS (10.000) asiliyor
+                    // ve renderer OTOMATIK olarak birden fazla batch'e boluyor.
+                    // TAB ile draw call sayisinin 1'den 3'e ciktigini gorursun.
+                    // Batch'in sinirini gozle gormek icin bu test onemli.
+                    m_GridSize = std::min(200, m_GridSize + 20);
+                    FX_INFO("Izgara: %dx%d = %d quad%s", m_GridSize, m_GridSize,
+                            m_GridSize * m_GridSize,
+                            (m_GridSize * m_GridSize > 10000)
+                                ? "  (10.000 siniri asildi - TAB'a bas, draw call artmis olmali)"
+                                : "");
+                    break;
+
+                case SDLK_X:
+                    m_UseTextures = !m_UseTextures;
+                    FX_INFO("Mod -> %s", m_UseTextures ? "TEXTURE'LI" : "DUZ RENK");
+                    break;
+
                 case SDLK_R:
                     m_CameraPosition = { 0.0f, 0.0f, 0.0f };
                     m_CameraRotation = 0.0f;
-                    m_ZoomLevel      = 5.0f;
+                    m_ZoomLevel      = 12.0f;
                     UpdateCameraProjection();
-                    FX_INFO("Kamera sifirlandi.");
                     break;
 
                 case SDLK_T:
                     m_Wireframe = !m_Wireframe;
                     FX::RenderCommand::SetWireframe(m_Wireframe);
-                    FX_INFO("Tel kafes -> %s", m_Wireframe ? "ACIK" : "KAPALI");
                     break;
 
                 case SDLK_SPACE:
                     m_Animate = !m_Animate;
-                    FX_INFO("Animasyon -> %s", m_Animate ? "ACIK" : "DURDU");
                     break;
 
                 case SDLK_V:
@@ -381,18 +317,7 @@ namespace FXEd
                 }
 
                 case SDLK_TAB:
-                    FX_INFO("--- Istatistikler ---");
-                    FX_INFO("  Kamera konum  : (%.2f, %.2f)", m_CameraPosition.x, m_CameraPosition.y);
-                    FX_INFO("  Kamera aci    : %.1f derece", m_CameraRotation);
-                    FX_INFO("  Zoom          : %.2f (dikeyde %.1f birim gorunuyor)",
-                            m_ZoomLevel, m_ZoomLevel * 2.0f);
-                    FX_INFO("  Pencere       : %ux%u piksel (oran %.3f)",
-                            GetWindow().GetWidth(), GetWindow().GetHeight(),
-                            static_cast<float>(GetWindow().GetWidth()) /
-                            static_cast<float>(GetWindow().GetHeight()));
-                    FX_INFO("  Guncelleme    : %llu", static_cast<unsigned long long>(m_UpdateCount));
-                    FX_INFO("  Kare          : %llu", static_cast<unsigned long long>(m_FrameCount));
-                    FX_INFO("  Cizim cagrisi : 5 / kare  (Faz 4'te 1 olacak)");
+                    LogStats();
                     break;
 
                 default:
@@ -403,8 +328,10 @@ namespace FXEd
 
     void EditorApp::OnShutdown()
     {
-        FX_INFO("Editor kapaniyor. Toplam %llu guncelleme, %llu kare.",
-                static_cast<unsigned long long>(m_UpdateCount),
+        // Renderer2D'yi GL context olmeden once kapat.
+        FX::Renderer2D::Shutdown();
+
+        FX_INFO("Editor kapaniyor. Toplam %llu kare.",
                 static_cast<unsigned long long>(m_FrameCount));
     }
 }

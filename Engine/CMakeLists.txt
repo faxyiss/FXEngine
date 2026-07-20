@@ -1,4 +1,4 @@
-# ===========================================================================
+﻿# ===========================================================================
 # FXEngine - motor cekirdegi (statik kutuphane)
 #
 # Bu target Editor'u HIC BILMEZ. Editor'e dair tek bir include, tek bir
@@ -20,6 +20,7 @@ set(FXENGINE_SOURCES
     src/Renderer/RenderCommand.cpp
     src/Renderer/Texture.cpp
     src/Renderer/OrthographicCamera.cpp
+    src/Renderer/Renderer2D.cpp
 )
 
 set(FXENGINE_HEADERS
@@ -34,6 +35,7 @@ set(FXENGINE_HEADERS
     include/FXEngine/Renderer/RenderCommand.h
     include/FXEngine/Renderer/Texture.h
     include/FXEngine/Renderer/OrthographicCamera.h
+    include/FXEngine/Renderer/Renderer2D.h
 )
 
 add_library(FXEngine STATIC

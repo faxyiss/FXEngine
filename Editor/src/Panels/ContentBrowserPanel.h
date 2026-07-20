@@ -10,13 +10,14 @@
 // yaninda .meta dosyasi tutar; boylece dosyayi TASIYINCA referanslar
 // kopmaz. Biz simdilik yolu kimlik olarak kullaniyoruz.
 //
-// Dizinden disari cikma (assets/ disina) engelli: kok her zaman assets/.
+// Kok her zaman <exe>/assets; disari cikilamaz.
 // ===========================================================================
 
 #include <FXEngine/Renderer/TextureLibrary.h>
 
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace FXEd
 {
@@ -35,16 +36,50 @@ namespace FXEd
 
         void OnImGuiRender();
 
+        const std::filesystem::path& GetCurrentDirectory() const { return m_Current; }
+
+        // Disaridan bir dosyayi mevcut klasore KOPYALAR (tasimaz - kaynak
+        // dosya kullanicinin, ona dokunmuyoruz). Goreceli yolu doner,
+        // basarisizsa bos string.
+        std::string ImportFile(const std::string& absoluteSource);
+
+        // Kullanici "Ice Aktar..." dediyse true doner ve istegi temizler.
+        // Yerel dosya diyalogu modaldir; ImGui cercevesinin ortasinda
+        // acilamaz, bu yuzden EditorApp'e devrediyoruz.
+        bool TakeImportRequest();
+
+        // Klasor icerigi degistiginde (disaridan kopyalama vb.) cagrilir.
+        void Refresh() { m_NeedsRefresh = true; }
+
     private:
-        void DrawBreadcrumbs();
+        void DrawToolbar();
         void DrawEntry(const std::filesystem::directory_entry& entry);
+        void DrawModals();
+
+        void RefreshIfNeeded();
 
         FX::TextureLibrary* m_Library = nullptr;
 
         std::filesystem::path m_Root;      // <exe>/assets
         std::filesystem::path m_Current;
 
+        // Klasor icerigi her karede degil, sadece degistiginde okunuyor.
+        // 60 Hz'de disk gezmek gereksiz ve buyuk klasorlerde fark edilir.
+        std::vector<std::filesystem::directory_entry> m_Directories;
+        std::vector<std::filesystem::directory_entry> m_Files;
+        bool m_NeedsRefresh = true;
+
+        // Islemler dongu DISINDA uygulanir: uzerinde gezdigimiz listeyi
+        // gezerken degistirmek yineleyicileri bozar.
+        std::filesystem::path m_RenameTarget;
+        std::filesystem::path m_DeleteTarget;
+        bool m_OpenNewFolderPopup = false;
+        bool m_ImportRequest      = false;
+
+        char m_NameBuffer[128]{};
+        char m_SearchBuffer[64]{};
+
         float m_ThumbnailSize = 84.0f;
-        float m_Padding       = 12.0f;
+        float m_Padding       = 16.0f;
     };
 }

@@ -13,6 +13,7 @@
 // ===========================================================================
 
 #include <string>
+#include <vector>
 
 namespace FX { class Window; }
 
@@ -26,7 +27,15 @@ namespace FXEd
         static std::string OpenFile(const FX::Window& window, const char* filter);
         static std::string SaveFile(const FX::Window& window, const char* filter);
 
+        // Coklu secim. Bos vektor = iptal.
+        static std::vector<std::string> OpenFiles(const FX::Window& window, const char* filter);
+
+        // Dosyayi isletim sisteminin dosya yoneticisinde secili gosterir.
+        // Modal degil, ImGui cercevesi icinden cagrilabilir.
+        static void RevealInFileManager(const std::string& absolutePath);
+
         static const char* SceneFilter();
         static const char* PrefabFilter();
+        static const char* AssetFilter();
     };
 }

@@ -53,7 +53,13 @@ namespace FXEd
         void PushRecentScene(const std::string& path);
 
         // Icerik panelinden viewport'a birakilan dosyayi ele alir.
-        void HandleContentDrop(const std::string& relativePath);
+        void HandleContentDrop(const std::string& relativePath, float screenX, float screenY);
+
+        // Isletim sisteminden (Explorer'dan) surukleyip birakilan dosya.
+        void HandleExternalDrop(const std::string& absolutePath, float screenX, float screenY);
+
+        // "Ice Aktar..." -> dosya diyalogu -> Icerik paneline kopyala.
+        void ImportAssets();
 
         // Fare ekran konumu -> sahne dunya konumu.
         glm::vec2 ScreenToWorld(float screenX, float screenY) const;
@@ -114,6 +120,11 @@ namespace FXEd
 
         // ImGuizmo islem tipi (ImGuizmo::OPERATION). -1 = gizmo kapali.
         int m_GizmoOperation = -1;
+
+        // Menuden gelen ice aktarma istegi. Yerel diyalog modaldir ve
+        // ImGui cercevesinin ortasinda acilamaz; cerceve bittikten sonra
+        // isleniyor.
+        bool m_ImportRequested = false;
 
         // --- Kaynaklar ---------------------------------------------------------
         // Kutuphane, yol -> texture eslemesini tutar. Sahne yuklerken

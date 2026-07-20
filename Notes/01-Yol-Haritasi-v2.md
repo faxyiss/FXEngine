@@ -99,8 +99,11 @@ Ayrıntılar: [Faz-11-Notlar.md](Faz-11-Notlar.md)
 
 ## Faz 12 — Varlık yönetimi + prefab ✅ TAMAM
 
-- [x] `Content Browser` paneli — `assets/` klasörünü gezen dosya tarayıcısı
+- [x] `Content Browser` paneli — ikonlar, arama, kırıntı yolu, klasör
+      oluşturma, yeniden adlandırma, silme, Explorer'da gösterme
 - [x] Dosyadan viewport'a **sürükle-bırak** ile sprite oluşturma
+- [x] **Dışarıdan varlık aktarma** — pencereye sürükle-bırak (`SDL_EVENT_DROP_FILE`)
+      veya Ctrl+I ile çoklu seçim
 - [x] Yerel dosya diyalogları (Win32 `GetOpenFileName`/`GetSaveFileName`)
 - [x] **Prefab**: bir entity ağacını dosyaya kaydet, sahneye örnekle
 - [x] Son açılan sahneler listesi (`editor.json`)
@@ -251,6 +254,8 @@ MVP sırasında bilinçli olarak bıraktıklarımız:
 | Hata durumunda yedek doku yok | Texture yüklenemezse `nullptr`; mor "eksik doku" dokusu daha iyi olurdu. | `TextureLibrary.cpp` |
 | **Varlık kimliği = dosya yolu** | Dosyayı taşımak/yeniden adlandırmak tüm referansları koparır. Çözüm: `.meta` dosyaları + GUID tabanlı `AssetManager`. | `SceneSerializer`, `TextureLibrary` (Faz 12) |
 | Dosya diyalogları sadece Win32 | Linux/macOS'ta boş gövde derleniyor; `nfd` veya portal gerekli. | `Editor/src/Platform/FileDialogs.cpp` |
+| Proje klasörü kavramı yok | Editör `<exe>/assets`'i kök alıyor; içe aktarılan varlıklar `build/` altında kalıyor ve sürüm kontrolüne girmiyor. | `ContentBrowserPanel.cpp` (Faz 12) |
+| Dosya izleyici yok | Klasör dışarıdan değişirse panel fark etmiyor; elle "Yenile" gerekiyor. | `ContentBrowserPanel.cpp` (Faz 12) |
 | Prefab bağlantısı yok | Örnek kaynağından bağımsız; kaynak değişince örnekler güncellenmiyor (override sistemi yok). | `PrefabSerializer.cpp` (Faz 12) |
 | `GetRegistry()` çok açık | Registry'ye doğrudan `create`/`destroy` çağırmak UUID haritasını bozar. Daha dar bir erişim gerekebilir. | `Scene.h` (Faz 8) |
 | `FollowSystem` Scene'e bağımlı | Diğer sistemler sadece registry alıyor, bu Scene alıyor (UUID haritası için). Test etmesi daha zor. | `Systems.cpp` (Faz 8) |

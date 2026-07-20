@@ -38,7 +38,7 @@ target_link_libraries(FXEditor PRIVATE
 # comdlg32: GetOpenFileName/GetSaveFileName (yerel dosya diyaloglari).
 # Sadece Windows'ta; FileDialogs.cpp diger platformlarda bos govde derliyor.
 if(WIN32)
-    target_link_libraries(FXEditor PRIVATE comdlg32)
+    target_link_libraries(FXEditor PRIVATE comdlg32 shell32)
 endif()
 
 if(WIN32)

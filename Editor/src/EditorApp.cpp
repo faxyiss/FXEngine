@@ -114,6 +114,7 @@ namespace FXEd
         FX_INFO("Viewport uzerindeyken: W/A/S/D kamera, tekerlek zoom.");
         FX_INFO("Ctrl+N yeni, Ctrl+O ac, Ctrl+S kaydet, Ctrl+Shift+S farkli kaydet.");
         FX_INFO("Icerik panelinden viewport'a resim/prefab/sahne surukleyebilirsin.");
+        FX_INFO("Disaridan dosya: pencereye surukle-birak veya Ctrl+I.");
         FX_INFO("Viewport'ta sol tik ile entity sec.");
         FX_INFO("Gizmo: Z kapali, X tasi, C dondur, B olcekle (Ctrl = kademeli)");
     }
@@ -432,7 +433,48 @@ namespace FXEd
         return { world.x, world.y };
     }
 
-    void EditorApp::HandleContentDrop(const std::string& relativePath)
+    void EditorApp::ImportAssets()
+    {
+        const auto files = FileDialogs::OpenFiles(GetWindow(), FileDialogs::AssetFilter());
+        if (files.empty())
+            return;
+
+        std::size_t imported = 0;
+        for (const auto& file : files)
+        {
+            if (!m_ContentBrowser.ImportFile(file).empty())
+                ++imported;
+        }
+
+        SetStatus(std::to_string(imported) + " dosya ice aktarildi");
+    }
+
+    void EditorApp::HandleExternalDrop(const std::string& absolutePath,
+                                       float screenX, float screenY)
+    {
+        // Once assets/ icine KOPYALA. Kopyalamadan dogrudan kullanmak,
+        // sahne dosyasina kullanicinin masaustunu gosteren bir yol
+        // yazmak demek olurdu - proje tasinir tasinmaz kirilir.
+        const std::string relative = m_ContentBrowser.ImportFile(absolutePath);
+        if (relative.empty())
+        {
+            SetStatus("Ice aktarilamadi: " + absolutePath);
+            return;
+        }
+
+        SetStatus("Ice aktarildi: " + relative);
+
+        // Viewport uzerine birakildiysa ayrica sahneye de koy.
+        const bool overViewport =
+            screenX >= m_ViewportBoundsMin.x && screenX <= m_ViewportBoundsMax.x &&
+            screenY >= m_ViewportBoundsMin.y && screenY <= m_ViewportBoundsMax.y;
+
+        if (overViewport)
+            HandleContentDrop(relative, screenX, screenY);
+    }
+
+    void EditorApp::HandleContentDrop(const std::string& relativePath,
+                                      float screenX, float screenY)
     {
         const std::string ext = std::filesystem::path(relativePath).extension().string();
 
@@ -442,8 +484,7 @@ namespace FXEd
             return;
         }
 
-        const ImVec2 mouse = ImGui::GetMousePos();
-        const glm::vec2 world = ScreenToWorld(mouse.x, mouse.y);
+        const glm::vec2 world = ScreenToWorld(screenX, screenY);
 
         if (ext == ".fxprefab")
         {
@@ -635,9 +676,16 @@ namespace FXEd
         m_HierarchyPanel.OnImGuiRender();
         m_ContentBrowser.OnImGuiRender();
 
-        // Prefab kaydetme istegi paneller cizildikten SONRA ele aliniyor:
-        // dosya diyalogu modal ve programi bloklar. ImGui cercevesinin
-        // ortasinda acmak, o kare boyunca ImGui'nin ic durumunu dondurur.
+        // Yerel dosya diyalogu isteyen tum istekler paneller cizildikten
+        // SONRA ele aliniyor: diyalog modal ve programi bloklar. ImGui
+        // cercevesinin ortasinda acmak, o kare boyunca ImGui'nin ic
+        // durumunu dondurur ve diyalogun arkasi siyah kalir.
+        if (m_ImportRequested || m_ContentBrowser.TakeImportRequest())
+        {
+            m_ImportRequested = false;
+            ImportAssets();
+        }
+
         if (FX::Entity prefabRoot = m_HierarchyPanel.TakePrefabRequest())
         {
             const std::string absolute =
@@ -696,6 +744,10 @@ namespace FXEd
                     if (!toOpen.empty())
                         OpenScene(toOpen);
                 }
+
+                ImGui::Separator();
+                if (ImGui::MenuItem("Varlik Ice Aktar...", "Ctrl+I"))
+                    m_ImportRequested = true;
 
                 ImGui::Separator();
                 if (ImGui::MenuItem("Kaydet", "Ctrl+S"))
@@ -822,7 +874,10 @@ namespace FXEd
         if (ImGui::BeginDragDropTarget())
         {
             if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(kContentPayload))
-                HandleContentDrop(static_cast<const char*>(payload->Data));
+            {
+                const ImVec2 mouse = ImGui::GetMousePos();
+                HandleContentDrop(static_cast<const char*>(payload->Data), mouse.x, mouse.y);
+            }
 
             ImGui::EndDragDropTarget();
         }
@@ -972,6 +1027,18 @@ namespace FXEd
 
     void EditorApp::OnEvent(const SDL_Event& event)
     {
+        // ISLETIM SISTEMINDEN SURUKLE-BIRAK.
+        // ImGui'den ONCE bakiyoruz: bu bir OS olayi, ImGui'nin fare
+        // durumuyla ilgisi yok ve ImGui onu tuketmez. Native surukleme
+        // sirasinda ImGui'nin fare konumu guncellenmez, bu yuzden
+        // koordinati olayin KENDISINDEN aliyoruz.
+        if (event.type == SDL_EVENT_DROP_FILE)
+        {
+            if (event.drop.data)
+                HandleExternalDrop(event.drop.data, event.drop.x, event.drop.y);
+            return;
+        }
+
         // ImGui once gorsun. true donerse olayi tuketmis demektir.
         if (m_ImGuiLayer.OnEvent(event))
             return;
@@ -1018,6 +1085,12 @@ namespace FXEd
 
             case SDLK_O:
                 if (ctrl) OpenScene();
+                break;
+
+            case SDLK_I:
+                // Kisayol ImGui cercevesinin DISINDA isleniyor (OnEvent),
+                // bu yuzden diyalogu dogrudan acmak guvenli.
+                if (ctrl) ImportAssets();
                 break;
 
             // Gizmo kisayollari - sadece viewport odaktayken, cunku

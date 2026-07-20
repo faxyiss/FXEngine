@@ -239,7 +239,135 @@ Yol göreceleştirme:
 C:\Windows\notepad.exe         ->  (uyari) mutlak yol korundu
 ```
 
+İçe aktarma:
+```
+i1 = assets/dis_kaynak.png
+i2 = assets/dis_kaynak (1).png     -> uzerine yazmadi, numaralandirdi
+i3 = (bos)  + uyari                -> olmayan dosya, cokme yok
+viewport'a birakma: entity 31 -> 32
+```
+
 Çalışma: GL hatası yok, temiz kapanış.
+
+---
+
+## 11. Dışarıdan varlık aktarma — iki yol
+
+### a) Sürükle-bırak (SDL_EVENT_DROP_FILE)
+
+Explorer'dan pencereye dosya bırakılabiliyor. Bu olay **ImGui'den önce**
+işleniyor:
+
+```cpp
+if (event.type == SDL_EVENT_DROP_FILE) { ... return; }
+if (m_ImGuiLayer.OnEvent(event)) return;
+```
+
+İki sebep:
+1. Bu bir *işletim sistemi* olayı; ImGui onu tüketmez, sıraya sokmanın
+   anlamı yok.
+2. **Native sürükleme sırasında ImGui'nin fare konumu güncellenmez.**
+   Fareyi işletim sistemi tutuyor, uygulamaya hareket olayı gelmiyor.
+   Bu yüzden bırakma koordinatını `ImGui::GetMousePos()`'tan değil
+   **olayın kendisinden** (`event.drop.x/y`) alıyoruz.
+
+Aynı sebeple panel-içi sürükle-bırak ile OS sürükle-bırak farklı
+koordinat kaynakları kullanıyor; `HandleContentDrop` artık konumu
+parametre olarak alıyor.
+
+### b) Ctrl+I / "İçe Aktar..." — çoklu seçim
+
+`OFN_ALLOWMULTISELECT`'in çıktı biçimi Win32'nin en tuhaf API'lerinden:
+
+```
+tek seçim   -> "C:\klasor\dosya.png\0\0"
+çoklu seçim -> "C:\klasor\0dosya1.png\0dosya2.png\0\0"
+```
+
+İlk parçanın klasör mü tam yol mu olduğunu **ancak ikinci parçaya bakarak**
+anlarsın. Ayrıca `MAX_PATH` tampon yetmez; 32 KB ayırdık.
+
+### Neden kopyalıyoruz, taşımıyoruz?
+
+İçe aktarılan dosya `assets/` içine **kopyalanır**. Kaynak dosya
+kullanıcının, ona dokunmak bizim işimiz değil.
+
+Kopyalamadan doğrudan kullanmak ise sahne dosyasına kullanıcının masaüstünü
+gösteren bir yol yazmak demek olurdu — proje taşınır taşınmaz kırılır.
+Aynı isim varsa **üzerine yazmıyoruz**, `ad (1).png` diye numaralandırıyoruz:
+mevcut bir varlığı sessizce yok etmek kabul edilemez, bir sahne o dosyaya
+işaret ediyor olabilir.
+
+---
+
+## 12. İkonlar koda gömülü, dosyada değil
+
+Klasör ve dosya ikonları `ImDrawList` ile birkaç dikdörtgen olarak çiziliyor.
+
+Bir ikon seti eklemek `assets/` içine karışan, sürümlenmesi gereken ve
+ölçeklendiğinde bulanıklaşan ikili dosyalar demekti. Çizim listesi zaten
+elimizde; küçük resim boyutu kaydırıldığında ikonlar keskin kalıyor.
+
+Düğme **şeffaf** çiziliyor, ikon üstüne konuyor:
+
+```cpp
+PushStyleColor(ImGuiCol_Button, transparan);
+ImGui::Button("##oge", size);
+// GetItemRectMin/Max -> kendi çizimimiz
+```
+
+Böylece vurgu/tıklama görselleri ImGui'den bedava geliyor ama görünüm bize
+ait. Resimler için de aynı yol: `ImageButton` yerine `AddImage`, kendi
+en-boy oranında ve hücreye ortalanmış (hücreyi doldursaydık dikdörtgen
+resimler ezik görünürdü).
+
+---
+
+## 13. Klasör içeriği her karede okunmuyor
+
+`m_NeedsRefresh` bayrağı: dizin listesi sadece değiştiğinde okunuyor.
+60 Hz'de disk gezmek gereksiz ve büyük klasörlerde fark edilir.
+
+`Refresh()` çağıran her yer: klasöre girme, geri, içe aktarma,
+oluşturma/silme/yeniden adlandırma ve elle "Yenile".
+
+> Bu hâlâ tam doğru değil: dosya **dışarıdan** değişirse (Explorer'da
+> silersen) panel bilmez. Doğrusu bir dosya izleyici (`ReadDirectoryChangesW`
+> / `inotify`). Teknik borç.
+
+---
+
+## 14. Silme ve yeniden adlandırma: geri dönüşü olmayan işlemler
+
+İkisi de **onay modalı** arkasında. Yeniden adlandırma modalinde ayrıca
+şu uyarı var:
+
+> "Bu dosyayı kullanan sahneler onu bulamayacak."
+
+Çünkü kimliğimiz dosya yolu (bölüm 3). Bu, `.meta`/GUID sisteminin neden
+gerekli olduğunu kullanıcıya somut olarak gösteren yer — soyut bir
+tasarım tercihi olmaktan çıkıp elle tutulur bir kısıt hâline geliyor.
+
+ImGui modalları, açılma isteğiyle **aynı ID kapsamında** `OpenPopup`
+edilmek zorunda. Bu yüzden istekler bayrak olarak biriktirilip hepsi tek
+bir yerde (`DrawModals`) açılıyor — Faz 9'daki "yapıyı değiştiren işlemler
+döngü dışında" kuralının bir başka görünümü.
+
+---
+
+## ⚠️ Varlıklar nerede yaşıyor?
+
+Content browser `<exe>/assets`'i, yani **`build/bin/assets`**'i gösteriyor.
+Kaynak ağaçtaki `Editor/assets` her derlemede oraya kopyalanıyor
+(`copy_directory_if_different`).
+
+Sonuç: **içe aktardığın dosyalar sürüm kontrolüne girmez.** `build/`
+klasörünü tamamen silersen kaybolurlar.
+
+Doğrusu bir **proje klasörü** kavramı: editör, exe'nin yanını değil
+kullanıcının açtığı proje dizinini kök alır (Unity/Godot böyle çalışır).
+Kalıcı tutmak istediğin varlıkları şimdilik elle `Editor/assets/` altına
+da kopyala. Teknik borç listesine eklendi.
 
 ## Onay
 - [x] Derlendi (uyarısız)
@@ -251,8 +379,10 @@ C:\Windows\notepad.exe         ->  (uyari) mutlak yol korundu
 ## Ertelenenler → teknik borç
 - **AssetManager (UUID tabanlı varlık kimliği)** — `.meta` dosyaları + varlık
   veritabanı gerektiriyor, kendi fazı olmalı.
+- **Proje klasörü kavramı** — editör `<exe>/assets`'i kök alıyor; içe
+  aktarılan varlıklar sürüm kontrolüne girmiyor.
 - Linux/macOS dosya diyalogları (`FileDialogs.cpp` orada boş gövde derliyor).
-- Content browser'da yeniden adlandırma / silme / klasör oluşturma.
+- Dosya izleyici: klasör dışarıdan değişirse panel fark etmiyor.
 - Prefab **bağlantısı** yok: örnek, kaynağından bağımsız. Gerçek prefab
   sistemlerinde örnek kaynağa bağlı kalır ve kaynak değişince güncellenir
   (üzerine yazılan alanlar "override" olarak saklanır).

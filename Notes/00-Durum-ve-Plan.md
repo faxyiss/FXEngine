@@ -87,8 +87,18 @@ Editör bir GUI uygulaması; test için:
 - Ekran görüntüsü alınıp `Read` ile incelenebilir
 - `Start-Process ... -RedirectStandardOutput` ile log okunur
 
+Motor çekirdeği (Engine) artık **birim testli** (0.5):
+`cmake --build build --config Debug --target FXTests` → `ctest -C Debug`
+(veya doğrudan `build/bin/FXTests.exe`). Yeni bir serializer/asset
+davranışı eklerken önce oraya bir test yaz.
+
 Derleme: `cmake --build build --config Debug`
 Çalışan editör exe'yi kilitler — `Get-Process FXEditor | Stop-Process -Force`.
+
+**Klavye simülasyonu tuzağı:** `keybd_event` ile Delete göndermek numpad
+nokta üretiyor; gerçek `SDLK_DELETE` için `PostMessage(WM_KEYDOWN, 0x2E)`
+gerekiyor ve o da pencereyi öne getirmiyor. Klavye kısayolları elle test
+edilmeli.
 
 ---
 
@@ -142,7 +152,7 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 | 0.4 | Dosya izleyici (`ReadDirectoryChangesW`) | ✅ GUID dışarıdan taşımada da korunuyor |
 | 0.2 | `SelectionContext` — seçimi panelden çıkar | ✅ sahibi `EditorApp`, paneller tüketici |
 | 0.3 | Entity çoklu seçimi | ✅ Ctrl/Shift, gizmoda delta, toplu silme |
-| 0.5 | Catch2 + `UUID`/`SceneSerializer`/`AssetManager` testleri | **sıradaki** |
+| 0.5 | Catch2 + `UUID`/`Scene`/`SceneSerializer`/`AssetManager` testleri | ✅ 26 test / 80 assertion |
 | 0.6 | Faz 22 artıkları (Inspector doku ayarları, prefab GUID, `AssetDirectory`) | 16'dan sonra |
 
 ### Bölünmüş fazlar

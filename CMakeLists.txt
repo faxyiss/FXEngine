@@ -41,6 +41,14 @@ if(MSVC)
 endif()
 
 # ---------------------------------------------------------------------------
+# Secenekler
+# ---------------------------------------------------------------------------
+# Testler VARSAYILAN OLARAK ACIK ama kapatilabilir: CI'da ve gelistirirken
+# calissinlar, motoru sadece derlemek isteyen biri Catch2 indirmek
+# zorunda kalmasin.
+option(FXENGINE_BUILD_TESTS "Birim testlerini derle (Catch2)" ON)
+
+# ---------------------------------------------------------------------------
 # Bagimliliklar
 # ---------------------------------------------------------------------------
 include(cmake/Dependencies.cmake)
@@ -51,3 +59,8 @@ include(cmake/Dependencies.cmake)
 # SIRA ONEMLI: Editor, Engine target'ina link olacagi icin Engine once tanimlanmali.
 add_subdirectory(Engine)
 add_subdirectory(Editor)
+
+if(FXENGINE_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(Tests)
+endif()

@@ -109,6 +109,18 @@ FetchContent_Declare(stb
     GIT_SHALLOW    TRUE)
 
 # ---------------------------------------------------------------------------
+# 8) Catch2 - birim testleri (0.5)
+# ---------------------------------------------------------------------------
+# FXENGINE_BUILD_TESTS kapaliysa hic indirilmiyor: testler istege bagli
+# olmali, motoru derlemek isteyen birini indirmeye zorlamamali.
+if(FXENGINE_BUILD_TESTS)
+    FetchContent_Declare(Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG        v3.5.4
+        GIT_SHALLOW    TRUE)
+endif()
+
+# ---------------------------------------------------------------------------
 # Indirme + dahil etme
 # ---------------------------------------------------------------------------
 message(STATUS "[FXEngine] Bagimliliklar cekiliyor (ilk sefer birkac dakika surebilir)...")
@@ -116,6 +128,10 @@ FetchContent_MakeAvailable(SDL3 glm EnTT nlohmann_json glad)
 
 # imgui, ImGuizmo ve stb icin: sadece indir, add_subdirectory YAPMA.
 FetchContent_MakeAvailable(imgui ImGuizmo stb)
+
+if(FXENGINE_BUILD_TESTS)
+    FetchContent_MakeAvailable(Catch2)
+endif()
 
 # ---------------------------------------------------------------------------
 # imgui target'ini elle kuruyoruz

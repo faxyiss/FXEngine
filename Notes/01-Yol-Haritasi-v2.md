@@ -150,8 +150,10 @@ Faz 22'nin bıraktığı tutarlılık açığı.
       yeniden adlandırma/taşıma GUID'i koruyor, yeni dosyaya `.meta`
       üretiliyor, silinende temizleniyor.
       Ayrıntı: [Borc-04-Dosya-Izleyici.md](Borc-04-Dosya-Izleyici.md)
-- [ ] **0.5 — Catch2 iskeleti.** `UUID`, `SceneSerializer`,
-      `AssetManager` testleri.
+- [x] **0.5 — Catch2 iskeleti.** `Tests/` altında `FXTests`; `UUID`,
+      `Scene`, `SceneSerializer`, `AssetManager` — 26 test / 80 assertion,
+      `ctest` ile de çalışıyor.
+      Ayrıntı: [Borc-05-Birim-Testleri.md](Borc-05-Birim-Testleri.md)
 - [ ] **0.6 — Faz 22 artıkları.** Inspector'da doku ayarları arayüzü,
       prefab / `StartScene` referanslarının GUID'e geçmesi,
       `AssetDirectory`'nin gerçekten kullanılması.
@@ -375,7 +377,7 @@ MVP sırasında bilinçli olarak bıraktıklarımız:
 | `GetRegistry()` çok açık | Registry'ye doğrudan `create`/`destroy` çağırmak UUID haritasını bozar. Daha dar bir erişim gerekebilir. | `Scene.h` (Faz 8) |
 | `FollowSystem` Scene'e bağımlı | Diğer sistemler sadece registry alıyor, bu Scene alıyor (UUID haritası için). Test etmesi daha zor. | `Systems.cpp` (Faz 8) |
 | ~~Seçim `SceneHierarchyPanel` içinde~~ | ✅ 0.2'de `SelectionContext`'e taşındı; sahibi `EditorApp`, paneller tüketici. | `SelectionContext.h` |
-| Test yok | Hiç birim testi yok. Serializer ve matematik en çok fayda sağlayacak yerler. | — |
+| ~~Test yok~~ | ✅ 0.5'te Catch2 geldi (`UUID`, `Scene`, `SceneSerializer`, `AssetManager`). Renderer ve `FileWatcher` hâlâ test dışı. | `Tests/` |
 | Sadece Windows'ta denendi | Kod taşınabilir yazıldı ama Linux'ta hiç derlenmedi. | — |
 
 ---

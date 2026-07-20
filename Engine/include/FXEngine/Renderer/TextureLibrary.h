@@ -28,10 +28,22 @@ namespace FX
     class TextureLibrary
     {
     public:
-        // Yol daha once yuklendiyse onbellekten doner, yoksa yukler.
-        // Yukleme basarisiz olursa nullptr doner (cagiran kontrol etmeli).
+        // "Bu dosyanin dokusunu ver, ayarlari umursamiyorum."
+        // Onbellekte varsa onu doner, yoksa varsayilan ayarlarla yukler.
+        // Icerik panelinin onizlemeleri gibi yerler icin.
+        std::shared_ptr<Texture2D> Load(const std::string& path);
+
+        // "Bu dosyayi BU ayarlarla istiyorum."
+        // Dosya daha once BASKA ayarlarla yuklendiyse uyari basar ve
+        // ilk yuklemeninkini doner (onbellek yola gore anahtarli).
+        //
+        // Iki ayri imza olmasinin sebebi: uyari ancak ISTEYEN birine
+        // anlamli. Varsayilan argumanli tek bir fonksiyon olsaydi,
+        // hicbir ayar talep etmeyen cagrilar da uyari alirdi - nitekim
+        // aliyorlardi: icerik paneli bir klasore her girisinde
+        // "farkli spec" uyarisi basiyordu.
         std::shared_ptr<Texture2D> Load(const std::string& path,
-                                        const TextureSpec& spec = {});
+                                        const TextureSpec& spec);
 
         // Disaridan olusturulmus bir texture'i onbellege ekler.
         // Editor'un elle yukledigi dokularin da tabloda gorunmesi icin -
@@ -46,6 +58,10 @@ namespace FX
         std::size_t GetCount() const { return m_Textures.size(); }
 
     private:
+        std::shared_ptr<Texture2D> LoadInternal(const std::string& path,
+                                                const TextureSpec& spec,
+                                                bool warnOnSpecMismatch);
+
         // shared_ptr: kutuphane texture'i tutar, entity'ler de tutar.
         // Kutuphane temizlense bile hala kullanilan bir texture yasamaya
         // devam eder - sahiplik paylasimi tam da bu durum icin var.

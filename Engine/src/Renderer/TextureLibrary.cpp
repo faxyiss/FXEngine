@@ -3,8 +3,21 @@
 
 namespace FX
 {
+    std::shared_ptr<Texture2D> TextureLibrary::Load(const std::string& path)
+    {
+        // Ayar talep edilmedi -> uyarilacak bir sey yok.
+        return LoadInternal(path, TextureSpec{}, false);
+    }
+
     std::shared_ptr<Texture2D> TextureLibrary::Load(const std::string& path,
                                                     const TextureSpec& spec)
+    {
+        return LoadInternal(path, spec, true);
+    }
+
+    std::shared_ptr<Texture2D> TextureLibrary::LoadInternal(const std::string& path,
+                                                            const TextureSpec& spec,
+                                                            bool warnOnSpecMismatch)
     {
         if (path.empty())
             return nullptr;
@@ -20,9 +33,13 @@ namespace FX
             // Sessiz birakmiyoruz cunku belirtisi cok dolayli: "sahneyi
             // yeniden yukleyince zeminin dosemesi bozuldu" gibi.
             //
+            // Ama uyari SADECE aciktan ayar isteyene basiliyor: icerik
+            // paneli gibi "ne varsa ver" diyen cagiranlar icin yanlis
+            // alarm olurdu.
+            //
             // Dogru cozum dosya basina kalici doku ayari (.fxmeta) -> Faz 21.
             // O zamana kadar bir dosyanin spec'i, ilk yuklendigi yerdedir.
-            if (m_Specs.count(path) && !(m_Specs[path] == spec))
+            if (warnOnSpecMismatch && m_Specs.count(path) && !(m_Specs[path] == spec))
                 FX_CORE_WARN("TextureLibrary: '%s' farkli bir spec ile istendi; "
                              "ilk yuklemenin ayarlari kullanilacak.", path.c_str());
 

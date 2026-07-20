@@ -41,6 +41,22 @@ namespace FX
         static void DrawIndexed(const std::shared_ptr<VertexArray>& vertexArray,
                                 std::uint32_t indexCount = 0);
 
+        // Index'siz cizim, GL_LINES. Her 2 kose bir cizgi parcasi.
+        // Cizgilerde index buffer'in faydasi yok: quad'larda ayni kose
+        // dort ucgen arasinda paylasilirken, cizgi kosesi tektir.
+        static void DrawLines(const std::shared_ptr<VertexArray>& vertexArray,
+                              std::uint32_t vertexCount);
+
+        // Piksel cinsinden. Surucu bir araligi asamayabilir (cogu modern
+        // GPU sadece 1.0'i garanti eder), bu yuzden kalinliga bel baglama.
+        static void SetLineWidth(float width);
+
+        // Derinlik testini ac/kapa. Editorde ustte durmasi gereken cizimler
+        // (izgara, secim cercevesi) icin kapatiliyor: o zaman siralamayi
+        // z degeri degil CIZIM SIRASI belirler, ki debug cizimi icin
+        // istenen tam olarak budur.
+        static void SetDepthTest(bool enabled);
+
         // Hata ayiklama: tel kafes (wireframe) modu. Ucgenlerin gercekten
         // nasil yerlestigini gormek icin paha bicilmez.
         static void SetWireframe(bool enabled);

@@ -116,7 +116,7 @@ namespace FXEd
         FX_INFO("Ctrl+N yeni, Ctrl+O ac, Ctrl+S kaydet, Ctrl+Shift+S farkli kaydet.");
         FX_INFO("Icerik panelinden viewport'a resim/prefab/sahne surukleyebilirsin.");
         FX_INFO("Disaridan dosya: pencereye surukle-birak veya Ctrl+I.");
-        FX_INFO("Viewport'ta sol tik ile entity sec.");
+        FX_INFO("Viewport'ta sol tik ile entity sec, F ile odaklan, G izgara.");
         FX_INFO("Gizmo: Z kapali, X tasi, C dondur, B olcekle (Ctrl = kademeli)");
     }
 
@@ -706,7 +706,14 @@ namespace FXEd
 
         FX::Renderer2D::ResetStats();
 
+        // Izgara sahneden ONCE: derinlik testi kapali oldugu icin sirayi
+        // cizim belirliyor, yani izgara sprite'larin arkasinda kaliyor.
+        DrawGrid();
+
         m_Scene->OnRender(*m_Camera);
+
+        // Secim cercevesi sahneden SONRA: ayni sebeple her zaman ustte.
+        DrawSelectionOutline();
 
         PickEntity();
 
@@ -860,6 +867,11 @@ namespace FXEd
 
             if (ImGui::BeginMenu("Gorunum"))
             {
+                ImGui::MenuItem("Izgara", "G", &m_ShowGrid);
+                if (ImGui::MenuItem("Secilene Odaklan", "F"))
+                    FocusOnSelection();
+                ImGui::Separator();
+
                 if (ImGui::MenuItem("Kamerayi Sifirla"))
                 {
                     m_CameraPosition = { 0.0f, 0.0f, 0.0f };
@@ -998,6 +1010,10 @@ namespace FXEd
                               "dunya eksenleri mi? (Olceklemede her zaman yerel.)");
 
         ImGui::SameLine(0.0f, 14.0f);
+        ImGui::Checkbox("Izgara", &m_ShowGrid);
+        ImGui::SetItemTooltip("Izgarayi goster/gizle (G)");
+
+        ImGui::SameLine(0.0f, 14.0f);
 
         ImGui::Checkbox("Kademe", &m_SnapEnabled);
         ImGui::SetItemTooltip("Kapaliyken de Ctrl basili tutarak kademeli hareket edilir.");
@@ -1027,6 +1043,148 @@ namespace FXEd
         ImGui::EndChild();
         ImGui::PopStyleColor();
         ImGui::PopStyleVar();
+    }
+
+    namespace
+    {
+        // Gorunen yuksekligi kabaca `hedefCizgi` parcaya bolen "yuvarlak"
+        // bir aralik secer: 1-2-5-10-20-50-100...
+        //
+        // Neden dogrudan yukseklik/50 degil? Cunku 0.37 gibi bir aralik
+        // izgarayi okunamaz yapar. Insan gozu 1'in katlarini bekler;
+        // zoom yaparken aralik surekli degil KADEMELI degismeli.
+        float ChooseGridStep(float visibleHeight, float targetLines)
+        {
+            const float raw = visibleHeight / targetLines;
+            if (raw <= 0.0f)
+                return 1.0f;
+
+            const float magnitude = std::pow(10.0f, std::floor(std::log10(raw)));
+            const float n = raw / magnitude;
+
+            float nice;
+            if      (n < 1.5f) nice = 1.0f;
+            else if (n < 3.5f) nice = 2.0f;
+            else if (n < 7.5f) nice = 5.0f;
+            else               nice = 10.0f;
+
+            return nice * magnitude;
+        }
+    }
+
+    void EditorApp::DrawGrid()
+    {
+        if (!m_ShowGrid || m_ViewportSize.y <= 0.0f)
+            return;
+
+        const float aspect        = m_ViewportSize.x / m_ViewportSize.y;
+        const float visibleHeight = m_ZoomLevel * 2.0f;
+        const float visibleWidth  = visibleHeight * aspect;
+
+        const float step = ChooseGridStep(visibleHeight, 16.0f);
+
+        // Gorunen alanin sinirlari. Bir adim tasma payi birakiyoruz ki
+        // kaydirirken kenarda cizgi eksigi gorunmesin.
+        const float left   = m_CameraPosition.x - visibleWidth  * 0.5f - step;
+        const float right  = m_CameraPosition.x + visibleWidth  * 0.5f + step;
+        const float bottom = m_CameraPosition.y - visibleHeight * 0.5f - step;
+        const float top    = m_CameraPosition.y + visibleHeight * 0.5f + step;
+
+        const glm::vec4 thin { 1.0f, 1.0f, 1.0f, 0.10f };
+        const glm::vec4 thick{ 1.0f, 1.0f, 1.0f, 0.22f };
+        const glm::vec4 axisX{ 0.85f, 0.30f, 0.35f, 0.85f };
+        const glm::vec4 axisY{ 0.40f, 0.80f, 0.40f, 0.85f };
+
+        FX::RenderCommand::SetDepthTest(false);
+        FX::Renderer2D::BeginScene(*m_Camera);
+
+        // Her 5 adimda bir kalin cizgi: sayarken referans noktasi olmadan
+        // izgara okunmaz. floor kullaniyoruz cunku negatif tarafta
+        // tam sayiya dogru kesme (truncation) 0 civarinda desen bozar.
+        const auto isMajor = [step](float v)
+        {
+            const long long k = static_cast<long long>(std::floor(v / step + 0.5f));
+            return (k % 5) == 0;
+        };
+
+        const float startX = std::floor(left   / step) * step;
+        const float startY = std::floor(bottom / step) * step;
+
+        for (float x = startX; x <= right; x += step)
+        {
+            const glm::vec4& c = (std::fabs(x) < step * 0.25f) ? axisY
+                                                               : (isMajor(x) ? thick : thin);
+            FX::Renderer2D::DrawLine({ x, bottom, 0.0f }, { x, top, 0.0f }, c);
+        }
+
+        for (float y = startY; y <= top; y += step)
+        {
+            const glm::vec4& c = (std::fabs(y) < step * 0.25f) ? axisX
+                                                               : (isMajor(y) ? thick : thin);
+            FX::Renderer2D::DrawLine({ left, y, 0.0f }, { right, y, 0.0f }, c);
+        }
+
+        FX::Renderer2D::EndScene();
+        FX::RenderCommand::SetDepthTest(true);
+    }
+
+    void EditorApp::DrawSelectionOutline()
+    {
+        FX::Entity selected = m_HierarchyPanel.GetSelectedEntity();
+        if (!selected || !selected.HasComponent<FX::TransformComponent>())
+            return;
+
+        // Dunya matrisi: parent zinciri zaten uygulanmis halde (Faz 9).
+        // Yerel transform'u kullansaydik cocuk entity'lerin cercevesi
+        // yanlis yerde cikardi.
+        glm::mat4 world{ 1.0f };
+        if (selected.HasComponent<FX::WorldTransformComponent>())
+            world = selected.GetComponent<FX::WorldTransformComponent>().Matrix;
+        else
+            world = selected.GetComponent<FX::TransformComponent>().GetTransform();
+
+        FX::RenderCommand::SetDepthTest(false);
+        FX::Renderer2D::SetLineWidth(2.0f);
+        FX::Renderer2D::BeginScene(*m_Camera);
+
+        FX::Renderer2D::DrawRect(world, { 1.0f, 0.55f, 0.15f, 1.0f });
+
+        FX::Renderer2D::EndScene();
+        FX::Renderer2D::SetLineWidth(1.0f);
+        FX::RenderCommand::SetDepthTest(true);
+    }
+
+    void EditorApp::FocusOnSelection()
+    {
+        FX::Entity selected = m_HierarchyPanel.GetSelectedEntity();
+        if (!selected || !selected.HasComponent<FX::TransformComponent>())
+        {
+            SetStatus("Odaklanacak entity secili degil.");
+            return;
+        }
+
+        glm::mat4 world{ 1.0f };
+        if (selected.HasComponent<FX::WorldTransformComponent>())
+            world = selected.GetComponent<FX::WorldTransformComponent>().Matrix;
+        else
+            world = selected.GetComponent<FX::TransformComponent>().GetTransform();
+
+        // Matrisin 4. sutunu konumdur; ayristirmaya gerek yok.
+        m_CameraPosition = { world[3][0], world[3][1], 0.0f };
+
+        // Nesneyi ekrana sigdir: dunya uzayindaki genisligini olceginden
+        // okuyup biraz pay birakiyoruz. Tam sinirina zoom yapmak nesneyi
+        // ekranin kenarina yapistirirdi.
+        const float scaleX = glm::length(glm::vec3(world[0]));
+        const float scaleY = glm::length(glm::vec3(world[1]));
+        const float extent = std::max(scaleX, scaleY);
+
+        m_ZoomLevel = glm::clamp(extent * 2.5f, 1.0f, 40.0f);
+
+        m_Camera->SetPosition(m_CameraPosition);
+        UpdateCameraProjection();
+
+        SetStatus("Odaklanildi: " + selected.GetComponent<FX::TagComponent>().Tag);
     }
 
     void EditorApp::PickEntity()
@@ -1146,6 +1304,7 @@ namespace FXEd
         ImGui::Separator();
         ImGui::Text("Draw call   : %u", stats.DrawCalls);
         ImGui::Text("Quad        : %u", stats.QuadCount);
+        ImGui::Text("Cizgi       : %u", stats.LineCount);
         ImGui::Text("Kose        : %u", stats.GetVertexCount());
         ImGui::Text("FPS         : %.0f", m_CurrentFps);
 
@@ -1256,6 +1415,14 @@ namespace FXEd
 
             // Gizmo kisayollari - sadece viewport odaktayken, cunku
             // W/E/R ayni zamanda kamera tuslari.
+            case SDLK_F:
+                if (m_ViewportHovered) FocusOnSelection();
+                break;
+
+            case SDLK_G:
+                if (m_ViewportHovered) m_ShowGrid = !m_ShowGrid;
+                break;
+
             case SDLK_Z:
                 if (m_ViewportHovered) m_GizmoOperation = -1;
                 break;

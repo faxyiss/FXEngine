@@ -75,6 +75,16 @@ namespace FXEd
         // Tekerlek zoom'u: imlecin altindaki dunya noktasi sabit kalir.
         void ZoomAtCursor(float wheelY, float mouseX, float mouseY);
 
+        // Sonsuz izgara. Aralik zoom'a gore 1-2-5-10 serisinde secilir.
+        void DrawGrid();
+
+        // Secili entity'nin sinirlarini cizer (dunya matrisiyle, yani
+        // dondurulmus/olceklenmis nesnelerde de uzerine oturur).
+        void DrawSelectionOutline();
+
+        // Kamerayi secili entity'yi cerceveleyecek sekilde konumlandirir.
+        void FocusOnSelection();
+
         // ImGui panellerini cizer.
         void DrawMenuBar();
         void DrawViewportPanel();
@@ -174,6 +184,8 @@ namespace FXEd
 
         // --- Kamera ------------------------------------------------------------
         std::unique_ptr<FX::OrthographicCamera> m_Camera;
+
+        bool m_ShowGrid = true;
 
         // Kamera DONMUYOR. Bu bir sahne duzenleme viewport'u; egik bir
         // kamera duzenlemeyi zorlastirmaktan baska ise yaramiyordu.

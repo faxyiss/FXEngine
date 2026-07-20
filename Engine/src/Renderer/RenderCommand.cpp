@@ -63,6 +63,24 @@ namespace FX
         glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(count), GL_UNSIGNED_INT, nullptr);
     }
 
+    void RenderCommand::DrawLines(const std::shared_ptr<VertexArray>& vertexArray,
+                                  std::uint32_t vertexCount)
+    {
+        vertexArray->Bind();
+        glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(vertexCount));
+    }
+
+    void RenderCommand::SetLineWidth(float width)
+    {
+        glLineWidth(width);
+    }
+
+    void RenderCommand::SetDepthTest(bool enabled)
+    {
+        if (enabled) glEnable(GL_DEPTH_TEST);
+        else         glDisable(GL_DEPTH_TEST);
+    }
+
     void RenderCommand::SetWireframe(bool enabled)
     {
         glPolygonMode(GL_FRONT_AND_BACK, enabled ? GL_LINE : GL_FILL);

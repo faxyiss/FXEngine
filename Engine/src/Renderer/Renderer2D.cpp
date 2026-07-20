@@ -49,6 +49,23 @@ namespace FX
         // Shader'daki dizi boyutu ile ESLESMELI (Renderer2D.frag).
         constexpr std::uint32_t MAX_TEXTURE_SLOTS = 32;
 
+        // -------------------------------------------------------------------
+        // Cizgi kosesi
+        // -------------------------------------------------------------------
+        // Quad kosesinden cok daha ince: UV yok (texture yok), tiling yok.
+        // Ayri bir struct olmasinin sebebi bu - QuadVertex'i kullansaydik
+        // kose basina 20 bayti bosuna tasirdik.
+        struct LineVertex
+        {
+            glm::vec3 Position;
+            glm::vec4 Color;
+            int       EntityID;
+        };
+
+        // Izgara en kalabalik musteri: ekranda ~100 cizgi. 2000 bol bol yeter.
+        constexpr std::uint32_t MAX_LINES         = 2000;
+        constexpr std::uint32_t MAX_LINE_VERTICES = MAX_LINES * 2;
+
         struct Renderer2DData
         {
             std::shared_ptr<VertexArray>  QuadVA;
@@ -78,6 +95,19 @@ namespace FX
             // Her cizimde transform ile carpilarak dunya koordinatina cevrilir.
             // vec4 cunku matris carpimi icin w bileseni gerekiyor.
             glm::vec4 QuadVertexPositions[4];
+
+            // --- Cizgi batch'i (quad'lardan tamamen ayri) ---------------------
+            // GL tek draw call'da hem ucgen hem cizgi cizemez; bu yuzden
+            // ikinci bir VAO/VBO/shader ucusu var.
+            std::shared_ptr<VertexArray>  LineVA;
+            std::shared_ptr<VertexBuffer> LineVB;
+            std::unique_ptr<Shader>       LineShader;
+
+            std::uint32_t LineVertexCount = 0;
+            std::vector<LineVertex> LineVertexBufferBase;
+            LineVertex*             LineVertexBufferPtr = nullptr;
+
+            float LineWidth = 1.0f;
 
             Renderer2D::Statistics Stats;
             bool SceneStarted = false;
@@ -204,8 +234,37 @@ namespace FX
 
         s_Data.TextureSlots[0] = s_Data.WhiteTexture;
 
-        FX_CORE_INFO("Renderer2D hazir (max %u quad/batch, %u texture slotu).",
-                     MAX_QUADS, s_Data.MaxTextureSlots);
+        // --- Cizgi batch'i -----------------------------------------------------
+        // Index buffer YOK. Quad'da ayni kose iki ucgen arasinda paylasildigi
+        // icin indeksleme kazanc saglar; bir cizgi parcasinin iki kosesi ise
+        // baska hicbir yerde tekrarlanmaz. glDrawArrays yeterli.
+        s_Data.LineVertexBufferBase.resize(MAX_LINE_VERTICES);
+
+        s_Data.LineVA = std::make_shared<VertexArray>();
+        s_Data.LineVA->Bind();
+
+        s_Data.LineVB = std::make_shared<VertexBuffer>(
+            static_cast<std::uint32_t>(MAX_LINE_VERTICES * sizeof(LineVertex)));
+
+        s_Data.LineVB->SetLayout({
+            { ShaderDataType::Float3, "a_Position" },
+            { ShaderDataType::Float4, "a_Color"    },
+            { ShaderDataType::Int,    "a_EntityID" }
+        });
+        s_Data.LineVA->AddVertexBuffer(s_Data.LineVB);
+        s_Data.LineVA->Unbind();
+
+        s_Data.LineShader.reset(Shader::FromFiles("Line",
+                                                  "assets/shaders/Line.vert",
+                                                  "assets/shaders/Line.frag"));
+        if (!s_Data.LineShader || !s_Data.LineShader->IsValid())
+        {
+            FX_CORE_ERROR("Line shader'i yuklenemedi!");
+            return;
+        }
+
+        FX_CORE_INFO("Renderer2D hazir (max %u quad + %u cizgi/batch, %u texture slotu).",
+                     MAX_QUADS, MAX_LINES, s_Data.MaxTextureSlots);
     }
 
     void Renderer2D::Shutdown()
@@ -220,6 +279,12 @@ namespace FX
             t.reset();
         s_Data.QuadVertexBufferBase.clear();
         s_Data.QuadVertexBufferBase.shrink_to_fit();
+
+        s_Data.LineVA.reset();
+        s_Data.LineVB.reset();
+        s_Data.LineShader.reset();
+        s_Data.LineVertexBufferBase.clear();
+        s_Data.LineVertexBufferBase.shrink_to_fit();
     }
 
     std::uint32_t Renderer2D::GetMaxTextureSlots()
@@ -236,7 +301,20 @@ namespace FX
         s_Data.TextureShader->Bind();
         s_Data.TextureShader->SetMat4("u_ViewProjection", camera.GetViewProjectionMatrix());
 
+        // Cizgi shader'i ayri bir program: kendi uniform'unu kendi almali.
+        if (s_Data.LineShader)
+        {
+            s_Data.LineShader->Bind();
+            s_Data.LineShader->SetMat4("u_ViewProjection", camera.GetViewProjectionMatrix());
+        }
+
         StartNewBatch();
+
+        // Cizgi tamponu StartNewBatch'te DEGIL burada sifirlaniyor:
+        // StartNewBatch quad batch'i bolunurken de cagriliyor ve o an
+        // birikmis cizgileri atmak istemeyiz.
+        s_Data.LineVertexCount     = 0;
+        s_Data.LineVertexBufferPtr = s_Data.LineVertexBufferBase.data();
     }
 
     void Renderer2D::StartNewBatch()
@@ -255,7 +333,36 @@ namespace FX
     {
         FX_ASSERT(s_Data.SceneStarted, "EndScene, BeginScene cagrilmadan cagrildi!");
         Flush();
+
+        // Cizgiler quad'lardan SONRA gonderiliyor. Derinlik testi degil sira
+        // belirliyor: debug cizimi her zaman sahnenin ustunde gorunmeli,
+        // yoksa sprite'in altinda kalan bir secim cercevesi ise yaramaz.
+        FlushLines();
+
         s_Data.SceneStarted = false;
+    }
+
+    void Renderer2D::FlushLines()
+    {
+        if (s_Data.LineVertexCount == 0)
+            return;
+
+        const auto dataSize = static_cast<std::uint32_t>(
+            reinterpret_cast<std::uint8_t*>(s_Data.LineVertexBufferPtr) -
+            reinterpret_cast<std::uint8_t*>(s_Data.LineVertexBufferBase.data()));
+
+        s_Data.LineVB->SetData(s_Data.LineVertexBufferBase.data(), dataSize);
+
+        s_Data.LineShader->Bind();
+        RenderCommand::SetLineWidth(s_Data.LineWidth);
+        RenderCommand::DrawLines(s_Data.LineVA, s_Data.LineVertexCount);
+
+        ++s_Data.Stats.DrawCalls;
+
+        // Gonderdikten sonra sifirla: batch bolunmesi sirasinda EndScene
+        // tekrar cagrilabiliyor, ayni veriyi iki kez gondermeyelim.
+        s_Data.LineVertexCount     = 0;
+        s_Data.LineVertexBufferPtr = s_Data.LineVertexBufferBase.data();
     }
 
     void Renderer2D::Flush()
@@ -454,6 +561,77 @@ namespace FX
         const float texIndex = ResolveTextureSlot(texture);
         SubmitQuad(transform, tint, texIndex, tilingFactor, entityID);
     }
+
+    // -----------------------------------------------------------------------
+    // Cizgiler
+    // -----------------------------------------------------------------------
+    void Renderer2D::DrawLine(const glm::vec3& p0, const glm::vec3& p1,
+                              const glm::vec4& color, int entityID)
+    {
+        // Tampon doluysa gonder ve devam et. Quad tarafindaki EnsureRoom'un
+        // karsiligi, ama burada EndScene'e gerek yok: cizgi batch'inin
+        // texture slotu gibi bir yan durumu yok.
+        if (s_Data.LineVertexCount + 2 > MAX_LINE_VERTICES)
+            FlushLines();
+
+        s_Data.LineVertexBufferPtr->Position = p0;
+        s_Data.LineVertexBufferPtr->Color    = color;
+        s_Data.LineVertexBufferPtr->EntityID = entityID;
+        ++s_Data.LineVertexBufferPtr;
+
+        s_Data.LineVertexBufferPtr->Position = p1;
+        s_Data.LineVertexBufferPtr->Color    = color;
+        s_Data.LineVertexBufferPtr->EntityID = entityID;
+        ++s_Data.LineVertexBufferPtr;
+
+        s_Data.LineVertexCount += 2;
+        ++s_Data.Stats.LineCount;
+    }
+
+    void Renderer2D::DrawLine(const glm::vec2& p0, const glm::vec2& p1,
+                              const glm::vec4& color, int entityID)
+    {
+        DrawLine(glm::vec3(p0, 0.0f), glm::vec3(p1, 0.0f), color, entityID);
+    }
+
+    void Renderer2D::DrawRect(const glm::vec3& position, const glm::vec2& size,
+                              const glm::vec4& color, int entityID)
+    {
+        const float x0 = position.x - size.x * 0.5f;
+        const float x1 = position.x + size.x * 0.5f;
+        const float y0 = position.y - size.y * 0.5f;
+        const float y1 = position.y + size.y * 0.5f;
+
+        const glm::vec3 p0{ x0, y0, position.z };
+        const glm::vec3 p1{ x1, y0, position.z };
+        const glm::vec3 p2{ x1, y1, position.z };
+        const glm::vec3 p3{ x0, y1, position.z };
+
+        DrawLine(p0, p1, color, entityID);
+        DrawLine(p1, p2, color, entityID);
+        DrawLine(p2, p3, color, entityID);
+        DrawLine(p3, p0, color, entityID);
+    }
+
+    void Renderer2D::DrawRect(const glm::mat4& transform, const glm::vec4& color,
+                              int entityID)
+    {
+        // Birim quad'in dort kosesini transform'dan geciriyoruz. Boylece
+        // donmus ve olceklenmis bir entity'nin cercevesi de dogru cikar -
+        // pozisyon/boyuta ayristirip eksen hizali kutu cizseydik donmus
+        // nesnelerde cerceve nesnenin uzerine oturmazdi.
+        glm::vec3 corners[4];
+        for (int i = 0; i < 4; ++i)
+            corners[i] = glm::vec3(transform * s_Data.QuadVertexPositions[i]);
+
+        DrawLine(corners[0], corners[1], color, entityID);
+        DrawLine(corners[1], corners[2], color, entityID);
+        DrawLine(corners[2], corners[3], color, entityID);
+        DrawLine(corners[3], corners[0], color, entityID);
+    }
+
+    void  Renderer2D::SetLineWidth(float width) { s_Data.LineWidth = width; }
+    float Renderer2D::GetLineWidth()            { return s_Data.LineWidth; }
 
     Renderer2D::Statistics Renderer2D::GetStats() { return s_Data.Stats; }
     void Renderer2D::ResetStats()                 { s_Data.Stats = Statistics{}; }

@@ -91,7 +91,7 @@ oyun **kopya bir sahnede** çalışır, ⏹ deyince düzenleme hali geri gelir.
 - [x] Gizmo kısayolları — Z/X/C/B (W/E/R kamera tuşlarıyla çakışıyordu)
 - [x] Bonus: `glVertexAttribIPointer` hatası düzeltildi
 - [x] Bonus: varsayılan panel düzeni (DockBuilder), `imgui.ini` exe yanına
-- [ ] Seçili entity'ye turuncu çerçeve → Faz 18 (debug çizim) ile birlikte
+- [x] Seçili entity'ye turuncu çerçeve → Faz 18'in çizgi altyapısıyla yapıldı
 
 Ayrıntılar: [Faz-11-Notlar.md](Faz-11-Notlar.md)
 
@@ -198,14 +198,25 @@ gerçek karşılığını burada göreceksin.
 
 ---
 
-## Faz 18 — Render iyileştirmeleri
+## Faz 18 — Render iyileştirmeleri 🟡 KISMEN
 
-- [ ] Çizgi ve daire primitifleri (`Renderer2D::DrawLine / DrawCircle`)
-- [ ] Debug çizim katmanı (collider, ızgara, kamera sınırı)
+Çizgi altyapısı ve editörün görsel eksikleri öne alındı (viewport'u
+oturtmak için). Kalanı duruyor.
+
+- [x] `Renderer2D::DrawLine` + ayrı çizgi batch'i (GL_LINES, index'siz)
+- [x] `Renderer2D::DrawRect` — hem eksen hizalı hem matrisli
+- [x] `RenderCommand::SetDepthTest` — debug çiziminde sırayı z değil
+      çizim sırası belirlesin
+- [x] Sonsuz ızgara (editör zemini) — 1-2-5-10 serisinde adaptif aralık
+- [x] Seçim çerçevesi (dünya matrisiyle, döndürülmüş nesnede doğru)
+- [x] `F` ile seçiliye odaklan, `G` ile ızgara aç/kapa
+- [ ] Daire primitifi (`DrawCircle`) — collider debug'ı için gerekecek
+- [ ] Debug çizim katmanı (collider, kamera sınırı)
 - [ ] Sıralama katmanı (`SortingLayer` + `OrderInLayer`)
 - [ ] Saydam nesneler için doğru sıralama (arkadan öne)
-- [ ] Sonsuz ızgara (editör zemini)
 - [ ] Shader hot reload — dosya değişince yeniden derle
+
+Ayrıntılar: [Faz-18-Notlar.md](Faz-18-Notlar.md)
 
 **Öğrenilecek:** 2D'de derinlik tamponu neden yetmez, sıralama neden gerekir.
 

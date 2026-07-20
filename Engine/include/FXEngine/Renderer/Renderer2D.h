@@ -94,6 +94,30 @@ namespace FX
                              float tilingFactor = 1.0f,
                              const glm::vec4& tint = glm::vec4(1.0f), int entityID = -1);
 
+        // --- Cizgiler ----------------------------------------------------------
+        // AYRI BIR BATCH. Quad'lardan bagimsiz birikir ve GL_LINES ile
+        // ayri bir draw call'da gonderilir - GL tek cagrida hem ucgen hem
+        // cizgi cizemez. Ikisi karisik cagrilabilir, sira korunmaz:
+        // cizgiler her zaman quad'larin USTUNE ciziliyor (debug icin
+        // istenen davranis bu).
+        static void DrawLine(const glm::vec3& p0, const glm::vec3& p1,
+                             const glm::vec4& color, int entityID = -1);
+        static void DrawLine(const glm::vec2& p0, const glm::vec2& p1,
+                             const glm::vec4& color, int entityID = -1);
+
+        // Ici bos dikdortgen. position MERKEZ (quad'larla ayni kural).
+        static void DrawRect(const glm::vec3& position, const glm::vec2& size,
+                             const glm::vec4& color, int entityID = -1);
+
+        // Donusum matrisiyle: birim quad'in dort kosesi transform'dan
+        // gecirilip birlestirilir. Donmus/olceklenmis bir entity'nin
+        // sinirini cizmenin dogru yolu budur.
+        static void DrawRect(const glm::mat4& transform, const glm::vec4& color,
+                             int entityID = -1);
+
+        static void  SetLineWidth(float width);
+        static float GetLineWidth();
+
         // --- Istatistik --------------------------------------------------------
         // Batch renderer'in ISE YARADIGINI OLCEBILMEK icin. Sayilari
         // gormeden "optimize ettim" demek anlamsizdir.
@@ -101,8 +125,9 @@ namespace FX
         {
             std::uint32_t DrawCalls = 0;
             std::uint32_t QuadCount = 0;
+            std::uint32_t LineCount = 0;
 
-            std::uint32_t GetVertexCount() const { return QuadCount * 4; }
+            std::uint32_t GetVertexCount() const { return QuadCount * 4 + LineCount * 2; }
             std::uint32_t GetIndexCount()  const { return QuadCount * 6; }
         };
 
@@ -117,5 +142,8 @@ namespace FX
         // Iki durumda cagrilir: (a) dizi doldu, (b) texture slotlari doldu.
         static void Flush();
         static void StartNewBatch();
+
+        // Cizgi tamponu dolduysa gonderip sifirlar.
+        static void FlushLines();
     };
 }

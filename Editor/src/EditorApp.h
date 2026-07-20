@@ -67,6 +67,11 @@ namespace FXEd
         // Sonsuz izgara. Aralik zoom'a gore 1-2-5-10 serisinde secilir.
         void DrawGrid();
 
+        // Sahnedeki kameralarin gorus alanini ve konumunu cizer.
+        // Kameranin sprite'i yoktur; bu cizim olmadan nereye baktigi
+        // gorunmez ve viewport'tan secilemez.
+        void DrawCameraGizmos();
+
         // Secili entity'nin sinirlarini cizer (dunya matrisiyle, yani
         // dondurulmus/olceklenmis nesnelerde de uzerine oturur).
         void DrawSelectionOutline();
@@ -193,7 +198,8 @@ namespace FXEd
         // --- Kamera ------------------------------------------------------------
         EditorCamera m_EditorCamera;
 
-        bool m_ShowGrid = true;
+        bool m_ShowGrid        = true;
+        bool m_ShowCameraGizmos = true;
 
         // --- Durum -------------------------------------------------------------
         float m_Time = 0.0f;

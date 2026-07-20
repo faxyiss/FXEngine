@@ -683,6 +683,11 @@ namespace FXEd
         // goruntusunu kirletirler.
         if (!IsPlaying())
         {
+            // Kamera gizmosu PickEntity'den once: cizgileri kendi entity
+            // ID'lerini ID ekine yaziyor, boylece kamera viewport'tan
+            // tiklanarak secilebiliyor.
+            DrawCameraGizmos();
+
             // Secim cercevesi sahneden SONRA: ayni sebeple her zaman ustte.
             DrawSelectionOutline();
             PickEntity();
@@ -839,6 +844,7 @@ namespace FXEd
             if (ImGui::BeginMenu("Gorunum"))
             {
                 ImGui::MenuItem("Izgara", "G", &m_ShowGrid);
+                ImGui::MenuItem("Kamera cerceveleri", nullptr, &m_ShowCameraGizmos);
                 if (ImGui::MenuItem("Secilene Odaklan", "F"))
                     FocusOnSelection();
                 ImGui::Separator();
@@ -1023,6 +1029,10 @@ namespace FXEd
         ImGui::Checkbox("Izgara", &m_ShowGrid);
         ImGui::SetItemTooltip("Izgarayi goster/gizle (G)");
 
+        ImGui::SameLine();
+        ImGui::Checkbox("Kamera", &m_ShowCameraGizmos);
+        ImGui::SetItemTooltip("Kameralarin gorus alanini goster/gizle");
+
         ImGui::SameLine(0.0f, 14.0f);
 
         ImGui::Checkbox("Kademe", &m_SnapEnabled);
@@ -1135,6 +1145,101 @@ namespace FXEd
             const glm::vec4& c = (std::fabs(y) < step * 0.25f) ? axisX
                                                                : (isMajor(y) ? thick : thin);
             FX::Renderer2D::DrawLine({ left, y, 0.0f }, { right, y, 0.0f }, c);
+        }
+
+        FX::Renderer2D::EndScene();
+        FX::RenderCommand::SetDepthTest(true);
+    }
+
+    void EditorApp::DrawCameraGizmos()
+    {
+        if (!m_ShowCameraGizmos || m_ViewportSize.y <= 0.0f)
+            return;
+
+        auto view = m_Scene->GetRegistry().view<FX::CameraComponent>();
+        if (view.begin() == view.end())
+            return;
+
+        const float aspect   = m_ViewportSize.x / m_ViewportSize.y;
+        FX::Entity  selected = m_HierarchyPanel.GetSelectedEntity();
+
+        // Ikon dunya uzayinda cizildigi icin boyutu zoom'a bagli olmali;
+        // sabit birim verseydik uzaklasinca kaybolur, yakinlasinca
+        // ekrani kaplardi.
+        const float iconHalf = m_EditorCamera.GetZoom() * 0.035f;
+
+        FX::RenderCommand::SetDepthTest(false);
+        FX::Renderer2D::BeginScene(m_EditorCamera.GetCamera());
+
+        for (auto handle : view)
+        {
+            FX::Entity cam{ handle, m_Scene };
+            const auto& cc = view.get<FX::CameraComponent>(handle);
+
+            glm::mat4 world{ 1.0f };
+            if (cam.HasComponent<FX::WorldTransformComponent>())
+                world = cam.GetComponent<FX::WorldTransformComponent>().Matrix;
+            else
+                world = cam.GetComponent<FX::TransformComponent>().GetTransform();
+
+            const glm::vec2 pos{ world[3][0], world[3][1] };
+
+            // Kameranin GERCEKTEN gordugu alan. Yukseklik component'ten,
+            // genislik viewport'un en-boy oranindan - Play'de kullanilan
+            // hesabin aynisi, yoksa cerceve yalan soylerdi.
+            const float halfH = cc.OrthographicSize;
+            const float halfW = halfH * aspect;
+
+            const bool isSelected = (selected && selected == cam);
+
+            glm::vec4 color = cc.Primary ? glm::vec4{ 0.95f, 0.85f, 0.25f, 0.55f }
+                                         : glm::vec4{ 0.55f, 0.60f, 0.70f, 0.40f };
+            if (isSelected)
+                color.a = 1.0f;
+
+            // Gorus dikdortgeni. Entity ID veriyoruz: cizgiye tiklayinca
+            // kamera secilebiliyor. Kameranin sprite'i yok, yoksa
+            // viewport'tan hic secilemezdi.
+            const int id = static_cast<int>(handle);
+
+            const glm::vec3 c0{ pos.x - halfW, pos.y - halfH, 0.0f };
+            const glm::vec3 c1{ pos.x + halfW, pos.y - halfH, 0.0f };
+            const glm::vec3 c2{ pos.x + halfW, pos.y + halfH, 0.0f };
+            const glm::vec3 c3{ pos.x - halfW, pos.y + halfH, 0.0f };
+
+            FX::Renderer2D::DrawLine(c0, c1, color, id);
+            FX::Renderer2D::DrawLine(c1, c2, color, id);
+            FX::Renderer2D::DrawLine(c2, c3, color, id);
+            FX::Renderer2D::DrawLine(c3, c0, color, id);
+
+            // Kameranin KENDI konumunu gosteren ikon: govde + one bakan
+            // huni. Cerceve merkezi bos kalsaydi kameranin nerede
+            // durdugu (ve hangi cercevenin ona ait oldugu) belirsiz olurdu.
+            glm::vec4 iconColor = color;
+            iconColor.a = isSelected ? 1.0f : 0.8f;
+
+            const float h = iconHalf;
+            const glm::vec3 b0{ pos.x - h,        pos.y - h * 0.7f, 0.0f };
+            const glm::vec3 b1{ pos.x + h * 0.3f, pos.y - h * 0.7f, 0.0f };
+            const glm::vec3 b2{ pos.x + h * 0.3f, pos.y + h * 0.7f, 0.0f };
+            const glm::vec3 b3{ pos.x - h,        pos.y + h * 0.7f, 0.0f };
+
+            FX::Renderer2D::DrawLine(b0, b1, iconColor, id);
+            FX::Renderer2D::DrawLine(b1, b2, iconColor, id);
+            FX::Renderer2D::DrawLine(b2, b3, iconColor, id);
+            FX::Renderer2D::DrawLine(b3, b0, iconColor, id);
+
+            // Huni: saga (+X) bakan ucgen. Yon, kameranin baktigi tarafi
+            // degil (ortografik 2D'de hep -Z'ye bakar) sadece ikonun
+            // "on" tarafini gosteriyor.
+            const glm::vec3 l0{ pos.x + h * 0.3f, pos.y - h * 0.45f, 0.0f };
+            const glm::vec3 l1{ pos.x + h * 1.1f, pos.y - h * 0.9f,  0.0f };
+            const glm::vec3 l2{ pos.x + h * 1.1f, pos.y + h * 0.9f,  0.0f };
+            const glm::vec3 l3{ pos.x + h * 0.3f, pos.y + h * 0.45f, 0.0f };
+
+            FX::Renderer2D::DrawLine(l0, l1, iconColor, id);
+            FX::Renderer2D::DrawLine(l1, l2, iconColor, id);
+            FX::Renderer2D::DrawLine(l2, l3, iconColor, id);
         }
 
         FX::Renderer2D::EndScene();

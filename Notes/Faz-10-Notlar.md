@@ -155,6 +155,47 @@ detayına bağımlı hale gelirdi.
 
 ---
 
+## 7. Kamera gizmosu — görünmeyen bir nesneyi düzenlemek
+
+İlk halinde kameranın sahnede hiçbir izi yoktu: sprite'ı olmadığı için
+ne nereye baktığı görünüyordu ne de viewport'tan seçilebiliyordu.
+Hierarchy'den seçmek tek yoldu.
+
+Çizilen iki şey var:
+
+**Görüş dikdörtgeni** — `OrthographicSize` yüksekliği, genişliği
+viewport'un en-boy oranından. Play'de kullanılan hesabın **aynısı**;
+farklı hesaplasaydık çerçeve yalan söylerdi.
+
+**Kamera ikonu** — gövde + öne bakan huni, kameranın kendi konumunda.
+Çerçevenin merkezi boş kalsaydı kameranın nerede durduğu (ve hangi
+çerçevenin ona ait olduğu) belirsiz olurdu.
+
+İkon dünya uzayında çizildiği için boyutu zoom'a bağlı:
+
+```cpp
+const float iconHalf = m_EditorCamera.GetZoom() * 0.035f;
+```
+
+Sabit birim verseydik uzaklaşınca kaybolur, yakınlaşınca ekranı kaplardı.
+
+### Çizgiler entity ID taşıyor
+
+```cpp
+FX::Renderer2D::DrawLine(c0, c1, color, id);   // <- entity ID
+```
+
+Faz 18'de line shader'ına `o_EntityID` çıktısını eklemiştik; orada amaç
+çizgilerin `-1` yazıp seçimi bozmamasıydı. Burada aynı mekanizma ters
+yönde çalışıyor: kamera çizgilerine **kendi ID'sini** verince kamera
+viewport'tan tıklanarak seçilebiliyor.
+
+Bu yüzden `DrawCameraGizmos()` sahneden sonra ama `PickEntity()`'den
+**önce** çağrılıyor — ID ekine yazması gerekiyor.
+
+Birincil kamera sarı, diğerleri gri; seçili olan tam opak. Görünüm
+menüsünden ve toolbar'dan kapatılabiliyor.
+
 ## Test sonuçları
 
 **Play/Stop döngüsü** (ekran görüntüsü + simüle edilmiş tıklama):
@@ -181,6 +222,7 @@ Scene::Copy     : 32 entity, kamera=Ana Kamera, parent=Oyuncu
 - [x] Sahne kamerası Play'de devrede
 - [x] Kamera serileştirme (kaydet/yükle)
 - [x] `EditorCamera` ayrıldı
+- [x] Kamera gizmosu: görüş alanı + ikon, viewport'tan seçilebiliyor
 - [ ] Kullanıcı onayı
 
 ## Yapılmayanlar

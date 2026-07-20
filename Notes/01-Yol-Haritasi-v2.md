@@ -154,9 +154,12 @@ Faz 22'nin bıraktığı tutarlılık açığı.
       `Scene`, `SceneSerializer`, `AssetManager` — 26 test / 80 assertion,
       `ctest` ile de çalışıyor.
       Ayrıntı: [Borc-05-Birim-Testleri.md](Borc-05-Birim-Testleri.md)
-- [ ] **0.6 — Faz 22 artıkları.** Inspector'da doku ayarları arayüzü,
-      prefab / `StartScene` referanslarının GUID'e geçmesi,
-      `AssetDirectory`'nin gerçekten kullanılması.
+- [x] **0.6 — Faz 22 artıkları.** Inspector'da doku ayarları arayüzü,
+      `StartScene` GUID'e geçti (`.fxproject` sürüm 2) + "Baslangic
+      Sahnesi Yap" menüsü, `AssetDirectory` gerçekten kullanılıyor,
+      görünüm tercihi kaydediliyor. Prefab referansları zaten GUID'miş
+      (ortak `SerializeEntity`).
+      Ayrıntı: [Borc-06-Faz22-Artiklari.md](Borc-06-Faz22-Artiklari.md)
 
 > **Neden 0.2 ve 0.3 Faz 20'den önce?** Undo komutları "hangi entity'ler
 > üzerinde?" sorusunu cevaplar. Tek seçim varsayımıyla yazılan her komut,
@@ -328,8 +331,9 @@ Faz 12'den beri açık duran borç: varlığın kimliği dosya yoluydu.
 - [x] Sahne sürümü 4 — `TextureHandle` (GUID); sürüm ≤3 otomatik dönüşüyor
 - [x] Doku ayarları `.meta`'da → `TextureLibrary` spec çakışması bitti
 - [x] İçerik paneli: `.meta` taşıma/gizleme, taşımada referans korunuyor
-- [ ] Inspector'da doku ayarları arayüzü
-- [ ] Prefab / `StartScene` referansları da GUID'e geçsin
+- [x] Inspector'da doku ayarları arayüzü → 0.6
+- [x] `StartScene` GUID'e geçti (`.fxproject` sürüm 2) → 0.6
+      (prefab referansları zaten GUID'di: ortak `SerializeEntity`)
 
 Ayrıntılar: [Faz-22-Notlar.md](Faz-22-Notlar.md)
 

@@ -16,6 +16,8 @@
 // tasinabilir, surum kontrolune girebilir, baska makinede acilabilir.
 // ===========================================================================
 
+#include "FXEngine/Asset/Asset.h"
+
 #include <memory>
 #include <string>
 
@@ -29,9 +31,12 @@ namespace FX
         // varlik yollari buna gore saklanir.
         std::string AssetDirectory = "assets";
 
-        // Editor acilista bunu yukler. Bos = bos sahne ile basla.
-        // Proje kokune goreceli.
-        std::string StartScene;
+        // Editor acilista bunu yukler. Gecersiz = bos sahne ile basla.
+        //
+        // GUID, yol DEGIL (0.6): sahne dosyasini tasimak ya da adini
+        // degistirmek projeyi bozmasin. Yol tabanliyken .fxproject'i elle
+        // duzeltmek gerekiyordu.
+        AssetHandle StartScene{ 0 };
     };
 
     class Project

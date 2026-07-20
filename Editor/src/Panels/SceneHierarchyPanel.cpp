@@ -2,6 +2,7 @@
 #include "Panels/ContentBrowserPanel.h"
 
 #include <FXEngine/Scene/Components.h>
+#include <FXEngine/Asset/AssetManager.h>
 #include <FXEngine/Core/Log.h>
 
 #include <imgui.h>
@@ -408,6 +409,62 @@ namespace FXEd
             ImGui::TextDisabled("Icerik panelinden\nbir resim surukle");
         }
         ImGui::EndGroup();
+
+        DrawTextureSettings(sc);
+    }
+
+    void SceneHierarchyPanel::DrawTextureSettings(FX::SpriteRendererComponent& sc)
+    {
+        if (!sc.Texture || !m_Library)
+            return;
+
+        const std::string path = sc.Texture->GetPath();
+
+        const FX::AssetHandle handle = FX::AssetManager::GetHandle(path);
+        if (!handle.IsValid())
+        {
+            // Proje disindan gelen (motor varligi) veya taranmamis bir
+            // doku olabilir; ayari yazacak bir .meta yok.
+            ImGui::TextDisabled("Ayarlar: bu doku varlik tablosunda degil");
+            return;
+        }
+
+        if (!ImGui::TreeNode("Doku Ayarlari"))
+            return;
+
+        FX::TextureImportSettings settings =
+            FX::AssetManager::GetMetadata(handle).TextureSettings;
+
+        bool changed = false;
+        changed |= ImGui::Checkbox("Nearest (pixel-art)", &settings.Nearest);
+        changed |= ImGui::Checkbox("Repeat (tekrarla)",   &settings.Repeat);
+        changed |= ImGui::Checkbox("Mipmap uret",         &settings.GenerateMipmaps);
+
+        ImGui::TextDisabled("Ayar dokunun .meta dosyasinda saklanir,");
+        ImGui::TextDisabled("bu sprite'a degil DOSYAYA aittir.");
+
+        if (changed)
+        {
+            FX::AssetManager::UpdateTextureSettings(handle, settings);
+            ReplaceTextureInScene(path, m_Library->Reload(path));
+        }
+
+        ImGui::TreePop();
+    }
+
+    void SceneHierarchyPanel::ReplaceTextureInScene(
+        const std::string& path, const std::shared_ptr<FX::Texture2D>& fresh)
+    {
+        if (!m_Scene || !fresh)
+            return;
+
+        auto view = m_Scene->GetRegistry().view<FX::SpriteRendererComponent>();
+        for (auto entityID : view)
+        {
+            auto& sprite = view.get<FX::SpriteRendererComponent>(entityID);
+            if (sprite.Texture && sprite.Texture->GetPath() == path)
+                sprite.Texture = fresh;
+        }
     }
 
     void SceneHierarchyPanel::DrawComponents(FX::Entity entity)

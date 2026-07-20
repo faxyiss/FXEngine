@@ -77,6 +77,9 @@ namespace FXEd
         // dunya-uzayi deltasi uygulaniyor.
         void ApplyGizmoDelta(const glm::mat4& delta, FX::Entity primary);
 
+        // Acik sahneyi projenin baslangic sahnesi yapar (GUID olarak).
+        void SetAsStartScene();
+
         // Icerik panelinde cift tiklanan dosyayi turune gore acar.
         void OpenAsset(const std::string& relativePath);
 

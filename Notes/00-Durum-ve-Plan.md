@@ -114,18 +114,15 @@ edilmeli.
 ### Orta
 | Sorun | Nerede |
 |---|---|
-| Prefab / `StartScene` referansları hâlâ yol tabanlı | `PrefabSerializer`, `Project` |
-| Inspector'da doku ayarları arayüzü yok (`.meta` elle düzenleniyor) | altyapı hazır: `UpdateTextureSettings`, `Reload` |
-| İçerik paneli görünüm tercihi kaydedilmiyor | `editor.json`'a yazılabilir |
-| `AssetDirectory` gerçekten kullanılmıyor (`assets` varsayılıyor) | `ContentBrowserPanel` |
-| Prefab bağlantısı yok (örnek kaynağından bağımsız) | `PrefabSerializer` |
-| Linux/macOS dosya diyalogları boş gövde | `FileDialogs.cpp` |
+| Prefab bağlantısı yok (örnek kaynağından bağımsız, override sistemi yok) | `PrefabSerializer` |
+| Linux/macOS dosya diyalogları boş gövde, dosya izleyici yok | `FileDialogs.cpp`, `FileWatcher.cpp` |
+| Çoklu seçimde Inspector yalnızca birincili düzenliyor | `SceneHierarchyPanel` |
 
 ### Düşük
 - `Renderer2D` global durum (`s_Data` statik), batch bölme yolu hacky
 - `Shader::FromFiles` ham `new` döndürüyor
 - `GetRegistry()` çok açık — doğrudan `create`/`destroy` UUID haritasını bozar
-- Hiç birim testi yok (Catch2 en çok serializer ve matematikte işe yarar)
+- `Renderer2D` ve `TextureLibrary` test dışı (OpenGL bağlamı ister)
 - Sadece Windows'ta denendi
 - `glLineWidth` > 1.0 garanti değil (seçim çerçevesi 2.0 istiyor)
 
@@ -153,7 +150,10 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 | 0.2 | `SelectionContext` — seçimi panelden çıkar | ✅ sahibi `EditorApp`, paneller tüketici |
 | 0.3 | Entity çoklu seçimi | ✅ Ctrl/Shift, gizmoda delta, toplu silme |
 | 0.5 | Catch2 + `UUID`/`Scene`/`SceneSerializer`/`AssetManager` testleri | ✅ 26 test / 80 assertion |
-| 0.6 | Faz 22 artıkları (Inspector doku ayarları, prefab GUID, `AssetDirectory`) | 16'dan sonra |
+| 0.6 | Faz 22 artıkları (Inspector doku ayarları, `StartScene` GUID, `AssetDirectory`) | ✅ `.fxproject` sürüm 2 |
+
+**Borç turu bitti.** Sıradaki: **Faz 13a** (`KeyCode`/`MouseButton` +
+`FX::Input`) — ya da 13a+13b yapıp doğrudan 16'ya (script) geçmek.
 
 ### Bölünmüş fazlar
 

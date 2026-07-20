@@ -59,6 +59,11 @@ namespace FXEd
         // Klasor icerigi degistiginde (disaridan kopyalama vb.) cagrilir.
         void Refresh() { m_NeedsRefresh = true; }
 
+        // Gorunum tercihi editor.json'da saklaniyor; okuma/yazma
+        // EditorApp'in isi, panel sadece degeri tasiyor.
+        bool IsListView() const { return m_ViewMode == ViewMode::List; }
+        void SetListView(bool list) { m_ViewMode = list ? ViewMode::List : ViewMode::Grid; }
+
     private:
         // Izgara: buyuk kucuk resimler, gorsel varliklar icin.
         // Liste: tek sutun, ad + tur + boyut. Cok dosya varken ve
@@ -118,7 +123,11 @@ namespace FXEd
 
         FX::TextureLibrary* m_Library = nullptr;
 
-        std::filesystem::path m_Root;      // <exe>/assets
+        // Projenin varlik klasoru adi (`.fxproject`'ten). Yollari
+        // olustururken sabit "assets" yazmak yerine bunu kullaniyoruz.
+        std::string m_AssetDir = "assets";
+
+        std::filesystem::path m_Root;      // <proje>/<m_AssetDir>
         std::filesystem::path m_Current;
 
         // Klasor icerigi her karede degil, sadece degistiginde okunuyor.

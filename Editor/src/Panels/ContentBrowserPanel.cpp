@@ -2,6 +2,7 @@
 #include "Platform/FileDialogs.h"
 
 #include <FXEngine/Core/FileSystem.h>
+#include <FXEngine/Core/Project.h>
 #include <FXEngine/Asset/AssetManager.h>
 #include <FXEngine/Core/Log.h>
 
@@ -127,7 +128,14 @@ namespace FXEd
     {
         m_Library = library;
 
-        m_Root    = std::filesystem::path(FX::FileSystem::ResolveProjectAsset("assets"));
+        // Klasor adi PROJEDEN geliyor, sabit "assets" degil. AssetManager
+        // zaten config'e bakiyordu; panel bakmayinca ikisi farkli klasoru
+        // dogru sanabilirdi.
+        m_AssetDir = FX::Project::HasActive()
+                         ? FX::Project::GetActive()->GetConfig().AssetDirectory
+                         : std::string("assets");
+
+        m_Root    = std::filesystem::path(FX::FileSystem::ResolveProjectAsset(m_AssetDir));
         m_Current = m_Root;
 
         std::error_code ec;
@@ -220,7 +228,7 @@ namespace FXEd
 
             const std::string relative = change.Path.empty()
                                              ? std::string{}
-                                             : "assets/" + change.Path;
+                                             : m_AssetDir + "/" + change.Path;
 
             switch (change.Action)
             {
@@ -235,7 +243,7 @@ namespace FXEd
                     break;
 
                 case FX::FileAction::Renamed:
-                    FX::AssetManager::OnAssetMoved("assets/" + change.OldPath, relative);
+                    FX::AssetManager::OnAssetMoved(m_AssetDir + "/" + change.OldPath, relative);
                     tableChanged = true;
                     break;
 

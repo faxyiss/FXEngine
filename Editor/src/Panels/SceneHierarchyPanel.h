@@ -67,6 +67,18 @@ namespace FXEd
 
         void DrawTextureSlot(FX::SpriteRendererComponent& sprite);
 
+        // Dokunun .meta'sindaki ice aktarma ayarlari. Ayar SPRITE'A degil
+        // DOSYAYA ait: ayni dokuyu kullanan her entity ayni filtrelemeyi
+        // gorur (Faz 22'nin kararı).
+        void DrawTextureSettings(FX::SpriteRendererComponent& sprite);
+
+        // Yeniden yuklenen dokuyu sahnedeki TUM kullanicilara dagitir.
+        // TextureLibrary::Reload onbellegi tazeliyor ama entity'ler eski
+        // shared_ptr'i tutuyor; dolayli bir katman (handle -> texture)
+        // eklemek butun cagri yerlerini degistirmek demekti.
+        void ReplaceTextureInScene(const std::string& path,
+                                   const std::shared_ptr<FX::Texture2D>& fresh);
+
         // "Component Ekle" acilir menusu.
         void DrawAddComponentMenu(FX::Entity entity);
 

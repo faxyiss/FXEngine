@@ -17,7 +17,9 @@ namespace FX
 
     namespace
     {
-        constexpr int kProjectVersion = 1;
+        // Surum 2: StartScene artik yol degil GUID (0.6). Surum 1
+        // dosyalari aciliyor ve ilk acilista sessizce donusturuluyor.
+        constexpr int kProjectVersion = 2;
 
         std::string WithTrailingSlash(std::string p)
         {
@@ -82,10 +84,22 @@ namespace FX
         auto& cfg = project->m_Config;
         cfg.Name           = j.value("Name", std::string("Isimsiz Proje"));
         cfg.AssetDirectory = j.value("AssetDirectory", std::string("assets"));
-        cfg.StartScene     = j.value("StartScene", std::string());
+        // Surum 1'de StartScene bir YOLDU, surum 2'de GUID. Tipe BAKARAK
+        // ayiriyoruz: dogrudan value<uint64_t> cagirmak eski dosyalarda
+        // istisna atiyor ve proje hic acilmiyordu.
+        std::string legacyStartScene;
+
+        if (j.contains("StartScene"))
+        {
+            const auto& node = j["StartScene"];
+            if (node.is_string())
+                legacyStartScene = node.get<std::string>();
+            else if (node.is_number_unsigned())
+                cfg.StartScene = AssetHandle{ node.get<std::uint64_t>() };
+        }
 
         const int version = j.value("Version", 0);
-        if (version != kProjectVersion)
+        if (version > kProjectVersion)
             FX_CORE_WARN("Proje surumu %d (beklenen %d) - yine de aciliyor.",
                          version, kProjectVersion);
 
@@ -94,6 +108,22 @@ namespace FX
         // Tarama SetActive'den SONRA: AssetManager yollari aktif projenin
         // kokune gore cozuyor.
         AssetManager::ScanProject();
+
+        if (!legacyStartScene.empty())
+        {
+            cfg.StartScene = AssetManager::GetHandle(legacyStartScene);
+
+            if (cfg.StartScene.IsValid())
+            {
+                FX_CORE_INFO("StartScene GUID'e cevrildi: %s", legacyStartScene.c_str());
+                project->Save();
+            }
+            else
+            {
+                FX_CORE_WARN("StartScene bulunamadi, temizlendi: %s",
+                             legacyStartScene.c_str());
+            }
+        }
 
         FX_CORE_INFO("Proje acildi: '%s'", cfg.Name.c_str());
         FX_CORE_INFO("  kok    : %s", project->m_Directory.c_str());
@@ -148,7 +178,7 @@ namespace FX
         j["Version"]        = kProjectVersion;
         j["Name"]           = m_Config.Name;
         j["AssetDirectory"] = m_Config.AssetDirectory;
-        j["StartScene"]     = m_Config.StartScene;
+        j["StartScene"]     = static_cast<std::uint64_t>(m_Config.StartScene);
 
         std::ofstream out(m_FilePath);
         if (!out)

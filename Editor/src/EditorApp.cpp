@@ -520,14 +520,21 @@ namespace FXEd
 
         m_ContentBrowser.SetContext(&m_TextureLibrary);
 
-        const auto& startScene = project->GetConfig().StartScene;
-        if (!startScene.empty() &&
-            FX::FileSystem::Exists(FX::FileSystem::ResolveProjectAsset(startScene)))
+        // Baslangic sahnesi GUID ile tutuluyor (0.6): dosyanin yeri
+        // degismis olabilir, tabloya soruyoruz.
+        const FX::AssetHandle startScene = project->GetConfig().StartScene;
+        const std::string startPath      = FX::AssetManager::GetPath(startScene);
+
+        if (!startPath.empty() &&
+            FX::FileSystem::Exists(FX::FileSystem::ResolveProjectAsset(startPath)))
         {
-            OpenScene(startScene);
+            OpenScene(startPath);
         }
         else
         {
+            if (startScene.IsValid())
+                FX_WARN("Baslangic sahnesi bulunamadi (GUID %llu)",
+                        static_cast<unsigned long long>(startScene));
             NewScene();
         }
 
@@ -687,6 +694,8 @@ namespace FXEd
             }
         }
 
+        m_ContentBrowser.SetListView(doc.value("ContentListView", false));
+
         FX_INFO("editor.json okundu (%zu son sahne, %zu son proje).",
                 m_RecentScenes.size(), m_RecentProjects.size());
     }
@@ -696,6 +705,10 @@ namespace FXEd
         nlohmann::json doc;
         doc["RecentScenes"]   = m_RecentScenes;
         doc["RecentProjects"] = m_RecentProjects;
+
+        // Gorunum tercihi de kullanicinin verisi: her proje acilisinda
+        // Izgara'ya donmesi kucuk ama surekli bir rahatsizlikti.
+        doc["ContentListView"] = m_ContentBrowser.IsListView();
 
         std::ofstream out(FX::FileSystem::GetBaseDirectory() + "editor.json");
         if (out)
@@ -755,6 +768,36 @@ namespace FXEd
 
         if (overViewport)
             HandleContentDrop(relative, screenX, screenY);
+    }
+
+    void EditorApp::SetAsStartScene()
+    {
+        auto project = FX::Project::GetActive();
+        if (!project || m_ScenePath.empty())
+            return;
+
+        const FX::AssetHandle handle = FX::AssetManager::GetHandle(m_ScenePath);
+        if (!handle.IsValid())
+        {
+            // Sahne yeni kaydedildiyse izleyici henuz yakalamamis
+            // olabilir; kaydettirmek beklemekten iyi.
+            const FX::AssetHandle fresh = FX::AssetManager::Register(m_ScenePath);
+            if (!fresh.IsValid())
+            {
+                SetStatus("Sahne varlik tablosuna eklenemedi: " + m_ScenePath);
+                return;
+            }
+            project->GetConfig().StartScene = fresh;
+        }
+        else
+        {
+            project->GetConfig().StartScene = handle;
+        }
+
+        if (project->Save())
+            SetStatus("Baslangic sahnesi: " + m_ScenePath);
+        else
+            SetStatus("Proje kaydedilemedi");
     }
 
     void EditorApp::OpenAsset(const std::string& relativePath)
@@ -1208,6 +1251,24 @@ namespace FXEd
                 {
                     BuildScene();
                     m_HierarchyPanel.SetContext(m_Scene);
+                }
+
+                ImGui::Separator();
+
+                // Baslangic sahnesi .fxproject'te GUID olarak duruyor;
+                // once bu ayari yapacak bir yer yoktu, dosyayi elle
+                // duzenlemek gerekiyordu.
+                const bool canSetStart =
+                    FX::Project::HasActive() && !m_ScenePath.empty();
+
+                if (ImGui::MenuItem("Baslangic Sahnesi Yap", nullptr, false, canSetStart))
+                    SetAsStartScene();
+
+                if (!canSetStart)
+                {
+                    ImGui::TextDisabled(FX::Project::HasActive()
+                                            ? "  (once sahneyi kaydet)"
+                                            : "  (once bir proje ac)");
                 }
                 ImGui::EndMenu();
             }

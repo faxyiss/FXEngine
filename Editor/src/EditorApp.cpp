@@ -96,7 +96,6 @@ namespace FXEd
             return;
         }
 
-        m_Camera = std::make_unique<FX::OrthographicCamera>(-1.0f, 1.0f, -1.0f, 1.0f);
 
         BuildScene();
 
@@ -412,28 +411,6 @@ namespace FXEd
         SaveEditorConfig();
     }
 
-    glm::vec2 EditorApp::ScreenToWorld(float screenX, float screenY) const
-    {
-        const float width  = m_ViewportBoundsMax.x - m_ViewportBoundsMin.x;
-        const float height = m_ViewportBoundsMax.y - m_ViewportBoundsMin.y;
-
-        if (width <= 0.0f || height <= 0.0f)
-            return { 0.0f, 0.0f };
-
-        // Panel-yerel piksel -> NDC (-1..1). Y ters cevriliyor: ImGui
-        // yukaridan asagi sayar, NDC asagidan yukari.
-        const float ndcX = 2.0f * (screenX - m_ViewportBoundsMin.x) / width - 1.0f;
-        const float ndcY = 1.0f - 2.0f * (screenY - m_ViewportBoundsMin.y) / height;
-
-        // Cizim yolunun TERSI: dunya -> view -> projeksiyon yerine
-        // projeksiyon+view'in tersiyle geri geliyoruz.
-        const glm::mat4 inverseVP =
-            glm::inverse(m_Camera->GetProjectionMatrix() * m_Camera->GetViewMatrix());
-
-        const glm::vec4 world = inverseVP * glm::vec4(ndcX, ndcY, 0.0f, 1.0f);
-        return { world.x, world.y };
-    }
-
     void EditorApp::ImportAssets()
     {
         const auto files = FileDialogs::OpenFiles(GetWindow(), FileDialogs::AssetFilter());
@@ -485,7 +462,7 @@ namespace FXEd
             return;
         }
 
-        const glm::vec2 world = ScreenToWorld(screenX, screenY);
+        const glm::vec2 world = m_EditorCamera.ScreenToWorld(screenX, screenY);
 
         if (ext == ".fxprefab")
         {
@@ -530,118 +507,11 @@ namespace FXEd
         SetStatus("Sprite olusturuldu: " + entity.GetName());
     }
 
-    void EditorApp::UpdateCameraProjection()
-    {
-        // ARTIK PENCEREYE DEGIL, VIEWPORT PANELINE gore hesapliyoruz.
-        // Paneller yer kapladigi icin viewport pencereden kucuktur;
-        // pencereyi kullansaydik sahne yamuk gorunurdu.
-        if (m_ViewportSize.y <= 0.0f)
-            return;
-        m_Camera->SetProjectionFromAspect(m_ViewportSize.x / m_ViewportSize.y, m_ZoomLevel);
-    }
-
     void EditorApp::OnWindowResize(std::uint32_t, std::uint32_t)
     {
         // Framebuffer ve kamera artik viewport paneline bagli.
         // Pencere boyutu degisince panel de degisecek ve
         // DrawViewportPanel bunu yakalayacak - burada is yok.
-    }
-
-    void EditorApp::UpdateCameraMovement(float dt)
-    {
-        // ---------------------------------------------------------------
-        // IKI KADEMELI KONTROL:
-        //   1) ImGui klavyeyi istiyorsa (metin kutusuna yaziliyor) -> dur
-        //   2) Fare viewport uzerinde degilse -> dur
-        //
-        // Birincisi olmadan, entity adini "Wall" yazmaya calisirken
-        // 'W' kamerayi oynatir. ImGui kullanan uygulamalarda en sik
-        // yapilan hata budur.
-        // ---------------------------------------------------------------
-        if (m_ImGuiLayer.WantsKeyboard())
-            return;
-        if (!m_ViewportHovered && !m_ViewportFocused)
-            return;
-
-        const bool* keys = SDL_GetKeyboardState(nullptr);
-
-        float dx = 0.0f, dy = 0.0f;
-        if (keys[SDL_SCANCODE_A]) dx -= 1.0f;
-        if (keys[SDL_SCANCODE_D]) dx += 1.0f;
-        if (keys[SDL_SCANCODE_S]) dy -= 1.0f;
-        if (keys[SDL_SCANCODE_W]) dy += 1.0f;
-
-        const float len = std::sqrt(dx * dx + dy * dy);
-        if (len > 0.0f)
-        {
-            // Kamera donmuyor (Q/E kaldirildi), o yuzden ekran ekseni ile
-            // dunya ekseni ayni: donus matrisi uygulamaya gerek yok.
-            const float move = m_CameraMoveSpeed * dt / len;
-            m_CameraPosition.x += dx * move;
-            m_CameraPosition.y += dy * move;
-        }
-
-        m_Camera->SetPosition(m_CameraPosition);
-    }
-
-    void EditorApp::UpdateCameraPan()
-    {
-        if (!m_Panning)
-        {
-            if (!m_ViewportHovered || ImGuizmo::IsUsing() || ImGuizmo::IsOver())
-                return;
-
-            if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
-                m_PanButton = ImGuiMouseButton_Right;
-            else if (ImGui::IsKeyDown(ImGuiKey_Space) &&
-                     !m_ImGuiLayer.WantsKeyboard() &&
-                     ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-                m_PanButton = ImGuiMouseButton_Left;
-            else
-                return;
-
-            m_Panning = true;
-        }
-
-        if (!ImGui::IsMouseDown(m_PanButton))
-        {
-            m_Panning = false;
-            return;
-        }
-
-        const ImVec2 delta = ImGui::GetIO().MouseDelta;
-        if (delta.x == 0.0f && delta.y == 0.0f)
-            return;
-
-        // Piksel deltasini elle olceklemek yerine AYNI KAREDE iki ekran
-        // noktasini dunyaya cevirip farkini aliyoruz. Zoom ve kamera
-        // donusu boylece bedavaya dogru cikiyor; ayrica imlecin altindaki
-        // nokta parmaga yapisik kaliyor.
-        const ImVec2 mouse = ImGui::GetMousePos();
-        const glm::vec2 now  = ScreenToWorld(mouse.x, mouse.y);
-        const glm::vec2 prev = ScreenToWorld(mouse.x - delta.x, mouse.y - delta.y);
-
-        m_CameraPosition.x -= now.x - prev.x;
-        m_CameraPosition.y -= now.y - prev.y;
-        m_Camera->SetPosition(m_CameraPosition);
-    }
-
-    void EditorApp::ZoomAtCursor(float wheelY, float mouseX, float mouseY)
-    {
-        // Imlec altindaki dunya noktasini sabit tutuyoruz: once olcuyoruz,
-        // zoom'dan sonra tekrar olcup kamerayi kaymanin tersine itiyoruz.
-        // Merkeze zoom yapmak, buyutmek istedigin seyi ekrandan kacirir.
-        const glm::vec2 before = ScreenToWorld(mouseX, mouseY);
-
-        m_ZoomLevel *= (wheelY > 0.0f) ? 0.9f : 1.1f;
-        m_ZoomLevel = glm::clamp(m_ZoomLevel, 1.0f, 40.0f);
-        UpdateCameraProjection();
-
-        const glm::vec2 after = ScreenToWorld(mouseX, mouseY);
-
-        m_CameraPosition.x += before.x - after.x;
-        m_CameraPosition.y += before.y - after.y;
-        m_Camera->SetPosition(m_CameraPosition);
     }
 
     void EditorApp::OnUpdate(float dt)
@@ -651,7 +521,12 @@ namespace FXEd
         if (m_StatusTimer > 0.0f)
             m_StatusTimer -= dt;
 
-        UpdateCameraMovement(dt);
+        // Iki kademeli kontrol: ImGui klavyeyi istiyorsa (metin kutusuna
+        // yaziliyor) veya fare viewport'ta degilse kamera oynamamali.
+        // Birincisi olmadan entity adina "Wall" yazarken 'W' kamerayi
+        // kaydirir - ImGui kullanan uygulamalarda en sik yapilan hata.
+        if (!m_ImGuiLayer.WantsKeyboard() && (m_ViewportHovered || m_ViewportFocused))
+            m_EditorCamera.OnUpdate(dt);
 
         // Duraklatma: editorde nesneleri incelemek icin sahneyi
         // dondurabilmek sart. Inspector'da bir degeri surukleyip
@@ -691,7 +566,6 @@ namespace FXEd
             if (spec.Width != w || spec.Height != h)
             {
                 m_Framebuffer->Resize(w, h);
-                UpdateCameraProjection();
             }
         }
 
@@ -710,7 +584,7 @@ namespace FXEd
         // cizim belirliyor, yani izgara sprite'larin arkasinda kaliyor.
         DrawGrid();
 
-        m_Scene->OnRender(*m_Camera);
+        m_Scene->OnRender(m_EditorCamera.GetCamera());
 
         // Secim cercevesi sahneden SONRA: ayni sebeple her zaman ustte.
         DrawSelectionOutline();
@@ -874,10 +748,7 @@ namespace FXEd
 
                 if (ImGui::MenuItem("Kamerayi Sifirla"))
                 {
-                    m_CameraPosition = { 0.0f, 0.0f, 0.0f };
-                    m_ZoomLevel      = 8.0f;
-                    m_Camera->SetPosition(m_CameraPosition);
-                    UpdateCameraProjection();
+                    m_EditorCamera.Reset();
                 }
                 if (ImGui::MenuItem("Panel Duzenini Sifirla"))
                     m_ImGuiLayer.ResetLayout();
@@ -931,6 +802,9 @@ namespace FXEd
         if (panelSize.x > 0.0f && panelSize.y > 0.0f)
             m_ViewportSize = { panelSize.x, panelSize.y };
 
+        // Kamera hem en-boy oranini hem ScreenToWorld'u bunlardan hesapliyor.
+        m_EditorCamera.SetViewport(m_ViewportSize, m_ViewportBoundsMin, m_ViewportBoundsMax);
+
         // ===============================================================
         // Framebuffer texture'ini panelde goster.
         //
@@ -959,7 +833,10 @@ namespace FXEd
 
         DrawGizmo();
         DrawViewportToolbar();
-        UpdateCameraPan();
+        // Kaydirma baslatma kosulu burada: kamera "fare viewport'ta mi"
+        // veya "gizmo kullaniliyor mu" bilmemeli.
+        const bool canPan = m_ViewportHovered && !ImGuizmo::IsUsing() && !ImGuizmo::IsOver();
+        m_EditorCamera.OnImGuiInteract(canPan, m_ImGuiLayer.WantsKeyboard());
 
         ImGui::End();
         ImGui::PopStyleVar();
@@ -1078,17 +955,18 @@ namespace FXEd
             return;
 
         const float aspect        = m_ViewportSize.x / m_ViewportSize.y;
-        const float visibleHeight = m_ZoomLevel * 2.0f;
+        const float visibleHeight = m_EditorCamera.GetZoom() * 2.0f;
         const float visibleWidth  = visibleHeight * aspect;
 
         const float step = ChooseGridStep(visibleHeight, 16.0f);
 
         // Gorunen alanin sinirlari. Bir adim tasma payi birakiyoruz ki
         // kaydirirken kenarda cizgi eksigi gorunmesin.
-        const float left   = m_CameraPosition.x - visibleWidth  * 0.5f - step;
-        const float right  = m_CameraPosition.x + visibleWidth  * 0.5f + step;
-        const float bottom = m_CameraPosition.y - visibleHeight * 0.5f - step;
-        const float top    = m_CameraPosition.y + visibleHeight * 0.5f + step;
+        const glm::vec3& camPos = m_EditorCamera.GetPosition();
+        const float left   = camPos.x - visibleWidth  * 0.5f - step;
+        const float right  = camPos.x + visibleWidth  * 0.5f + step;
+        const float bottom = camPos.y - visibleHeight * 0.5f - step;
+        const float top    = camPos.y + visibleHeight * 0.5f + step;
 
         const glm::vec4 thin { 1.0f, 1.0f, 1.0f, 0.10f };
         const glm::vec4 thick{ 1.0f, 1.0f, 1.0f, 0.22f };
@@ -1096,7 +974,7 @@ namespace FXEd
         const glm::vec4 axisY{ 0.40f, 0.80f, 0.40f, 0.85f };
 
         FX::RenderCommand::SetDepthTest(false);
-        FX::Renderer2D::BeginScene(*m_Camera);
+        FX::Renderer2D::BeginScene(m_EditorCamera.GetCamera());
 
         // Her 5 adimda bir kalin cizgi: sayarken referans noktasi olmadan
         // izgara okunmaz. floor kullaniyoruz cunku negatif tarafta
@@ -1145,7 +1023,7 @@ namespace FXEd
 
         FX::RenderCommand::SetDepthTest(false);
         FX::Renderer2D::SetLineWidth(2.0f);
-        FX::Renderer2D::BeginScene(*m_Camera);
+        FX::Renderer2D::BeginScene(m_EditorCamera.GetCamera());
 
         FX::Renderer2D::DrawRect(world, { 1.0f, 0.55f, 0.15f, 1.0f });
 
@@ -1170,7 +1048,7 @@ namespace FXEd
             world = selected.GetComponent<FX::TransformComponent>().GetTransform();
 
         // Matrisin 4. sutunu konumdur; ayristirmaya gerek yok.
-        m_CameraPosition = { world[3][0], world[3][1], 0.0f };
+        const glm::vec2 target{ world[3][0], world[3][1] };
 
         // Nesneyi ekrana sigdir: dunya uzayindaki genisligini olceginden
         // okuyup biraz pay birakiyoruz. Tam sinirina zoom yapmak nesneyi
@@ -1179,10 +1057,7 @@ namespace FXEd
         const float scaleY = glm::length(glm::vec3(world[1]));
         const float extent = std::max(scaleX, scaleY);
 
-        m_ZoomLevel = glm::clamp(extent * 2.5f, 1.0f, 40.0f);
-
-        m_Camera->SetPosition(m_CameraPosition);
-        UpdateCameraProjection();
+        m_EditorCamera.FocusOn(target, extent);
 
         SetStatus("Odaklanildi: " + selected.GetComponent<FX::TagComponent>().Tag);
     }
@@ -1194,7 +1069,7 @@ namespace FXEd
             return;
 
         // Space + sol tus kamerayi kaydiriyor, secim yapmiyor.
-        if (m_Panning || ImGui::IsKeyDown(ImGuiKey_Space))
+        if (m_EditorCamera.IsPanning() || ImGui::IsKeyDown(ImGuiKey_Space))
             return;
 
         if (!ImGui::IsMouseClicked(ImGuiMouseButton_Left))
@@ -1240,8 +1115,8 @@ namespace FXEd
                           m_ViewportBoundsMax.x - m_ViewportBoundsMin.x,
                           m_ViewportBoundsMax.y - m_ViewportBoundsMin.y);
 
-        const glm::mat4& view = m_Camera->GetViewMatrix();
-        const glm::mat4& proj = m_Camera->GetProjectionMatrix();
+        const glm::mat4& view = m_EditorCamera.GetCamera().GetViewMatrix();
+        const glm::mat4& proj = m_EditorCamera.GetCamera().GetProjectionMatrix();
 
         auto& tc = selected.GetComponent<FX::TransformComponent>();
 
@@ -1324,10 +1199,14 @@ namespace FXEd
         ImGui::Spacing();
         ImGui::Text("Kamera");
         ImGui::Separator();
-        ImGui::Text("Konum       : (%.2f, %.2f)", m_CameraPosition.x, m_CameraPosition.y);
+        ImGui::Text("Konum       : (%.2f, %.2f)",
+                    m_EditorCamera.GetPosition().x, m_EditorCamera.GetPosition().y);
         ImGui::SetNextItemWidth(-1.0f);
-        if (ImGui::SliderFloat("##Zoom", &m_ZoomLevel, 1.0f, 40.0f, "Zoom %.1f"))
-            UpdateCameraProjection();
+        float zoom = m_EditorCamera.GetZoom();
+        if (ImGui::SliderFloat("##Zoom", &zoom,
+                               FXEd::EditorCamera::kMinZoom, FXEd::EditorCamera::kMaxZoom,
+                               "Zoom %.1f"))
+            m_EditorCamera.SetZoom(zoom);
 
         ImGui::Spacing();
         bool vsync = GetWindow().IsVSync();
@@ -1368,7 +1247,8 @@ namespace FXEd
             // Koordinat olayin kendisinden: SDL pencere-goreli verir,
             // tek viewport'ta bu ImGui'nin ekran koordinatiyla ayni.
             if (m_ViewportHovered)
-                ZoomAtCursor(event.wheel.y, event.wheel.mouse_x, event.wheel.mouse_y);
+                m_EditorCamera.OnMouseScroll(event.wheel.y,
+                                             event.wheel.mouse_x, event.wheel.mouse_y);
             return;
         }
 

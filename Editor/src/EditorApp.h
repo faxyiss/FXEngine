@@ -14,6 +14,7 @@
 #include <FXEngine/Core/UUID.h>
 
 #include "ImGuiLayer.h"
+#include "EditorCamera.h"
 #include "Panels/SceneHierarchyPanel.h"
 #include "Panels/ContentBrowserPanel.h"
 
@@ -61,19 +62,7 @@ namespace FXEd
         // "Ice Aktar..." -> dosya diyalogu -> Icerik paneline kopyala.
         void ImportAssets();
 
-        // Fare ekran konumu -> sahne dunya konumu.
-        glm::vec2 ScreenToWorld(float screenX, float screenY) const;
-
         void SetStatus(const std::string& message);
-
-        void UpdateCameraMovement(float dt);
-        void UpdateCameraProjection();
-
-        // Sag tus (veya Space + sol tus) ile suruklerken kamerayi kaydirir.
-        void UpdateCameraPan();
-
-        // Tekerlek zoom'u: imlecin altindaki dunya noktasi sabit kalir.
-        void ZoomAtCursor(float wheelY, float mouseX, float mouseY);
 
         // Sonsuz izgara. Aralik zoom'a gore 1-2-5-10 serisinde secilir.
         void DrawGrid();
@@ -149,12 +138,6 @@ namespace FXEd
         float m_SnapRotate    = 15.0f;
         float m_SnapScale     = 0.25f;
 
-        // Fare ile kaydirma suruyor mu, hangi tusla baslatildi?
-        // Tusu basili tutarken viewport'tan cikilabildigi icin durum
-        // saklanmak zorunda: baslatma viewport'a bagli, surdurme degil.
-        bool m_Panning   = false;
-        int  m_PanButton = 0;
-
         // Menuden gelen ice aktarma istegi. Yerel diyalog modaldir ve
         // ImGui cercevesinin ortasinda acilamaz; cerceve bittikten sonra
         // isleniyor.
@@ -183,17 +166,9 @@ namespace FXEd
         float       m_StatusTimer = 0.0f;
 
         // --- Kamera ------------------------------------------------------------
-        std::unique_ptr<FX::OrthographicCamera> m_Camera;
+        EditorCamera m_EditorCamera;
 
         bool m_ShowGrid = true;
-
-        // Kamera DONMUYOR. Bu bir sahne duzenleme viewport'u; egik bir
-        // kamera duzenlemeyi zorlastirmaktan baska ise yaramiyordu.
-        // Ekran ekseni = dunya ekseni oldugu icin kaydirma ve
-        // ScreenToWorld de sadeleşti.
-        glm::vec3 m_CameraPosition{ 0.0f, 0.0f, 0.0f };
-        float     m_ZoomLevel      = 8.0f;
-        float     m_CameraMoveSpeed = 8.0f;
 
         // --- Durum -------------------------------------------------------------
         float m_Time = 0.0f;

@@ -6,6 +6,7 @@
 
 #include <FXEngine/Core/Application.h>
 #include <FXEngine/Renderer/Texture.h>
+#include <FXEngine/Renderer/TextureLibrary.h>
 #include <FXEngine/Renderer/OrthographicCamera.h>
 #include <FXEngine/Renderer/Framebuffer.h>
 #include <FXEngine/Scene/Scene.h>
@@ -34,6 +35,10 @@ namespace FXEd
     private:
         void BuildScene();
         void SpawnMover();
+
+        // Faz 7: sahne kaydet/yukle
+        void SaveScene();
+        void LoadScene();
 
         void UpdateCameraMovement(float dt);
         void UpdateCameraProjection();
@@ -66,8 +71,21 @@ namespace FXEd
         bool m_ViewportFocused = false;
 
         // --- Kaynaklar ---------------------------------------------------------
+        // Kutuphane, yol -> texture eslemesini tutar. Sahne yuklerken
+        // JSON'daki yollari texture'a cevirmek icin gerekli, ve ayni
+        // dosyanin tekrar tekrar yuklenmesini onler.
+        FX::TextureLibrary m_TextureLibrary;
+
         std::shared_ptr<FX::Texture2D> m_Checkerboard;
         std::shared_ptr<FX::Texture2D> m_Circle;
+
+        // Sahne dosyasinin yolu. Gercek bir editorde dosya secme
+        // penceresi olurdu; MVP icin sabit yol yeterli.
+        std::string m_ScenePath = "assets/scenes/Sahne.fxscene";
+
+        // Son islemin sonucu - menude kullaniciya geri bildirim icin.
+        std::string m_StatusMessage;
+        float       m_StatusTimer = 0.0f;
 
         // --- Kamera ------------------------------------------------------------
         std::unique_ptr<FX::OrthographicCamera> m_Camera;

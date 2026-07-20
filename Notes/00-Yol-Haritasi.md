@@ -11,8 +11,8 @@ Kural: aynı anda tek faz. Ben "test ettim, çalışıyor" demeden sonraki faza 
 | 3 | stb_image texture + texture'lı quad + ortho 2D kamera | ✅ onaylandı |
 | 4 | Batch renderer (dinamik VB, texture slot'ları) | ✅ onaylandı |
 | 5 | EnTT (Transform, SpriteRenderer, Tag + Movement/Render system) | ✅ onaylandı |
-| 6 | ImGui docking + framebuffer→Viewport + Hierarchy + Inspector | 🟡 test bekliyor |
-| 7 | JSON sahne kaydet/yükle → MVP | ⬜ |
+| 6 | ImGui docking + framebuffer→Viewport + Hierarchy + Inspector | ✅ onaylandı |
+| 7 | JSON sahne kaydet/yükle → MVP | 🟡 test bekliyor |
 
 Durum kodları: ⬜ başlamadı · 🟡 test bekliyor · ✅ onaylandı
 

@@ -5,6 +5,7 @@
 #include <FXEngine/Renderer/RenderCommand.h>
 #include <FXEngine/Renderer/Renderer2D.h>
 #include <FXEngine/Scene/Components.h>
+#include <FXEngine/Scene/SceneSerializer.h>
 
 #include <imgui.h>
 
@@ -62,11 +63,15 @@ namespace FXEd
         sharpSpec.WrapS     = FX::TextureWrap::Repeat;
         sharpSpec.WrapT     = FX::TextureWrap::Repeat;
 
-        m_Checkerboard = std::make_shared<FX::Texture2D>(
-            "assets/textures/checkerboard.png", sharpSpec);
-        m_Circle = std::make_shared<FX::Texture2D>("assets/textures/circle.png");
+        // ARTIK KUTUPHANE UZERINDEN yukluyoruz.
+        // Onemli: sahne yuklerken serializer de ayni kutuphaneyi kullanacak.
+        // Boylece "assets/textures/circle.png" yolu her iki yolda da AYNI
+        // texture nesnesine cozulur - Inspector'daki texture secimi
+        // isaretci karsilastirmasiyla calistigi icin bu sart.
+        m_Checkerboard = m_TextureLibrary.Load("assets/textures/checkerboard.png", sharpSpec);
+        m_Circle       = m_TextureLibrary.Load("assets/textures/circle.png");
 
-        if (!m_Checkerboard->IsValid() || !m_Circle->IsValid())
+        if (!m_Checkerboard || !m_Circle)
         {
             FX_ERROR("Texture'lar yuklenemedi. Aranan klasor: %s",
                      FX::FileSystem::GetBaseDirectory().c_str());
@@ -86,6 +91,7 @@ namespace FXEd
         FX_INFO("Editor hazir. Panelleri surukleyerek yeniden duzenleyebilirsin;");
         FX_INFO("duzen imgui.ini'ye kaydedilir.");
         FX_INFO("Viewport uzerindeyken: W/A/S/D kamera, tekerlek zoom.");
+        FX_INFO("Ctrl+S kaydet, Ctrl+O yukle. Sahne dosyasi: %s", m_ScenePath.c_str());
     }
 
     void EditorApp::BuildScene()
@@ -158,6 +164,47 @@ namespace FXEd
             RandFloat(-2.0f, 2.0f));
     }
 
+    void EditorApp::SaveScene()
+    {
+        FX::SceneSerializer serializer(m_Scene.get(), &m_TextureLibrary);
+
+        if (serializer.Serialize(m_ScenePath))
+            m_StatusMessage = "Sahne kaydedildi: " + m_ScenePath;
+        else
+            m_StatusMessage = "KAYDEDILEMEDI! (assets/scenes/ klasoru var mi?)";
+
+        m_StatusTimer = 4.0f;
+    }
+
+    void EditorApp::LoadScene()
+    {
+        FX::SceneSerializer serializer(m_Scene.get(), &m_TextureLibrary);
+
+        if (serializer.Deserialize(m_ScenePath))
+        {
+            m_StatusMessage = "Sahne yuklendi: " + m_ScenePath;
+
+            // ===============================================================
+            // KRITIK: Yukleme tum entity'leri yok edip yenilerini olusturdu.
+            // Elimizde tuttugumuz tutamaklar ARTIK GECERSIZ - baska bir
+            // entity'ye isaret ediyor olabilirler (EnTT kimlikleri yeniden
+            // kullanir). Temizlemezsek Inspector alakasiz veri gosterir
+            // veya assert tetiklenir.
+            //
+            // Bu, tutamak (handle) tabanli sistemlerin klasik tuzagidir:
+            // tutamak gecerli GORUNUR ama artik baskasini isaret eder.
+            // ===============================================================
+            m_PlayerEntity = {};
+            m_HierarchyPanel.SetContext(m_Scene.get());
+        }
+        else
+        {
+            m_StatusMessage = "YUKLENEMEDI! Once Ctrl+S ile kaydet.";
+        }
+
+        m_StatusTimer = 4.0f;
+    }
+
     void EditorApp::UpdateCameraProjection()
     {
         // ARTIK PENCEREYE DEGIL, VIEWPORT PANELINE gore hesapliyoruz.
@@ -223,6 +270,9 @@ namespace FXEd
     void EditorApp::OnUpdate(float dt)
     {
         m_Time += dt;
+
+        if (m_StatusTimer > 0.0f)
+            m_StatusTimer -= dt;
 
         UpdateCameraMovement(dt);
 
@@ -291,9 +341,10 @@ namespace FXEd
         {
             if (ImGui::BeginMenu("Dosya"))
             {
-                // Faz 7'de burasi gercek kaydet/yukle olacak.
-                ImGui::MenuItem("Sahneyi Kaydet", nullptr, false, false);
-                ImGui::MenuItem("Sahneyi Yukle",  nullptr, false, false);
+                if (ImGui::MenuItem("Sahneyi Kaydet", "Ctrl+S"))
+                    SaveScene();
+                if (ImGui::MenuItem("Sahneyi Yukle", "Ctrl+O"))
+                    LoadScene();
                 ImGui::Separator();
                 if (ImGui::MenuItem("Cikis"))
                     Close();
@@ -330,6 +381,16 @@ namespace FXEd
                 }
                 ImGui::MenuItem("ImGui Demo", nullptr, &m_ShowDemoWindow);
                 ImGui::EndMenu();
+            }
+
+            // Kaydet/yukle geri bildirimi - birkac saniye gorunur kalir.
+            // Sessiz basari, kullaniciya "oldu mu?" diye sorduran kotu
+            // bir tasarimdir.
+            if (m_StatusTimer > 0.0f)
+            {
+                ImGui::SameLine(ImGui::GetWindowWidth() - 620.0f);
+                ImGui::TextColored(ImVec4(0.5f, 0.9f, 0.6f, 1.0f), "%s",
+                                   m_StatusMessage.c_str());
             }
 
             // Sagda durum bilgisi
@@ -446,6 +507,10 @@ namespace FXEd
         if (event.type != SDL_EVENT_KEY_DOWN || event.key.repeat)
             return;
 
+        // Ctrl basili mi? SDL3'te modifier durumu event.key.mod'da gelir.
+        // KMOD_CTRL, sol ve sag Ctrl'un ikisini birden kapsar.
+        const bool ctrl = (event.key.mod & SDL_KMOD_CTRL) != 0;
+
         switch (event.key.key)
         {
             case SDLK_ESCAPE:
@@ -454,6 +519,14 @@ namespace FXEd
 
             case SDLK_SPACE:
                 m_ScenePaused = !m_ScenePaused;
+                break;
+
+            case SDLK_S:
+                if (ctrl) SaveScene();
+                break;
+
+            case SDLK_O:
+                if (ctrl) LoadScene();
                 break;
 
             default:

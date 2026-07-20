@@ -60,7 +60,10 @@ fiziksel olarak zorlanır.
 | 4 | Batch renderer (dinamik vertex buffer, texture slot'ları) | ✅ |
 | 5 | EnTT entegrasyonu (Transform, SpriteRenderer, Tag + system'ler) | ✅ |
 | 6 | ImGui docking + Viewport / Hierarchy / Inspector panelleri | ✅ |
-| 7 | JSON ile sahne kaydet/yükle → MVP | ⬜ |
+| 7 | JSON ile sahne kaydet/yükle → MVP | ✅ |
+
+**MVP tamamlandı.** Motor artık uçtan uca çalışıyor: pencere açar, sahneyi
+batch'lenmiş halde çizer, ECS ile yönetir, editörden düzenletir ve diske kaydeder.
 
 ## Derleme
 
@@ -104,9 +107,14 @@ düzen `imgui.ini`'ye kaydedilir.
 | `Q` `E` | Kamerayı döndür |
 | Fare tekerleği | Yakınlaş / uzaklaş |
 | `SPACE` | Sahneyi duraklat / devam ettir |
+| `Ctrl+S` | Sahneyi kaydet |
+| `Ctrl+O` | Sahneyi yükle |
 | `ESC` | Çıkış |
 | Hierarchy'de sağ tık | Entity oluştur / sil |
 | Inspector'da `X` | Component'i kaldır |
+
+Sahne `assets/scenes/Sahne.fxscene` dosyasına JSON olarak yazılır — okunabilir
+biçimde, metin editörüyle açılıp elle düzenlenebilir.
 
 Component'ler çalışma zamanında eklenip kaldırılabilir — Inspector'da bir
 `SpriteRenderer`'ı kaldır, entity görünmez olur ama hareket etmeyi sürdürür.

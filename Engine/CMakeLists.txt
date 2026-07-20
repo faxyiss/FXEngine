@@ -22,8 +22,10 @@ set(FXENGINE_SOURCES
     src/Renderer/OrthographicCamera.cpp
     src/Renderer/Renderer2D.cpp
     src/Renderer/Framebuffer.cpp
+    src/Renderer/TextureLibrary.cpp
     src/Scene/Scene.cpp
     src/Scene/Systems.cpp
+    src/Scene/SceneSerializer.cpp
 )
 
 set(FXENGINE_HEADERS
@@ -40,10 +42,12 @@ set(FXENGINE_HEADERS
     include/FXEngine/Renderer/OrthographicCamera.h
     include/FXEngine/Renderer/Renderer2D.h
     include/FXEngine/Renderer/Framebuffer.h
+    include/FXEngine/Renderer/TextureLibrary.h
     include/FXEngine/Scene/Components.h
     include/FXEngine/Scene/Entity.h
     include/FXEngine/Scene/Scene.h
     include/FXEngine/Scene/Systems.h
+    include/FXEngine/Scene/SceneSerializer.h
 )
 
 add_library(FXEngine STATIC

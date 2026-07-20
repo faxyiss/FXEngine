@@ -70,6 +70,13 @@ namespace FXEd
         void SaveEditorConfig();
         void PushRecentScene(const std::string& path);
 
+        // Secili tum entity'leri siler (Delete tusu).
+        void DeleteSelection();
+
+        // Coklu secimde gizmo birincil uzerinde duruyor; kalanlara ayni
+        // dunya-uzayi deltasi uygulaniyor.
+        void ApplyGizmoDelta(const glm::mat4& delta, FX::Entity primary);
+
         // Icerik panelinde cift tiklanan dosyayi turune gore acar.
         void OpenAsset(const std::string& relativePath);
 

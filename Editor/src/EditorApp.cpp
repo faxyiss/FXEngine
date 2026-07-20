@@ -1644,24 +1644,37 @@ namespace FXEd
 
     void EditorApp::DrawSelectionOutline()
     {
-        FX::Entity selected = m_Selection.GetPrimary();
-        if (!selected || !selected.HasComponent<FX::TransformComponent>())
+        if (m_Selection.IsEmpty())
             return;
-
-        // Dunya matrisi: parent zinciri zaten uygulanmis halde (Faz 9).
-        // Yerel transform'u kullansaydik cocuk entity'lerin cercevesi
-        // yanlis yerde cikardi.
-        glm::mat4 world{ 1.0f };
-        if (selected.HasComponent<FX::WorldTransformComponent>())
-            world = selected.GetComponent<FX::WorldTransformComponent>().Matrix;
-        else
-            world = selected.GetComponent<FX::TransformComponent>().GetTransform();
 
         FX::RenderCommand::SetDepthTest(false);
         FX::Renderer2D::SetLineWidth(2.0f);
         FX::Renderer2D::BeginScene(m_EditorCamera.GetCamera());
 
-        FX::Renderer2D::DrawRect(world, { 1.0f, 0.55f, 0.15f, 1.0f });
+        const FX::Entity primary = m_Selection.GetPrimary();
+
+        for (FX::Entity selected : m_Selection.GetAll())
+        {
+            if (!selected.HasComponent<FX::TransformComponent>())
+                continue;
+
+            // Dunya matrisi: parent zinciri zaten uygulanmis halde (Faz 9).
+            // Yerel transform'u kullansaydik cocuk entity'lerin cercevesi
+            // yanlis yerde cikardi.
+            glm::mat4 world{ 1.0f };
+            if (selected.HasComponent<FX::WorldTransformComponent>())
+                world = selected.GetComponent<FX::WorldTransformComponent>().Matrix;
+            else
+                world = selected.GetComponent<FX::TransformComponent>().GetTransform();
+
+            // Birincil turuncu, digerleri soluk: gizmonun hangi entity
+            // uzerinde durdugu tek bakista belli olsun.
+            const glm::vec4 color = (selected == primary)
+                                        ? glm::vec4{ 1.0f, 0.55f, 0.15f, 1.0f }
+                                        : glm::vec4{ 1.0f, 0.55f, 0.15f, 0.45f };
+
+            FX::Renderer2D::DrawRect(world, color);
+        }
 
         FX::Renderer2D::EndScene();
         FX::Renderer2D::SetLineWidth(1.0f);
@@ -1722,9 +1735,16 @@ namespace FXEd
 
         const int pixel = m_Framebuffer->ReadPixel(1, static_cast<int>(mx), static_cast<int>(my));
 
+        // Ctrl: ekle/cikar. Gizmo'nun kademe (snap) kisayolu da Ctrl ama
+        // burasi zaten gizmonun uzerinde DEGILKEN calisiyor - cakismiyorlar.
+        const bool ctrl = ImGui::GetIO().KeyCtrl;
+
         if (pixel < 0)
         {
-            m_Selection.Clear();
+            // Ctrl basiliyken bosluga tiklamak secimi silmemeli: coklu
+            // secim yaparken isabet ettiremeyen bir tik her seyi goturur.
+            if (!ctrl)
+                m_Selection.Clear();
             return;
         }
 
@@ -1732,7 +1752,12 @@ namespace FXEd
         if (m_Scene->GetRegistry().valid(handle))
         {
             FX::Entity picked{ handle, m_Scene };
-            m_Selection.Select(picked);
+
+            if (ctrl)
+                m_Selection.Toggle(picked);
+            else
+                m_Selection.Select(picked);
+
             FX_INFO("Secildi: %s", picked.GetComponent<FX::TagComponent>().Tag.c_str());
         }
     }
@@ -1783,11 +1808,17 @@ namespace FXEd
                         ? ImGuizmo::LOCAL
                         : static_cast<ImGuizmo::MODE>(m_GizmoMode);
 
+        // Delta matrisi: ImGuizmo'nun bu karede uyguladigi DUNYA uzayi
+        // donusumu. Coklu secimde digerlerine bunu uyguluyoruz - her
+        // entity'yi birincilin mutlak konumuna tasimak yerine, hepsini
+        // ayni miktarda oynatmak istiyoruz.
+        glm::mat4 delta{ 1.0f };
+
         ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(proj),
                              static_cast<ImGuizmo::OPERATION>(m_GizmoOperation),
                              mode,
                              glm::value_ptr(transform),
-                             nullptr,
+                             glm::value_ptr(delta),
                              snap ? snapValues : nullptr);
 
         if (ImGuizmo::IsUsing())
@@ -1797,6 +1828,77 @@ namespace FXEd
 
             float translation[3], rotation[3], scale[3];
             ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(local),
+                                                  translation, rotation, scale);
+
+            tc.Translation = { translation[0], translation[1], translation[2] };
+            tc.Rotation    = glm::radians(rotation[2]);
+            tc.Scale       = { scale[0], scale[1] };
+
+            if (m_Selection.Count() > 1)
+                ApplyGizmoDelta(delta, selected);
+        }
+    }
+
+    void EditorApp::DeleteSelection()
+    {
+        if (IsPlaying() || m_Selection.IsEmpty())
+            return;
+
+        // Secim listesinin KOPYASI uzerinde geziyoruz: silme sirasinda
+        // secimi de temizliyoruz.
+        const std::vector<FX::Entity> selection = m_Selection.GetAll();
+        int deleted = 0;
+
+        for (FX::Entity entity : selection)
+        {
+            // Listedeki bir entity, daha once silinen baskasinin cocugu
+            // olabilir; o zaten yok oldu.
+            if (!entity || !m_Scene->GetRegistry().valid(entity.GetHandle()))
+                continue;
+
+            m_Scene->DestroyEntity(entity);
+            ++deleted;
+        }
+
+        m_Selection.Clear();
+        SetStatus(std::to_string(deleted) + " entity silindi");
+    }
+
+    void EditorApp::ApplyGizmoDelta(const glm::mat4& delta, FX::Entity primary)
+    {
+        for (FX::Entity entity : m_Selection.GetAll())
+        {
+            if (entity == primary || !entity.HasComponent<FX::TransformComponent>())
+                continue;
+
+            // Atasi da seciliyse ATLA: parent zaten oynadi, cocuk onunla
+            // birlikte geldi. Bir kez daha uygularsak iki kat hareket eder.
+            bool ancestorSelected = false;
+            for (FX::Entity other : m_Selection.GetAll())
+            {
+                if (other != entity && other.IsAncestorOf(entity))
+                {
+                    ancestorSelected = true;
+                    break;
+                }
+            }
+            if (ancestorSelected)
+                continue;
+
+            auto& tc = entity.GetComponent<FX::TransformComponent>();
+
+            glm::mat4 parentWorld{ 1.0f };
+            if (FX::Entity parent = entity.GetParent())
+            {
+                if (parent.HasComponent<FX::WorldTransformComponent>())
+                    parentWorld = parent.GetComponent<FX::WorldTransformComponent>().Matrix;
+            }
+
+            const glm::mat4 world    = parentWorld * tc.GetTransform();
+            const glm::mat4 newLocal = glm::inverse(parentWorld) * (delta * world);
+
+            float translation[3], rotation[3], scale[3];
+            ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(newLocal),
                                                   translation, rotation, scale);
 
             tc.Translation = { translation[0], translation[1], translation[2] };
@@ -1943,6 +2045,10 @@ namespace FXEd
                 // Kisayol ImGui cercevesinin DISINDA isleniyor (OnEvent),
                 // bu yuzden diyalogu dogrudan acmak guvenli.
                 if (ctrl) ImportAssets();
+                break;
+
+            case SDLK_DELETE:
+                if (m_ViewportHovered) DeleteSelection();
                 break;
 
             // Gizmo kisayollari - sadece viewport odaktayken, cunku

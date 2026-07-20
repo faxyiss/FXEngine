@@ -9,6 +9,7 @@
 
 #include <glm/gtc/type_ptr.hpp>
 
+#include <algorithm>
 #include <cstring>
 #include <string>
 
@@ -54,7 +55,9 @@ namespace FXEd
         // NOT: view uzerinde gezerken entity SILMEK tehlikelidir -
         // dizi altimizdan degisir. Bu yuzden silme istegini bir
         // degiskende biriktirip dongu BITTIKTEN SONRA uyguluyoruz.
-        m_ToDelete = {};
+        m_ToDelete.clear();
+        m_VisibleOrder.clear();
+        m_ClickTarget    = {};
         m_ReparentChild  = {};
         m_ReparentTarget = {};
         m_ReparentToRoot = false;
@@ -85,8 +88,21 @@ namespace FXEd
         }
 
         // Bos alana sol tik -> secimi kaldir.
-        if (ImGui::IsMouseDown(ImGuiMouseButton_Left) && ImGui::IsWindowHovered())
+        //
+        // IsAnyItemHovered SART: IsWindowHovered bir satirin uzerindeyken
+        // de true doner, yani bu kontrol satira yapilan tiklamada da
+        // calisirdi. IsMouseDown yerine IsMouseClicked de sart - basili
+        // tutulan fare her karede secimi silerdi ve tiklama isteginin
+        // islendigi ILK kareden sonrakiler secimi geri aliyordu.
+        //
+        // Ctrl basiliysa hic dokunmuyoruz: coklu secim yaparken isabet
+        // ettiremeyen bir tik butun secimi goturmemeli.
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered() &&
+            !ImGui::IsAnyItemHovered() && !ImGui::GetIO().KeyCtrl)
+        {
             m_Selection->Clear();
+            m_RangeAnchor = {};
+        }
 
         // Bos alana sag tik -> yeni entity olustur.
         if (ImGui::BeginPopupContextWindow("HierarchyContext",
@@ -100,6 +116,10 @@ namespace FXEd
 
         ImGui::End();
 
+        // Tiklama agac tamamen cizildikten sonra isleniyor: Shift araligi
+        // gorunen siraya, o da bu dongunun bitmesine bagli.
+        ApplyPendingClick();
+
         // Yapiyi degistiren islemler dongu DISINDA: agac uzerinde
         // gezerken parent/child listelerini degistirmek yineleyicileri
         // gecersiz kilardi.
@@ -111,18 +131,25 @@ namespace FXEd
                 m_ReparentChild.SetParent(m_ReparentTarget);
         }
 
-        if (m_ToDelete)
+        for (FX::Entity toDelete : m_ToDelete)
         {
+            // Coklu silmede listedeki bir entity, daha once silinen
+            // baska birinin cocugu olabilir - o zaten yok oldu.
+            // Entity::operator bool registry'ye bakmiyor, bu yuzden
+            // gecerliligi burada sormak zorundayiz.
+            if (!toDelete || !m_Scene->GetRegistry().valid(toDelete.GetHandle()))
+                continue;
+
             // Secili entity silinenin ALTINDA olabilir; o da yok olacak.
             // Silmeden ONCE ayikliyoruz: sonrasinda IsAncestorOf'a
             // gecersiz entity sormus olurduk.
             const std::vector<FX::Entity> selection = m_Selection->GetAll();
             for (FX::Entity selected : selection)
             {
-                if (selected == m_ToDelete || m_ToDelete.IsAncestorOf(selected))
+                if (selected == toDelete || toDelete.IsAncestorOf(selected))
                     m_Selection->Remove(selected);
             }
-            m_Scene->DestroyEntity(m_ToDelete);
+            m_Scene->DestroyEntity(toDelete);
         }
 
         // ===================================================================
@@ -131,15 +158,72 @@ namespace FXEd
         ImGui::Begin("Inspector");
 
         if (FX::Entity primary = m_Selection->GetPrimary())
+        {
+            // Coklu secimde SADECE birincil duzenleniyor. Cok-hedefli
+            // alan duzenleme (Unity'nin "-" gosteren alanlari) ayri bir
+            // is; yaniltici olmamasi icin durumu acikca yaziyoruz.
+            if (m_Selection->Count() > 1)
+            {
+                ImGui::TextDisabled("%d entity secili - duzenlenen: birincil",
+                                    static_cast<int>(m_Selection->Count()));
+                ImGui::Separator();
+            }
             DrawComponents(primary);
+        }
         else
+        {
             ImGui::TextDisabled("Hierarchy'den bir entity sec.");
+        }
 
         ImGui::End();
     }
 
+    void SceneHierarchyPanel::ApplyPendingClick()
+    {
+        if (!m_ClickTarget)
+            return;
+
+        FX::Entity target = m_ClickTarget;
+        m_ClickTarget = {};
+
+        if (m_ClickShift && m_RangeAnchor)
+        {
+            const auto begin = m_VisibleOrder.begin();
+            const auto end   = m_VisibleOrder.end();
+
+            const auto from = std::find(begin, end, m_RangeAnchor);
+            const auto to   = std::find(begin, end, target);
+
+            // Cipa artik gorunmuyorsa (dali kapanmis olabilir) aralik
+            // hesaplanamaz; tek secime dusuyoruz.
+            if (from == end || to == end)
+            {
+                m_Selection->Select(target);
+                m_RangeAnchor = target;
+                return;
+            }
+
+            m_Selection->Clear();
+            for (auto it = std::min(from, to); it <= std::max(from, to); ++it)
+                m_Selection->Add(*it);
+
+            // Cipa DEGISMIYOR: Shift ile arka arkaya tiklayarak araligi
+            // buyutup kucultmek ancak boyle mumkun.
+            return;
+        }
+
+        if (m_ClickCtrl)
+            m_Selection->Toggle(target);
+        else
+            m_Selection->Select(target);
+
+        m_RangeAnchor = target;
+    }
+
     void SceneHierarchyPanel::DrawEntityNode(FX::Entity entity)
     {
+        m_VisibleOrder.push_back(entity);
+
         const auto& tag = entity.GetComponent<FX::TagComponent>().Tag;
         const bool hasChildren = entity.HasChildren();
 
@@ -160,10 +244,29 @@ namespace FXEd
             flags, "%s", tag.c_str());
 
         if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
+        {
+            m_ClickTarget = entity;
+            m_ClickCtrl   = ImGui::GetIO().KeyCtrl;
+            m_ClickShift  = ImGui::GetIO().KeyShift;
+        }
+
+        // Sag tik secimin DISINDA bir ogeye yapildiysa secim ona gecer:
+        // menudeki islem gorunmeyen bir secime uygulanmasin.
+        if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right) &&
+            !m_Selection->IsSelected(entity))
+        {
             m_Selection->Select(entity);
+            m_RangeAnchor = entity;
+        }
 
         if (ImGui::BeginPopupContextItem())
         {
+            const std::size_t selCount = m_Selection->Count();
+            const bool        multi    = selCount > 1 && m_Selection->IsSelected(entity);
+
+            if (multi)
+                ImGui::TextDisabled("%d entity secili", static_cast<int>(selCount));
+
             if (ImGui::MenuItem("Alt Entity Ekle"))
             {
                 FX::Entity child = m_Scene->CreateEntity("Yeni Entity");
@@ -180,8 +283,13 @@ namespace FXEd
             if (ImGui::MenuItem("Prefab Olarak Kaydet..."))
                 m_PrefabRequest = entity;
             ImGui::Separator();
-            if (ImGui::MenuItem("Entity'yi Sil"))
-                m_ToDelete = entity;
+            if (ImGui::MenuItem(multi ? "Secilenleri Sil" : "Entity'yi Sil"))
+            {
+                if (multi)
+                    m_ToDelete = m_Selection->GetAll();
+                else
+                    m_ToDelete.push_back(entity);
+            }
             ImGui::EndPopup();
         }
 

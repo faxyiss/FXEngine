@@ -142,8 +142,9 @@ Faz 22'nin bıraktığı tutarlılık açığı.
       çıkarıldı; `EditorApp` tutuyor, paneller tüketici. API baştan
       çoklu seçime göre yazıldı, davranış şimdilik tek seçim.
       Ayrıntı: [Borc-02-SelectionContext.md](Borc-02-SelectionContext.md)
-- [ ] **0.3 — Entity çoklu seçimi.** Ctrl/Shift, gizmoyla toplu
-      dönüşüm, toplu silme.
+- [x] **0.3 — Entity çoklu seçimi.** Hierarchy'de Ctrl/Shift, viewport'ta
+      Ctrl+tık, gizmoyla toplu dönüşüm (delta), toplu silme.
+      Ayrıntı: [Borc-03-Coklu-Secim.md](Borc-03-Coklu-Secim.md)
 - [x] **0.4 — Dosya izleyici.** `FX::FileWatcher`
       (`ReadDirectoryChangesW` + tek thread + debounce). Dışarıdan
       yeniden adlandırma/taşıma GUID'i koruyor, yeni dosyaya `.meta`

@@ -141,8 +141,8 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 | 0.1 | Faz 22'nin gerçek veriyle doğrulanması | ✅ sahne v4, GUID eşleşiyor, eksik `.meta` eklendi |
 | 0.4 | Dosya izleyici (`ReadDirectoryChangesW`) | ✅ GUID dışarıdan taşımada da korunuyor |
 | 0.2 | `SelectionContext` — seçimi panelden çıkar | ✅ sahibi `EditorApp`, paneller tüketici |
-| 0.3 | Entity çoklu seçimi | **sıradaki** |
-| 0.5 | Catch2 + `UUID`/`SceneSerializer`/`AssetManager` testleri | |
+| 0.3 | Entity çoklu seçimi | ✅ Ctrl/Shift, gizmoda delta, toplu silme |
+| 0.5 | Catch2 + `UUID`/`SceneSerializer`/`AssetManager` testleri | **sıradaki** |
 | 0.6 | Faz 22 artıkları (Inspector doku ayarları, prefab GUID, `AssetDirectory`) | 16'dan sonra |
 
 ### Bölünmüş fazlar

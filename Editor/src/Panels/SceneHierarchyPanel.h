@@ -25,6 +25,7 @@
 #include <FXEngine/Renderer/TextureLibrary.h>
 
 #include <memory>
+#include <vector>
 
 namespace FXEd
 {
@@ -52,6 +53,15 @@ namespace FXEd
         // Hierarchy'de tek bir satir.
         void DrawEntityNode(FX::Entity entity);
 
+        // Explorer/Unity davranisi: tek tik secer, Ctrl ekler/cikarir,
+        // Shift son tiklanandan buraya kadar olan araligi secer.
+        //
+        // Tiklama ANINDA uygulanmiyor: Shift araligi "gorunen sira"ya
+        // ihtiyac duyuyor ve o sira ancak agac tamamen cizilince belli
+        // oluyor. Istek biriktirilip cerceve sonunda isleniyor - agac
+        // uzerinde gezerken secim degistirmemenin de faydasi var.
+        void ApplyPendingClick();
+
         // Inspector'da secili entity'nin tum component'leri.
         void DrawComponents(FX::Entity entity);
 
@@ -66,12 +76,23 @@ namespace FXEd
 
         // Agac uzerinde gezerken yapiyi degistirmek yineleyicileri bozar;
         // istekleri biriktirip dongu bittikten sonra uyguluyoruz.
-        FX::Entity m_ToDelete;
+        std::vector<FX::Entity> m_ToDelete;
         FX::Entity m_ReparentChild;
         FX::Entity m_ReparentTarget;
         bool       m_ReparentToRoot = false;
 
         FX::Entity m_PrefabRequest;
+
+        // Bu karede cizilen entity'ler, GORUNEN sirada (kapali dallarin
+        // cocuklari yok). Shift araligi bunun uzerinden hesaplaniyor.
+        std::vector<FX::Entity> m_VisibleOrder;
+
+        FX::Entity m_ClickTarget;
+        bool       m_ClickCtrl  = false;
+        bool       m_ClickShift = false;
+
+        // Shift araliginin baslangici: son kez Shift'siz tiklanan entity.
+        FX::Entity m_RangeAnchor;
 
         FX::TextureLibrary* m_Library = nullptr;
     };

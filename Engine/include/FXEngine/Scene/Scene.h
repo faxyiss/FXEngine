@@ -12,11 +12,13 @@
 // ===========================================================================
 
 #include "FXEngine/Renderer/OrthographicCamera.h"
+#include "FXEngine/Core/UUID.h"
 
 #include <entt/entt.hpp>
 
 #include <cstdint>
 #include <string>
+#include <unordered_map>
 
 namespace FX
 {
@@ -35,8 +37,33 @@ namespace FX
         Scene(const Scene&)            = delete;
         Scene& operator=(const Scene&) = delete;
 
+        // Yeni bir UUID uretir.
         Entity CreateEntity(const std::string& name = "Entity");
-        void   DestroyEntity(Entity entity);
+
+        // BELIRLI bir UUID ile olusturur - sahne YUKLERKEN kullanilir.
+        // Dosyadaki kimligi korumak sart: korumazsak entity'ler arasi
+        // referanslar (EntityRef) yuklemeden sonra bozulur.
+        Entity CreateEntityWithUUID(UUID uuid, const std::string& name = "Entity");
+
+        void DestroyEntity(Entity entity);
+
+        // Tum entity'leri siler. Sahne yuklerken registry.clear() yerine
+        // bunu kullanmak zorundayiz: UUID haritasi da temizlenmeli, yoksa
+        // olu entity'lere isaret eden kayitlar kalir.
+        void Clear();
+
+        // UUID -> Entity. Bulunamazsa gecersiz (bos) Entity doner;
+        // cagiran `if (entity)` ile kontrol etmeli.
+        //
+        // O(1): dogrusal arama yapmiyoruz. Binlerce entity'nin oldugu bir
+        // sahnede her karede takip hedefi aramak dogrusal olsaydi
+        // kare suresini yerdi.
+        Entity FindEntityByUUID(UUID uuid);
+
+        // Ada gore arama. UUID'nin aksine isimler BENZERSIZ DEGILDIR -
+        // ilk eslesen doner. Editor kolayligi icin var, oyun mantiginda
+        // isim yerine UUID kullanilmali.
+        Entity FindEntityByName(const std::string& name);
 
         // Mantik guncellemesi. SABIT adimli dt ile cagrilir (Application).
         void OnUpdate(float dt);
@@ -54,6 +81,20 @@ namespace FX
 
     private:
         entt::registry m_Registry;
+
+        // UUID -> entt::entity haritasi.
+        //
+        // Neden ayri bir harita? Registry'yi gezip IDComponent'leri
+        // karsilastirmak da ise yarardi ama O(n) olurdu. Bu harita
+        // aramayi O(1) yapiyor; bedeli entity basina birkac bayt ve
+        // olusturma/silmede haritayi guncel tutma sorumlulugu.
+        //
+        // DIKKAT: Bu harita ile registry'nin SENKRON kalmasi sart.
+        // Bu yuzden entity olusturma/silme SADECE Scene uzerinden
+        // yapilmali - registry'ye dogrudan create/destroy cagirmak
+        // haritayi bozar. GetRegistry()'nin acik olmasi bu riski
+        // tasiyor; ileride daha dar bir erisim gerekebilir.
+        std::unordered_map<UUID, entt::entity> m_EntityMap;
 
         // Entity, registry'ye erismek zorunda -> arkadas sinif.
         // Alternatifi registry'yi public yapmakti; bu daha dar bir kapi.

@@ -56,6 +56,18 @@ namespace FX
         {
             json e;
 
+            // UUID EN BASA. Sadece duzen icin degil: dosyayi elle
+            // incelerken hangi entity'ye baktigini ilk satirda gormek
+            // istersin, cunku referanslar bu sayilarla kuruluyor.
+            //
+            // uint64_t olarak yaziyoruz. JSON sayilari cift duyarlikli
+            // ondalik olarak saklar ve 2^53 ustu tam sayilar hassasiyet
+            // kaybedebilir - ama nlohmann/json tam sayilari ayri tutar
+            // (integer/unsigned ayrimi yapar), bu yuzden 64-bit degerler
+            // guvenle gidip gelir.
+            if (entity.HasComponent<IDComponent>())
+                e["ID"] = static_cast<std::uint64_t>(entity.GetComponent<IDComponent>().ID);
+
             if (entity.HasComponent<TagComponent>())
                 e["Tag"] = entity.GetComponent<TagComponent>().Tag;
 
@@ -99,6 +111,22 @@ namespace FX
                 };
             }
 
+            if (entity.HasComponent<FollowComponent>())
+            {
+                const auto& fc = entity.GetComponent<FollowComponent>();
+
+                // ISTE FAZ 8'IN BUTUN MESELESI.
+                // Burada bir isaretci veya entt kimligi degil, hedefin
+                // KALICI UUID'sini yaziyoruz. Yukleme sirasinda hedef
+                // entity ayni UUID ile yeniden olusturulacagi icin
+                // referans kendiliginden dogru yere baglanir.
+                e["Follow"] = {
+                    { "Target",       static_cast<std::uint64_t>(fc.Target.Target) },
+                    { "Speed",        fc.Speed },
+                    { "StopDistance", fc.StopDistance }
+                };
+            }
+
             return e;
         }
     }
@@ -121,7 +149,11 @@ namespace FX
         // Surum numarasi: ileride format degisirse eski dosyalari
         // taniyip donusturebilmek icin. Bugun kullanmiyoruz ama
         // SONRADAN EKLEMEK cok zordur - dosyalar coktan yazilmis olur.
-        root["Version"] = 1;
+        // Surum 2: entity UUID'leri ve FollowComponent eklendi.
+        // Surum 1 dosyalari hala aciliyor (ID alani yoksa yeni uretiliyor) -
+        // Faz 7'de bu alani "bugun kullanmiyoruz ama sonradan eklemek zor"
+        // diye koymustuk; ilk faydasini simdi goruyoruz.
+        root["Version"] = 2;
         root["Scene"]   = "Untitled";
 
         json entities = json::array();
@@ -214,8 +246,11 @@ namespace FX
         }
 
         const int version = root.value("Version", 0);
-        if (version != 1)
-            FX_CORE_WARN("Sahne surumu %d, beklenen 1. Yine de denenecek.", version);
+        if (version == 1)
+            FX_CORE_WARN("Sahne surumu 1 (Faz 7). UUID'ler yeniden uretilecek, "
+                         "entity referanslari kaybolabilir.");
+        else if (version != 2)
+            FX_CORE_WARN("Sahne surumu %d, beklenen 2. Yine de denenecek.", version);
 
         if (!root.contains("Entities") || !root["Entities"].is_array())
         {
@@ -225,8 +260,12 @@ namespace FX
 
         // --- Mevcut sahneyi temizle ------------------------------------------
         // Yuklemek "uzerine eklemek" degil "degistirmek" demektir.
-        // Temizlemezsek eski entity'ler kalir ve sahne her yuklemede buyur.
-        m_Scene->GetRegistry().clear();
+        //
+        // Scene::Clear() kullaniyoruz, registry.clear() DEGIL: UUID
+        // haritasinin da temizlenmesi sart. Faz 8 oncesi registry'yi
+        // dogrudan temizliyorduk; artik Scene iki veri yapisi tutuyor
+        // ve ikisi senkron kalmali.
+        m_Scene->Clear();
 
         std::size_t loaded = 0;
 
@@ -234,8 +273,23 @@ namespace FX
         {
             const std::string name = e.value("Tag", std::string("Entity"));
 
-            // CreateEntity zaten Tag ve Transform ekliyor.
-            Entity entity = m_Scene->CreateEntity(name);
+            // =============================================================
+            // UUID'YI DOSYADAN AL, YENIDEN URETME.
+            //
+            // CreateEntity() cagirsaydik her entity yeni bir kimlik alirdi
+            // ve FollowComponent'lerdeki hedef UUID'leri hicbir seye
+            // isaret etmezdi. Referanslarin yuklemeden sag cikmasinin
+            // tek yolu kimligi korumaktir.
+            //
+            // Eski (Faz 7) dosyalarda "ID" alani yok; o durumda yeni
+            // bir UUID uretiyoruz. Boylece eski sahneler hala aciliyor -
+            // Version alanini bosuna koymamistik.
+            // =============================================================
+            Entity entity;
+            if (e.contains("ID"))
+                entity = m_Scene->CreateEntityWithUUID(UUID(e["ID"].get<std::uint64_t>()), name);
+            else
+                entity = m_Scene->CreateEntity(name);
 
             if (e.contains("Transform"))
             {
@@ -275,6 +329,26 @@ namespace FX
                 auto& vc = entity.AddComponent<VelocityComponent>();
                 vc.Linear  = ToVec2(v.value("Linear", json::array()));
                 vc.Angular = v.value("Angular", 0.0f);
+            }
+
+            if (e.contains("Follow"))
+            {
+                const auto& f = e["Follow"];
+                auto& fc = entity.AddComponent<FollowComponent>();
+
+                // Hedef UUID'sini oldugu gibi aliyoruz.
+                //
+                // DIKKAT: Hedef entity HENUZ OLUSTURULMAMIS olabilir -
+                // dosyada bizden sonra geliyorsa. Bu sorun DEGIL, cunku
+                // cozumlemeyi burada yapmiyoruz; FollowSystem her karede
+                // aramayi tekrarliyor. "Gec cozumleme"nin ikinci faydasi
+                // bu: yukleme sirasi onemsizlesiyor.
+                //
+                // Isaretci cozseydik, iki gecisli bir yukleyici yazmak
+                // zorunda kalirdik (once tum entity'ler, sonra referanslar).
+                fc.Target       = UUID(f.value("Target", std::uint64_t{ 0 }));
+                fc.Speed        = f.value("Speed", 2.0f);
+                fc.StopDistance = f.value("StopDistance", 1.0f);
             }
 
             ++loaded;

@@ -17,6 +17,7 @@
 // ===========================================================================
 
 #include "FXEngine/Renderer/Texture.h"
+#include "FXEngine/Core/UUID.h"
 
 #include <memory>
 #include <string>
@@ -26,6 +27,25 @@
 
 namespace FX
 {
+    // -----------------------------------------------------------------------
+    // IDComponent - entity'nin KALICI kimligi
+    // -----------------------------------------------------------------------
+    // Her entity'ye CreateEntity'de otomatik eklenir. TagComponent gibi
+    // "istege bagli" degildir: kimliksiz bir entity serilestirilemez ve
+    // referans verilemez.
+    //
+    // Neden ayri bir component, Entity sinifinin icinde bir alan degil?
+    // Cunku Entity sadece bir TUTAMAK (handle) - veri tutmaz, registry'de
+    // yasamaz. Kalici olmasi gereken her sey component olmali; ancak o
+    // zaman serilestirilir, kopyalanir, sorgulanir.
+    struct IDComponent
+    {
+        UUID ID;
+
+        IDComponent() = default;
+        IDComponent(UUID id) : ID(id) {}
+    };
+
     // -----------------------------------------------------------------------
     // TagComponent - entity'nin okunabilir adi
     // -----------------------------------------------------------------------
@@ -119,5 +139,51 @@ namespace FX
         VelocityComponent() = default;
         VelocityComponent(const glm::vec2& linear, float angular = 0.0f)
             : Linear(linear), Angular(angular) {}
+    };
+
+    // -----------------------------------------------------------------------
+    // EntityRef - baska bir entity'ye KALICI referans
+    // -----------------------------------------------------------------------
+    // BU, FAZ 8'IN ASIL SEBEBIDIR.
+    //
+    // Neden dogrudan Entity (veya entt::entity) saklamiyoruz?
+    //   1) entt::entity yuklemede degisir -> dosyaya yazilamaz
+    //   2) Hedef silinirse tutamak GECERSIZ olur ama GECERLI GORUNUR
+    //      (EnTT kimlikleri geri donusturur) -> sessizce yanlis entity'ye
+    //      baglanirsin. Faz 7'de bu tuzagi bizzat yasadik.
+    //
+    // UUID saklayip GEC COZUMLEME (lazy resolve) yapmak ikisini de cozer:
+    // hedef yoksa arama basarisiz olur ve bunu ANLARIZ.
+    //
+    // Bilincli olarak Scene'i BILMIYOR - sadece bir UUID tasiyor. Cozumleme
+    // Scene::FindEntityByUUID ile cagiran tarafta yapilir. Boylece
+    // Components.h, Scene.h'i include etmek zorunda kalmiyor (dairesel
+    // bagimlilik olurdu).
+    struct EntityRef
+    {
+        UUID Target{ 0 };   // 0 = hedef yok
+
+        EntityRef() = default;
+        EntityRef(UUID target) : Target(target) {}
+
+        bool IsSet() const { return Target.IsValid(); }
+        void Clear() { Target = UUID(0); }
+    };
+
+    // -----------------------------------------------------------------------
+    // FollowComponent - "su entity'yi takip et"
+    // -----------------------------------------------------------------------
+    // EntityRef'in ise yaradigini GOSTEREN ornek. Bir davranis degil,
+    // sadece veri: hedef kim, ne kadar hizli, ne kadar yakina kadar.
+    // Isi FollowSystem yapar.
+    struct FollowComponent
+    {
+        EntityRef Target;
+        float     Speed        = 2.0f;   // birim / saniye
+        float     StopDistance = 1.0f;   // bu mesafeye gelince dur
+
+        FollowComponent() = default;
+        FollowComponent(UUID target, float speed = 2.0f)
+            : Target(target), Speed(speed) {}
     };
 }

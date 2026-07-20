@@ -85,7 +85,7 @@ namespace FXEd
 
         m_HierarchyPanel.SetContext(m_Scene.get());
         m_HierarchyPanel.SetAvailableTextures(m_Checkerboard, m_Circle);
-        m_HierarchyPanel.SetSelectedEntity(m_PlayerEntity);
+        m_HierarchyPanel.SetSelectedEntity(GetPlayer());
 
         FX_INFO("");
         FX_INFO("Editor hazir. Panelleri surukleyerek yeniden duzenleyebilirsin;");
@@ -110,13 +110,38 @@ namespace FXEd
         }
 
         {
-            m_PlayerEntity = m_Scene->CreateEntity("Oyuncu");
-            auto& tf = m_PlayerEntity.GetComponent<FX::TransformComponent>();
+            auto player = m_Scene->CreateEntity("Oyuncu");
+            auto& tf = player.GetComponent<FX::TransformComponent>();
             tf.Translation = { 0.0f, 0.0f, 0.1f };
 
-            m_PlayerEntity.AddComponent<FX::SpriteRendererComponent>(
+            player.AddComponent<FX::SpriteRendererComponent>(
                 m_Circle, glm::vec4{ 1.0f, 0.85f, 0.3f, 1.0f });
-            m_PlayerEntity.AddComponent<FX::VelocityComponent>();
+            player.AddComponent<FX::VelocityComponent>();
+
+            // Tutamak degil KIMLIK sakliyoruz - yuklemeden sag cikar.
+            m_PlayerUUID = player.GetComponent<FX::IDComponent>().ID;
+        }
+
+        // --- Takipciler --------------------------------------------------------
+        // Faz 8'in kanit sahnesi: bu uc entity oyuncuyu UUID uzerinden
+        // takip ediyor. Sahneyi kaydedip yukledikten sonra da takip
+        // ETMEYE DEVAM etmeliler - iste kalici kimligin butun mesele.
+        for (int i = 0; i < 3; ++i)
+        {
+            auto e = m_Scene->CreateEntity("Takipci " + std::to_string(i));
+
+            auto& tf = e.GetComponent<FX::TransformComponent>();
+            tf.Translation = { -6.0f + static_cast<float>(i) * 1.5f, -6.0f, 0.05f };
+            tf.Scale = { 0.7f, 0.7f };
+
+            e.AddComponent<FX::SpriteRendererComponent>(
+                m_Circle, glm::vec4{ 1.0f, 0.35f, 0.35f, 1.0f });
+            e.AddComponent<FX::VelocityComponent>();
+
+            auto& fc = e.AddComponent<FX::FollowComponent>();
+            fc.Target       = m_PlayerUUID;
+            fc.Speed        = 1.5f + static_cast<float>(i) * 0.5f;
+            fc.StopDistance = 1.0f + static_cast<float>(i) * 0.6f;
         }
 
         for (int i = 0; i < 8; ++i)
@@ -164,6 +189,17 @@ namespace FXEd
             RandFloat(-2.0f, 2.0f));
     }
 
+    FX::Entity EditorApp::GetPlayer()
+    {
+        if (!m_Scene || !m_PlayerUUID.IsValid())
+            return {};
+
+        // O(1) harita aramasi. Her karede cagirmak sorun degil ve
+        // tutamak onbelleklemenin aksine GUVENLI: oyuncu silinmisse
+        // gecersiz Entity doner, biz de fark ederiz.
+        return m_Scene->FindEntityByUUID(m_PlayerUUID);
+    }
+
     void EditorApp::SaveScene()
     {
         FX::SceneSerializer serializer(m_Scene.get(), &m_TextureLibrary);
@@ -185,17 +221,29 @@ namespace FXEd
             m_StatusMessage = "Sahne yuklendi: " + m_ScenePath;
 
             // ===============================================================
-            // KRITIK: Yukleme tum entity'leri yok edip yenilerini olusturdu.
-            // Elimizde tuttugumuz tutamaklar ARTIK GECERSIZ - baska bir
-            // entity'ye isaret ediyor olabilirler (EnTT kimlikleri yeniden
-            // kullanir). Temizlemezsek Inspector alakasiz veri gosterir
-            // veya assert tetiklenir.
+            // FAZ 8 FARKI:
             //
-            // Bu, tutamak (handle) tabanli sistemlerin klasik tuzagidir:
-            // tutamak gecerli GORUNUR ama artik baskasini isaret eder.
+            // Faz 7'de burada "m_PlayerEntity = {}" yazmak ZORUNDAYDIK.
+            // Tutamaklar yuklemeden sonra gecersizdi ama GECERLI GORUNUYORDU
+            // (EnTT kimlikleri geri donusturur), dolayisiyla korlemesine
+            // temizlemek tek guvenli secenekti - ve oyuncuya erisimi
+            // kaybediyorduk.
+            //
+            // Artik m_PlayerUUID sakliyoruz. Kimlik dosyada yaziyor, ayni
+            // degerle geri geliyor; hicbir sey temizlemeye gerek yok.
+            // Oyuncu, sahne yuklendikten sonra da bulunabilir durumda.
+            //
+            // Panel secimini yine de temizliyoruz: secili entity KULLANICI
+            // tercihiydi, yeni sahnede karsiligi olmayabilir. Bu, teknik
+            // bir zorunluluk degil, davranissal bir tercih.
             // ===============================================================
-            m_PlayerEntity = {};
             m_HierarchyPanel.SetContext(m_Scene.get());
+
+            if (auto player = GetPlayer())
+                FX_INFO("Oyuncu yuklemeden sonra UUID ile bulundu: %llu",
+                        static_cast<unsigned long long>(m_PlayerUUID));
+            else
+                FX_WARN("Oyuncu bulunamadi - sahne dosyasinda yok olabilir.");
         }
         else
         {

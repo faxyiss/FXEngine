@@ -8,6 +8,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <cstring>
+#include <string>
 
 namespace FXEd
 {
@@ -166,6 +167,30 @@ namespace FXEd
 
     void SceneHierarchyPanel::DrawComponents(FX::Entity entity)
     {
+        // --- Kimlik ------------------------------------------------------------
+        // UUID salt okunur: kullanicinin degistirmesi anlamsiz ve tehlikeli
+        // olurdu (referanslar kopar). Ama GORUNMESI gerekiyor - bir
+        // FollowComponent hedefini ayarlarken bu sayiyi okuyacaksin.
+        if (entity.HasComponent<FX::IDComponent>())
+        {
+            const auto id = static_cast<std::uint64_t>(
+                entity.GetComponent<FX::IDComponent>().ID);
+
+            ImGui::TextDisabled("UUID");
+            ImGui::SameLine(110.0f);
+            ImGui::TextDisabled("%llu", static_cast<unsigned long long>(id));
+
+            // Kopyalama kolayligi: uzun sayilari elle yazmak istemezsin.
+            if (ImGui::IsItemClicked())
+            {
+                ImGui::SetClipboardText(std::to_string(id).c_str());
+                FX_INFO("UUID panoya kopyalandi: %llu",
+                        static_cast<unsigned long long>(id));
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Kopyalamak icin tikla");
+        }
+
         // --- Tag ---------------------------------------------------------------
         if (entity.HasComponent<FX::TagComponent>())
         {
@@ -271,6 +296,84 @@ namespace FXEd
                 entity.RemoveComponent<FX::VelocityComponent>();
         }
 
+        // --- Follow ---------------------------------------------------------------
+        if (entity.HasComponent<FX::FollowComponent>())
+        {
+            bool keep = true;
+            if (ImGui::CollapsingHeader("Follow", &keep, ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                auto& fc = entity.GetComponent<FX::FollowComponent>();
+
+                // HEDEF SECICI.
+                // Entity'yi ADIYLA gosteriyoruz ama sakladigimiz sey UUID.
+                // Kullanici arayuzu okunabilir olmali, veri modeli kalici -
+                // ikisi ayni sey olmak zorunda degil.
+                FX::Entity target = m_Scene->FindEntityByUUID(fc.Target.Target);
+
+                std::string preview = "Yok";
+                if (fc.Target.IsSet())
+                {
+                    preview = target
+                        ? target.GetComponent<FX::TagComponent>().Tag
+                        // Hedef UUID dolu ama entity bulunamiyor: silinmis
+                        // olabilir. Bunu SESSIZCE gizlemek yerine acikca
+                        // gosteriyoruz, yoksa kullanici neden calismadigini
+                        // anlayamaz.
+                        : std::string("<kayip: ") +
+                          std::to_string(static_cast<std::uint64_t>(fc.Target.Target)) + ">";
+                }
+
+                ImGui::Text("Hedef");
+                ImGui::SameLine(110.0f);
+                ImGui::SetNextItemWidth(-1.0f);
+                if (ImGui::BeginCombo("##Target", preview.c_str()))
+                {
+                    if (ImGui::Selectable("Yok", !fc.Target.IsSet()))
+                        fc.Target.Clear();
+
+                    // Sahnedeki tum entity'leri listele.
+                    auto view = m_Scene->GetRegistry().view<FX::TagComponent, FX::IDComponent>();
+                    for (auto id : view)
+                    {
+                        FX::Entity candidate{ id, m_Scene };
+
+                        // Kendini takip etmek anlamsiz - secenegi hic sunma.
+                        // (Faz 6'daki ilke: arayuz gecersiz eylemi mumkun kilmamali.)
+                        if (candidate == entity)
+                            continue;
+
+                        const auto& tag = candidate.GetComponent<FX::TagComponent>().Tag;
+                        const auto  uuid = candidate.GetComponent<FX::IDComponent>().ID;
+
+                        // Ayni isimde birden fazla entity olabilir; ImGui'nin
+                        // ID yiginina UUID'yi itiyoruz ki secimler karismasin.
+                        ImGui::PushID(static_cast<int>(static_cast<std::uint64_t>(uuid)));
+                        if (ImGui::Selectable(tag.c_str(), uuid == fc.Target.Target))
+                            fc.Target.Target = uuid;
+                        ImGui::PopID();
+                    }
+                    ImGui::EndCombo();
+                }
+
+                DrawFloatControl("Hiz", fc.Speed, 0.1f);
+                DrawFloatControl("Durma mesafesi", fc.StopDistance, 0.1f);
+
+                // FollowSystem, Velocity'ye YAZIYOR. Velocity yoksa
+                // sistem bu entity'yi hic gormez (view uc component istiyor).
+                // Kullaniciyi bu sessiz basarisizliktan haberdar et.
+                if (!entity.HasComponent<FX::VelocityComponent>())
+                {
+                    ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.3f, 1.0f),
+                                       "Velocity component'i gerekli!");
+                    if (ImGui::Button("Velocity Ekle"))
+                        entity.AddComponent<FX::VelocityComponent>();
+                }
+            }
+
+            if (!keep)
+                entity.RemoveComponent<FX::FollowComponent>();
+        }
+
         ImGui::Separator();
         DrawAddComponentMenu(entity);
     }
@@ -308,9 +411,26 @@ namespace FXEd
                 }
             }
 
+            if (!entity.HasComponent<FX::FollowComponent>())
+            {
+                if (ImGui::MenuItem("Follow"))
+                {
+                    entity.AddComponent<FX::FollowComponent>();
+
+                    // FollowSystem uc component istiyor; Velocity yoksa
+                    // takip sessizce calismaz. Kullaniciyi bu tuzaga
+                    // dusurmek yerine eksigi kendimiz tamamliyoruz.
+                    if (!entity.HasComponent<FX::VelocityComponent>())
+                        entity.AddComponent<FX::VelocityComponent>();
+
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+
             // Hicbir sey eklenemiyorsa kullaniciya sebebini soyle.
             if (entity.HasComponent<FX::SpriteRendererComponent>() &&
-                entity.HasComponent<FX::VelocityComponent>())
+                entity.HasComponent<FX::VelocityComponent>() &&
+                entity.HasComponent<FX::FollowComponent>())
             {
                 ImGui::TextDisabled("Eklenebilecek component yok");
             }

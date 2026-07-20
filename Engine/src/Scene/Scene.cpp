@@ -7,26 +7,73 @@ namespace FX
 {
     Entity Scene::CreateEntity(const std::string& name)
     {
+        // Varsayilan UUID yapicisi rastgele uretir.
+        return CreateEntityWithUUID(UUID(), name);
+    }
+
+    Entity Scene::CreateEntityWithUUID(UUID uuid, const std::string& name)
+    {
         Entity entity{ m_Registry.create(), this };
 
-        // HER entity Tag ve Transform alir.
+        // HER entity uc sey alir: kimlik, ad, konum.
         //
-        // Bu bir tasarim karari: teknik olarak Transform'suz bir entity
-        // mumkun (orn. saf bir "oyun ayarlari" nesnesi). Ama editorde
-        // her seyin konumu ve adi olmasi hayati kolaylastirir - Hierarchy
-        // paneli isim, Inspector konum gosterecek (Faz 6).
-        //
-        // Unity, Godot ve Hazel de ayni tercihi yapar. Kural degil,
-        // yaygin ve pratik bir varsayim.
+        // IDComponent Faz 8'de eklendi ve digerlerinden farkli bir
+        // statude: Tag ve Transform "pratik varsayimlar"di, ID ise
+        // ZORUNLU - kimliksiz entity serilestirilemez ve referans
+        // verilemez.
+        entity.AddComponent<IDComponent>(uuid);
         entity.AddComponent<TagComponent>(name);
         entity.AddComponent<TransformComponent>();
+
+        m_EntityMap[uuid] = entity.GetHandle();
 
         return entity;
     }
 
     void Scene::DestroyEntity(Entity entity)
     {
+        if (!entity)
+            return;
+
+        // ONCE haritadan cikar, SONRA registry'den sil.
+        // Ters yapsaydik, silinmis entity'nin IDComponent'ini okumaya
+        // calisirdik - tanimsiz davranis.
+        if (entity.HasComponent<IDComponent>())
+            m_EntityMap.erase(entity.GetComponent<IDComponent>().ID);
+
         m_Registry.destroy(entity);
+    }
+
+    void Scene::Clear()
+    {
+        m_Registry.clear();
+        m_EntityMap.clear();
+    }
+
+    Entity Scene::FindEntityByUUID(UUID uuid)
+    {
+        const auto it = m_EntityMap.find(uuid);
+        if (it == m_EntityMap.end())
+            return {};   // gecersiz Entity - cagiran `if (e)` ile kontrol eder
+
+        // Harita ile registry'nin ayrisma ihtimaline karsi dogrula.
+        // Normalde olmamali ama registry'ye disaridan erisim acik
+        // oldugu surece bu kontrol ucuz bir sigortadir.
+        if (!m_Registry.valid(it->second))
+            return {};
+
+        return Entity{ it->second, this };
+    }
+
+    Entity Scene::FindEntityByName(const std::string& name)
+    {
+        auto view = m_Registry.view<TagComponent>();
+        for (auto id : view)
+        {
+            if (view.get<TagComponent>(id).Tag == name)
+                return Entity{ id, this };
+        }
+        return {};
     }
 
     std::uint32_t Scene::GetEntityCount() const
@@ -47,10 +94,11 @@ namespace FX
         // SISTEM SIRASI BURADA TANIMLIDIR ve bu, Scene sinifinin
         // varlik sebebidir.
         //
-        // Su an tek sistem var ama sira zaten onemli olacak:
-        //   Input -> Movement -> Physics -> Collision -> Script
-        // Carpisma, hareketten SONRA calismali; yoksa bir kare gecikmeli
-        // carpisma tespiti yaparsin ve nesneler duvarlara girer.
+        //   Follow -> Movement
+        // Sira onemli: FollowSystem hedefe dogru bir HIZ yaziyor,
+        // MovementSystem o hizi konuma uyguluyor. Ters olsaydi takip
+        // her zaman bir kare gecikmeli calisirdi.
+        FollowSystem::Update(*this, dt);
         MovementSystem::Update(m_Registry, dt);
     }
 

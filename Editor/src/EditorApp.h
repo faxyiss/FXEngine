@@ -11,6 +11,7 @@
 #include <FXEngine/Renderer/Framebuffer.h>
 #include <FXEngine/Scene/Scene.h>
 #include <FXEngine/Scene/Entity.h>
+#include <FXEngine/Core/UUID.h>
 
 #include "ImGuiLayer.h"
 #include "Panels/SceneHierarchyPanel.h"
@@ -50,7 +51,19 @@ namespace FXEd
 
         // --- Sahne -------------------------------------------------------------
         std::unique_ptr<FX::Scene> m_Scene;
-        FX::Entity m_PlayerEntity;
+
+        // FAZ 8 DEGISIKLIGI: Artik Entity tutamagi degil UUID sakliyoruz.
+        //
+        // Faz 7'de m_PlayerEntity bir tutamakti ve sahne yuklendiginde
+        // gecersiz kaliyordu - elle temizlemek zorundaydik. UUID kalici
+        // oldugu icin yukleme sonrasi da GECERLI: sadece FindEntityByUUID
+        // ile cozmemiz yeterli.
+        //
+        // Bu, Faz 8'in getirdigi degisimin en somut ornegi.
+        FX::UUID m_PlayerUUID{ 0 };
+
+        // Her karede degil, ihtiyac aninda cozulur.
+        FX::Entity GetPlayer();
 
         // --- Editor arayuzu ----------------------------------------------------
         ImGuiLayer          m_ImGuiLayer;

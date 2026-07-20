@@ -21,6 +21,27 @@
 
 namespace FX
 {
+    class Scene;
+
+    // -----------------------------------------------------------------------
+    // FollowSystem - FollowComponent'in hedefine dogru hiz yazar
+    // -----------------------------------------------------------------------
+    // Faz 8'in kanit sistemi: UUID ile kurulmus referanslarin gercekten
+    // calistigini gosterir.
+    //
+    // DIKKAT: Bu sistem digerlerinden farkli olarak registry degil SCENE
+    // aliyor. Sebep: UUID cozumlemesi icin Scene::FindEntityByUUID gerekiyor
+    // ve o harita registry'de degil, Scene'de yasiyor.
+    //
+    // Bu bir tasarim gerilimi: sistemler ideal olarak sadece registry'ye
+    // bagimli olmali (test etmesi kolay olsun diye). Ama referans
+    // cozumlemesi sahne capinda bir islem. Kabul edip acikca yaziyoruz.
+    class FollowSystem
+    {
+    public:
+        static void Update(Scene& scene, float dt);
+    };
+
     // -----------------------------------------------------------------------
     // MovementSystem - Velocity'yi Transform'a uygular
     // -----------------------------------------------------------------------

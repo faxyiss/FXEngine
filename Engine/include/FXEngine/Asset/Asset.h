@@ -49,6 +49,24 @@ namespace FX
     // cöplugu yaratirdi.
     AssetType AssetTypeFromExtension(const std::string& extension);
 
+    // Doku ice aktarma ayarlari. .meta dosyasinda saklanir, yani
+    // DOSYA BASINA ve KALICI.
+    //
+    // Onceden bu ayarlar ilk yukleyen cagirandan geliyordu: aynı dosyayi
+    // farkli ayarlarla isteyen ikinci cagiran sessizce ilkininkini
+    // aliyordu ve TextureLibrary bunu uyari basarak haber vermek
+    // zorunda kaliyordu. Ayar dosyaya bagli olunca "kim once istedi"
+    // sorusu tumden ortadan kalkiyor.
+    struct TextureImportSettings
+    {
+        // Varsayilan Nearest: bu bir 2D motor ve varliklarin cogu
+        // pixel-art. (Faz 12'de verilen karar, artik dosya basina
+        // degistirilebilir.)
+        bool  Nearest        = true;
+        bool  Repeat         = false;   // false = ClampToEdge
+        bool  GenerateMipmaps = true;
+    };
+
     // Bir varlik hakkinda bildiklerimiz. Yol PROJE KOKUNE goreli ve
     // '/' ayirici kullanir; boylece .meta dosyalari platformlar arasi
     // tasinabilir.
@@ -57,6 +75,9 @@ namespace FX
         AssetHandle Handle{ 0 };
         std::string RelativePath;
         AssetType   Type = AssetType::None;
+
+        // Sadece Type == Texture icin anlamli.
+        TextureImportSettings TextureSettings;
 
         bool IsValid() const { return Handle.IsValid() && Type != AssetType::None; }
     };

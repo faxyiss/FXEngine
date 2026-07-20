@@ -1,0 +1,10 @@
+﻿{
+    "Version": 1,
+    "Guid": 7311204458821736401,
+    "Type": "Texture",
+    "Texture": {
+        "Nearest": true,
+        "Repeat": true,
+        "GenerateMipmaps": true
+    }
+}

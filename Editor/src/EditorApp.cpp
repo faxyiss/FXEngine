@@ -418,11 +418,16 @@ namespace FXEd
 
     void EditorApp::StartWithoutProject()
     {
-        FX::TextureSpec tilingSpec;
-        tilingSpec.WrapS = FX::TextureWrap::Repeat;
-        tilingSpec.WrapT = FX::TextureWrap::Repeat;
+        // Varlik taramasi doku YUKLEMEDEN once: ayarlar .meta'dan
+        // geliyor ve tablo bos olsaydi varsayilanlara duserdik.
+        // (Projeli modda bunu Project::Load yapiyor.)
+        FX::AssetManager::ScanProject();
 
-        m_Checkerboard = m_TextureLibrary.Load("assets/textures/checkerboard.png", tilingSpec);
+        // Sarma ayari artik BURADA verilmiyor: checkerboard.png'nin
+        // kendi .meta dosyasinda "Repeat: true" yaziyor. Zemin dosemesi
+        // TilingFactor ile tekrarlanabilsin diye gerekli olan ayar,
+        // artik dokunun kalici bir ozelligi.
+        m_Checkerboard = m_TextureLibrary.Load("assets/textures/checkerboard.png");
         m_Circle       = m_TextureLibrary.Load("assets/textures/circle.png");
 
         if (!m_Checkerboard || !m_Circle)

@@ -65,6 +65,11 @@ namespace FX
 
         static void OnAssetDeleted(const std::string& relativePath);
 
+        // Ice aktarma ayarlarini degistirir ve .meta'ya yazar.
+        // Doku zaten yuklenmisse cagiranin onu yeniden yuklemesi gerekir.
+        static bool UpdateTextureSettings(AssetHandle handle,
+                                          const TextureImportSettings& settings);
+
         // Bir varligin .meta dosyasinin yolu ("x.png" -> "x.png.meta").
         static std::string MetaPathFor(const std::string& relativePath);
 

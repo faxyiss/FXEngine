@@ -256,7 +256,7 @@ gerekmiyor, doğru çözüm ayrı bir faz.
 - [x] Projesiz mod hâlâ çalışıyor ama artık uyarıyor
 - [x] Açılışta proje seçme ekranı (launcher): son projeler, aç/oluştur, projesiz devam
 - [ ] `AssetDirectory` gerçekten kullanılsın (şimdilik `assets` varsayılıyor)
-- [ ] **`.meta` dosyaları + GUID tabanlı `AssetManager`** → kendi fazı olmalı
+- [x] **`.meta` dosyaları + GUID tabanlı `AssetManager`** → ✅ Faz 22
 
 Ayrıntılar: [Faz-21-Notlar.md](Faz-21-Notlar.md)
 
@@ -265,6 +265,26 @@ yer" farklı şeylerdir. Bu ayrımı yapmayan araçlar taşınabilir olmaz.
 
 > `AssetManager` (Faz 12'de ertelendi) buraya bağlı: GUID→yol tablosunun
 > taranacağı bir *proje kökü* olmadan varlık veritabanı kurulamaz.
+
+---
+
+## Faz 22 — AssetManager (GUID tabanlı varlık kimliği) ✅ TAMAM
+
+Faz 12'den beri açık duran borç: varlığın kimliği dosya yoluydu.
+
+- [x] `AssetHandle` / `AssetType` / `AssetMetadata`
+- [x] Her varlığın yanında `.meta` (GUID + içe aktarma ayarları)
+- [x] `AssetManager`: proje taraması, GUID↔yol tablosu
+- [x] Sahne sürümü 4 — `TextureHandle` (GUID); sürüm ≤3 otomatik dönüşüyor
+- [x] Doku ayarları `.meta`'da → `TextureLibrary` spec çakışması bitti
+- [x] İçerik paneli: `.meta` taşıma/gizleme, taşımada referans korunuyor
+- [ ] Inspector'da doku ayarları arayüzü
+- [ ] Prefab / `StartScene` referansları da GUID'e geçsin
+
+Ayrıntılar: [Faz-22-Notlar.md](Faz-22-Notlar.md)
+
+**Öğrenilen:** Kimlik ile konum ayrı şeylerdir — üçüncü kez (Faz 8 entity,
+Faz 21 proje, Faz 22 varlık).
 
 ---
 
@@ -295,11 +315,11 @@ MVP sırasında bilinçli olarak bıraktıklarımız:
 | ~~Editör kamerası `EditorApp` içinde~~ | ✅ Faz 10'da `EditorCamera` sınıfına taşındı. | — |
 | ~~Sahne yolu koda gömülü~~ | ✅ Faz 12'de dosya diyaloğuyla çözüldü. | — |
 | Hata durumunda yedek doku yok | Texture yüklenemezse `nullptr`; mor "eksik doku" dokusu daha iyi olurdu. | `TextureLibrary.cpp` |
-| Doku ayarı dosya başına saklanamıyor | Filtre/sarma yalnızca ilk yüklemede belirleniyor; sahne dosyası sadece *yolu* saklıyor. Kalıcı ayar `.fxmeta` gerektiriyor → Faz 21. Şimdilik farklı spec istenirse uyarı basılıyor. | `TextureLibrary.cpp` (Faz 12) |
+| ~~Doku ayarı dosya başına saklanamıyor~~ | ✅ Faz 22'de `.meta` dosyalarına taşındı; spec çakışması ve uyarısı ortadan kalktı. | — |
 | **Varlık kimliği = dosya yolu** | Dosyayı taşımak/yeniden adlandırmak tüm referansları koparır. Çözüm: `.meta` dosyaları + GUID tabanlı `AssetManager`. | `SceneSerializer`, `TextureLibrary` (Faz 12) |
 | Dosya diyalogları sadece Win32 | Linux/macOS'ta boş gövde derleniyor; `nfd` veya portal gerekli. | `Editor/src/Platform/FileDialogs.cpp` |
 | ~~Proje klasörü kavramı yok~~ | ✅ Faz 21'de `.fxproject` + iki ayrı kök ile çözüldü. | — |
-| Dosya izleyici yok | Klasör dışarıdan değişirse panel fark etmiyor; elle "Yenile" gerekiyor. | `ContentBrowserPanel.cpp` (Faz 12) |
+| Dosya izleyici yok | Klasör dışarıdan değişirse panel **ve varlık tablosu** fark etmiyor; elle "Yenile" gerekiyor. | `ContentBrowserPanel.cpp`, `AssetManager.cpp` |
 | Prefab bağlantısı yok | Örnek kaynağından bağımsız; kaynak değişince örnekler güncellenmiyor (override sistemi yok). | `PrefabSerializer.cpp` (Faz 12) |
 | `GetRegistry()` çok açık | Registry'ye doğrudan `create`/`destroy` çağırmak UUID haritasını bozar. Daha dar bir erişim gerekebilir. | `Scene.h` (Faz 8) |
 | `FollowSystem` Scene'e bağımlı | Diğer sistemler sadece registry alıyor, bu Scene alıyor (UUID haritası için). Test etmesi daha zor. | `Systems.cpp` (Faz 8) |

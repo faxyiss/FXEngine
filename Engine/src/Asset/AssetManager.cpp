@@ -115,6 +115,15 @@ namespace FX
         j["Guid"]    = static_cast<std::uint64_t>(meta.Handle);
         j["Type"]    = AssetTypeToString(meta.Type);
 
+        if (meta.Type == AssetType::Texture)
+        {
+            j["Texture"] = {
+                { "Nearest",         meta.TextureSettings.Nearest },
+                { "Repeat",          meta.TextureSettings.Repeat },
+                { "GenerateMipmaps", meta.TextureSettings.GenerateMipmaps }
+            };
+        }
+
         const std::string full =
             FileSystem::ResolveProjectAsset(MetaPathFor(meta.RelativePath));
 
@@ -151,6 +160,17 @@ namespace FX
                 {
                     meta.Handle = AssetHandle(guid);
 
+                    if (type == AssetType::Texture && j.contains("Texture"))
+                    {
+                        const auto& t = j["Texture"];
+                        meta.TextureSettings.Nearest =
+                            t.value("Nearest", true);
+                        meta.TextureSettings.Repeat =
+                            t.value("Repeat", false);
+                        meta.TextureSettings.GenerateMipmaps =
+                            t.value("GenerateMipmaps", true);
+                    }
+
                     // Tur .meta'da yaziyor ama UZANTIYA guveniyoruz:
                     // dosya yeniden adlandirilip uzantisi degismis
                     // olabilir ve o durumda gercek olan uzantidir.
@@ -182,13 +202,13 @@ namespace FX
     {
         Clear();
 
-        if (!Project::HasActive())
-        {
-            FX_CORE_WARN("AssetManager: acik proje yok, tarama atlandi.");
-            return;
-        }
-
-        const std::string assetDir = Project::GetActive()->GetConfig().AssetDirectory;
+        // Proje yoksa da tariyoruz: FileSystem o durumda exe klasorune
+        // dusuyor ve oradaki ornek varliklarin da kimligi olmali.
+        // "Projesiz devam et" modunda dokularin .meta ayarlari yine
+        // gecerli olsun istiyoruz.
+        const std::string assetDir = Project::HasActive()
+                                   ? Project::GetActive()->GetConfig().AssetDirectory
+                                   : std::string("assets");
         const std::string rootFull = FileSystem::ResolveProjectAsset(assetDir);
 
         std::error_code ec;
@@ -336,6 +356,17 @@ namespace FX
             FileSystem::ResolveProjectAsset(MetaPathFor(oldRel));
         if (std::filesystem::exists(oldMeta, ec))
             std::filesystem::remove(oldMeta, ec);
+    }
+
+    bool AssetManager::UpdateTextureSettings(AssetHandle handle,
+                                             const TextureImportSettings& settings)
+    {
+        const auto it = s_Assets.find(handle);
+        if (it == s_Assets.end() || it->second.Type != AssetType::Texture)
+            return false;
+
+        it->second.TextureSettings = settings;
+        return WriteMeta(it->second);
     }
 
     void AssetManager::OnAssetDeleted(const std::string& relativePath)

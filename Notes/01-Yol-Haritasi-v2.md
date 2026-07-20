@@ -143,8 +143,11 @@ Faz 22'nin bıraktığı tutarlılık açığı.
       prefab hepsi tüketici olacak.
 - [ ] **0.3 — Entity çoklu seçimi.** Ctrl/Shift, gizmoyla toplu
       dönüşüm, toplu silme.
-- [ ] **0.4 — Dosya izleyici.** `ReadDirectoryChangesW` + tek thread +
-      debounce; `AssetManager` ve içerik paneli diskle senkron kalacak.
+- [x] **0.4 — Dosya izleyici.** `FX::FileWatcher`
+      (`ReadDirectoryChangesW` + tek thread + debounce). Dışarıdan
+      yeniden adlandırma/taşıma GUID'i koruyor, yeni dosyaya `.meta`
+      üretiliyor, silinende temizleniyor.
+      Ayrıntı: [Borc-04-Dosya-Izleyici.md](Borc-04-Dosya-Izleyici.md)
 - [ ] **0.5 — Catch2 iskeleti.** `UUID`, `SceneSerializer`,
       `AssetManager` testleri.
 - [ ] **0.6 — Faz 22 artıkları.** Inspector'da doku ayarları arayüzü,
@@ -365,7 +368,7 @@ MVP sırasında bilinçli olarak bıraktıklarımız:
 | **Varlık kimliği = dosya yolu** | Dosyayı taşımak/yeniden adlandırmak tüm referansları koparır. Çözüm: `.meta` dosyaları + GUID tabanlı `AssetManager`. | `SceneSerializer`, `TextureLibrary` (Faz 12) |
 | Dosya diyalogları sadece Win32 | Linux/macOS'ta boş gövde derleniyor; `nfd` veya portal gerekli. | `Editor/src/Platform/FileDialogs.cpp` |
 | ~~Proje klasörü kavramı yok~~ | ✅ Faz 21'de `.fxproject` + iki ayrı kök ile çözüldü. | — |
-| Dosya izleyici yok | Klasör dışarıdan değişirse panel **ve varlık tablosu** fark etmiyor; elle "Yenile" gerekiyor. | `ContentBrowserPanel.cpp`, `AssetManager.cpp` |
+| ~~Dosya izleyici yok~~ | ✅ 0.4'te `FX::FileWatcher` ile çözüldü (Windows). Linux/macOS gövdesi hâlâ boş. | `Core/FileWatcher.cpp` |
 | Prefab bağlantısı yok | Örnek kaynağından bağımsız; kaynak değişince örnekler güncellenmiyor (override sistemi yok). | `PrefabSerializer.cpp` (Faz 12) |
 | `GetRegistry()` çok açık | Registry'ye doğrudan `create`/`destroy` çağırmak UUID haritasını bozar. Daha dar bir erişim gerekebilir. | `Scene.h` (Faz 8) |
 | `FollowSystem` Scene'e bağımlı | Diğer sistemler sadece registry alıyor, bu Scene alıyor (UUID haritası için). Test etmesi daha zor. | `Systems.cpp` (Faz 8) |

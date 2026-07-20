@@ -15,6 +15,7 @@ set(FXENGINE_SOURCES
     src/Core/Application.cpp
     src/Core/FileSystem.cpp
     src/Core/Project.cpp
+    src/Core/FileWatcher.cpp
     src/Asset/AssetManager.cpp
     src/Core/UUID.cpp
     src/Renderer/Shader.cpp
@@ -41,6 +42,7 @@ set(FXENGINE_HEADERS
     include/FXEngine/Core/Application.h
     include/FXEngine/Core/FileSystem.h
     include/FXEngine/Core/Project.h
+    include/FXEngine/Core/FileWatcher.h
     include/FXEngine/Asset/Asset.h
     include/FXEngine/Asset/AssetManager.h
     include/FXEngine/Core/UUID.h

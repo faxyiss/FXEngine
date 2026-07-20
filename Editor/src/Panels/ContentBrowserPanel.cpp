@@ -139,6 +139,11 @@ namespace FXEd
         }
 
         m_NeedsRefresh = true;
+
+        // Izleyici KOKU izliyor, gezilen klasoru degil: baska bir klasorde
+        // yapilan degisiklik de varlik tablosunu bozar, gorunmuyor olmasi
+        // onemli degil.
+        m_Watcher.Start(m_Root.string());
     }
 
     bool ContentBrowserPanel::TakeImportRequest()
@@ -157,6 +162,92 @@ namespace FXEd
             FX::FileSystem::MakeRelativeToProject(m_OpenRequest.string());
         m_OpenRequest.clear();
         return relative;
+    }
+
+    void ContentBrowserPanel::ProcessFileChanges()
+    {
+        std::vector<FX::FileChange> changes = m_Watcher.Poll();
+        if (changes.empty())
+            return;
+
+        // Tasima, ayni klasor icinde ad degisikligiyse Windows bize
+        // Renamed veriyor; klasorler arasi tasimada bazen Removed + Added
+        // ciftine bolunuyor. Ciftleri EN AZINDAN ayni yiginda esleyip
+        // tasima sayiyoruz - yoksa dosya yeni bir GUID alir ve sahnedeki
+        // referans kopardi. Izleyicinin var olma sebebi tam olarak bu.
+        auto fileName = [](const std::string& p) {
+            const auto slash = p.find_last_of('/');
+            return slash == std::string::npos ? p : p.substr(slash + 1);
+        };
+
+        for (auto& removed : changes)
+        {
+            if (removed.Action != FX::FileAction::Removed)
+                continue;
+
+            for (auto& added : changes)
+            {
+                if (added.Action != FX::FileAction::Added ||
+                    fileName(added.Path) != fileName(removed.Path))
+                    continue;
+
+                added.Action  = FX::FileAction::Renamed;
+                added.OldPath = removed.Path;
+                removed.Path.clear();     // isleme alinmasin
+                removed.Action = FX::FileAction::Modified;
+                break;
+            }
+        }
+
+        bool tableChanged = false;
+
+        for (const FX::FileChange& change : changes)
+        {
+            // Bos yol = izleyicinin tamponu tasti, ne degistigini bilmiyor.
+            if (change.Path.empty() && change.OldPath.empty())
+            {
+                FX::AssetManager::ScanProject();
+                tableChanged = true;
+                continue;
+            }
+
+            // .meta dosyalarinin kendi olaylari ilgilendirmiyor: onlari
+            // zaten varligin yaninda biz yonetiyoruz. Islersek varligi
+            // silinmis sanip GUID'i atardik.
+            if (FX::AssetManager::IsMetaFile(change.Path) ||
+                FX::AssetManager::IsMetaFile(change.OldPath))
+                continue;
+
+            const std::string relative = change.Path.empty()
+                                             ? std::string{}
+                                             : "assets/" + change.Path;
+
+            switch (change.Action)
+            {
+                case FX::FileAction::Added:
+                    FX::AssetManager::Register(relative);
+                    tableChanged = true;
+                    break;
+
+                case FX::FileAction::Removed:
+                    FX::AssetManager::OnAssetDeleted(relative);
+                    tableChanged = true;
+                    break;
+
+                case FX::FileAction::Renamed:
+                    FX::AssetManager::OnAssetMoved("assets/" + change.OldPath, relative);
+                    tableChanged = true;
+                    break;
+
+                case FX::FileAction::Modified:
+                    break;
+            }
+        }
+
+        if (tableChanged)
+            SetMessage("Klasor disaridan degisti, varlik tablosu guncellendi");
+
+        Refresh();
     }
 
     void ContentBrowserPanel::RefreshIfNeeded()
@@ -249,6 +340,10 @@ namespace FXEd
 
     void ContentBrowserPanel::OnImGuiRender()
     {
+        // Panel gizli olsa bile isleniyor: varlik tablosunun diskle
+        // tutarliligi panelin gorunur olmasina bagli olamaz.
+        ProcessFileChanges();
+
         // Begin'in donusunu kontrol ediyoruz: panel katlanmis/gizliyse
         // ImGui widget'lari zaten atlar ama BIZIM klasor okuma ve doku
         // yukleme isimiz yine de calisirdi.

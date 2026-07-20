@@ -13,6 +13,7 @@
 // Kok her zaman <exe>/assets; disari cikilamaz.
 // ===========================================================================
 
+#include <FXEngine/Core/FileWatcher.h>
 #include <FXEngine/Renderer/TextureLibrary.h>
 
 #include <imgui.h>
@@ -107,6 +108,13 @@ namespace FXEd
                            const ImVec2& min, const ImVec2& max);
 
         void RefreshIfNeeded();
+
+        // Disaridan (Explorer, baska bir program) yapilan degisiklikleri
+        // varlik tablosuna isler. Panel yalnizca gorunumu tazeliyor;
+        // asil is GUID'in dogru dosyada kalmasi.
+        void ProcessFileChanges();
+
+        FX::FileWatcher m_Watcher;
 
         FX::TextureLibrary* m_Library = nullptr;
 

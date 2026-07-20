@@ -35,6 +35,16 @@ namespace FX
         //     -> "C:/FXEngine/build/bin/assets/shaders/X.vert"
         static std::string ResolveAsset(const std::string& relativePath);
 
+        // ResolveAsset'in TERSI. Dosya diyaloglari mutlak yol dondurur ama
+        // sahne dosyasina mutlak yol yazmak felakettir: proje baska bir
+        // makineye kopyalandiginda hicbir texture bulunamaz. Varlik yollari
+        // her zaman exe klasorune GORECELI saklanmali.
+        //
+        // Yol base dizinin disindaysa oldugu gibi doner (baska care yok).
+        // Ayirici olarak '/' kullanir - dosyalarin platformlar arasi
+        // tasinabilir olmasi icin.
+        static std::string MakeRelativeToBase(const std::string& absolutePath);
+
         static bool Exists(const std::string& path);
     };
 }

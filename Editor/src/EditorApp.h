@@ -15,8 +15,11 @@
 
 #include "ImGuiLayer.h"
 #include "Panels/SceneHierarchyPanel.h"
+#include "Panels/ContentBrowserPanel.h"
 
+#include <deque>
 #include <memory>
+#include <string>
 
 namespace FXEd
 {
@@ -37,9 +40,25 @@ namespace FXEd
         void BuildScene();
         void SpawnMover();
 
-        // Faz 7: sahne kaydet/yukle
-        void SaveScene();
-        void LoadScene();
+        // --- Sahne dosyasi islemleri (Faz 12) ---------------------------------
+        void NewScene();
+        void SaveScene();                              // yol yoksa SaveSceneAs
+        void SaveSceneAs();
+        void OpenScene();                              // dosya diyalogu acar
+        void OpenScene(const std::string& path);       // dogrudan yukler
+
+        // Son acilan sahneler exe'nin yanindaki editor.json'da tutulur.
+        void LoadEditorConfig();
+        void SaveEditorConfig();
+        void PushRecentScene(const std::string& path);
+
+        // Icerik panelinden viewport'a birakilan dosyayi ele alir.
+        void HandleContentDrop(const std::string& relativePath);
+
+        // Fare ekran konumu -> sahne dunya konumu.
+        glm::vec2 ScreenToWorld(float screenX, float screenY) const;
+
+        void SetStatus(const std::string& message);
 
         void UpdateCameraMovement(float dt);
         void UpdateCameraProjection();
@@ -72,6 +91,7 @@ namespace FXEd
         // --- Editor arayuzu ----------------------------------------------------
         ImGuiLayer          m_ImGuiLayer;
         SceneHierarchyPanel m_HierarchyPanel;
+        ContentBrowserPanel m_ContentBrowser;
 
         // Sahne artik dogrudan ekrana degil, BUNA ciziliyor.
         // Sonra texture'i ImGui panelinde gosteriyoruz.
@@ -104,9 +124,14 @@ namespace FXEd
         std::shared_ptr<FX::Texture2D> m_Checkerboard;
         std::shared_ptr<FX::Texture2D> m_Circle;
 
-        // Sahne dosyasinin yolu. Gercek bir editorde dosya secme
-        // penceresi olurdu; MVP icin sabit yol yeterli.
-        std::string m_ScenePath = "assets/scenes/Sahne.fxscene";
+        // Acik sahnenin yolu. BOS = "henuz kaydedilmedi"; Ctrl+S bu durumda
+        // Farkli Kaydet diyalogunu acar. Faz 7'deki sabit yol kalkti.
+        std::string m_ScenePath;
+
+        // En yenisi basta. deque cunku hem basa ekleyip hem sondan
+        // atiyoruz; vector'de bas ekleme her seferinde tum diziyi kaydirirdi.
+        std::deque<std::string> m_RecentScenes;
+        static constexpr std::size_t kMaxRecentScenes = 8;
 
         // Son islemin sonucu - menude kullaniciya geri bildirim icin.
         std::string m_StatusMessage;

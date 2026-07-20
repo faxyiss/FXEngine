@@ -11,7 +11,11 @@ add_executable(FXEditor
     src/ImGuiLayer.cpp
     src/ImGuiLayer.h
     src/Panels/SceneHierarchyPanel.cpp
-    src/Panels/SceneHierarchyPanel.h)
+    src/Panels/SceneHierarchyPanel.h
+    src/Panels/ContentBrowserPanel.cpp
+    src/Panels/ContentBrowserPanel.h
+    src/Platform/FileDialogs.cpp
+    src/Platform/FileDialogs.h)
 
 target_include_directories(FXEditor PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
@@ -31,6 +35,12 @@ target_link_libraries(FXEditor PRIVATE
 # DLL'i kendi klasorunde veya PATH'te arar. Bu adim olmadan program
 # "SDL3.dll bulunamadi" diye acilmaz. $<TARGET_RUNTIME_DLLS> CMake'e
 # "bu exe'nin ihtiyac duydugu tum DLL'leri bul" der.
+# comdlg32: GetOpenFileName/GetSaveFileName (yerel dosya diyaloglari).
+# Sadece Windows'ta; FileDialogs.cpp diger platformlarda bos govde derliyor.
+if(WIN32)
+    target_link_libraries(FXEditor PRIVATE comdlg32)
+endif()
+
 if(WIN32)
     add_custom_command(TARGET FXEditor POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different

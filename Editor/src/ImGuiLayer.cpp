@@ -117,10 +117,12 @@ namespace FXEd
         const ImGuiID left  = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left,  0.18f, nullptr, &center);
         const ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.24f, nullptr, &center);
         const ImGuiID leftBottom = ImGui::DockBuilderSplitNode(left, ImGuiDir_Down, 0.45f, nullptr, nullptr);
+        const ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, 0.28f, nullptr, &center);
 
         ImGui::DockBuilderDockWindow("Hierarchy",      left);
         ImGui::DockBuilderDockWindow("Istatistikler",  leftBottom);
         ImGui::DockBuilderDockWindow("Inspector",      right);
+        ImGui::DockBuilderDockWindow("Icerik",         bottom);
         ImGui::DockBuilderDockWindow("Viewport",       center);
 
         ImGui::DockBuilderFinish(dockspaceID);

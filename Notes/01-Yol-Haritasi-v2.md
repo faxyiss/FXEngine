@@ -97,20 +97,25 @@ Ayrıntılar: [Faz-11-Notlar.md](Faz-11-Notlar.md)
 
 ---
 
-## Faz 12 — Varlık yönetimi + prefab
+## Faz 12 — Varlık yönetimi + prefab ✅ TAMAM
 
-Şu an sahne yolu **koda gömülü** (`assets/scenes/Sahne.fxscene`), texture
-seçimi Inspector'da iki seçenekli bir combo.
+- [x] `Content Browser` paneli — `assets/` klasörünü gezen dosya tarayıcısı
+- [x] Dosyadan viewport'a **sürükle-bırak** ile sprite oluşturma
+- [x] Yerel dosya diyalogları (Win32 `GetOpenFileName`/`GetSaveFileName`)
+- [x] **Prefab**: bir entity ağacını dosyaya kaydet, sahneye örnekle
+- [x] Son açılan sahneler listesi (`editor.json`)
+- [ ] `AssetManager` — **ertelendi**, aşağıya bak
 
-- [ ] `Content Browser` paneli — `assets/` klasörünü gezen dosya ağacı
-- [ ] Dosyadan viewport'a **sürükle-bırak** ile sprite oluşturma
-- [ ] Yerel dosya diyalogları (Windows: `IFileDialog`, taşınabilir: `nfd`)
-- [ ] `AssetManager` — `TextureLibrary`'nin genelleştirilmiş hâli
-- [ ] **Prefab**: bir entity ağacını dosyaya kaydet, sahneye örnekle
-- [ ] Son açılan sahneler listesi
+**Öğrenilen:** Varlık kimliği (asset handle) ile dosya yolu arasındaki fark;
+prefab örneklemenin özü olan **ID remapping**; mutlak yolun asla dosyaya
+yazılmaması.
 
-**Öğrenilecek:** Varlık kimliği (asset handle) ile dosya yolu arasındaki fark.
-Neath yol yerine UUID kullanmak taşımayı/yeniden adlandırmayı güvenli kılar.
+> **`AssetManager` neden ertelendi:** yol yerine UUID kullanmak, her varlığın
+> yanında bir `.meta` dosyası ve bir varlık veritabanı (proje taraması,
+> GUID→yol tablosu, dosya izleyici) gerektiriyor. Kendi başına bir faz.
+> Şimdilik yol = kimlik; taşıma/yeniden adlandırma referansları koparır.
+
+Ayrıntı: `Faz-12-Notlar.md`
 
 ---
 
@@ -242,8 +247,11 @@ MVP sırasında bilinçli olarak bıraktıklarımız:
 | Batch bölme yolu hacky | Slotlar dolunca `EndScene()` çağırıp elle durum düzeltiliyor. Ayrı bir `FlushAndReset()` olmalı. | `Renderer2D.cpp` |
 | `Shader::FromFiles` ham `new` | `unique_ptr` döndürmeli. | `Shader.cpp` |
 | Editör kamerası `EditorApp` içinde | Ayrı `EditorCamera` sınıfına taşınmalı (Faz 10'da zaten gerekecek). | `EditorApp.cpp` |
-| Sahne yolu koda gömülü | Faz 12'de dosya diyaloğuyla çözülecek. | `EditorApp.h` |
+| ~~Sahne yolu koda gömülü~~ | ✅ Faz 12'de dosya diyaloğuyla çözüldü. | — |
 | Hata durumunda yedek doku yok | Texture yüklenemezse `nullptr`; mor "eksik doku" dokusu daha iyi olurdu. | `TextureLibrary.cpp` |
+| **Varlık kimliği = dosya yolu** | Dosyayı taşımak/yeniden adlandırmak tüm referansları koparır. Çözüm: `.meta` dosyaları + GUID tabanlı `AssetManager`. | `SceneSerializer`, `TextureLibrary` (Faz 12) |
+| Dosya diyalogları sadece Win32 | Linux/macOS'ta boş gövde derleniyor; `nfd` veya portal gerekli. | `Editor/src/Platform/FileDialogs.cpp` |
+| Prefab bağlantısı yok | Örnek kaynağından bağımsız; kaynak değişince örnekler güncellenmiyor (override sistemi yok). | `PrefabSerializer.cpp` (Faz 12) |
 | `GetRegistry()` çok açık | Registry'ye doğrudan `create`/`destroy` çağırmak UUID haritasını bozar. Daha dar bir erişim gerekebilir. | `Scene.h` (Faz 8) |
 | `FollowSystem` Scene'e bağımlı | Diğer sistemler sadece registry alıyor, bu Scene alıyor (UUID haritası için). Test etmesi daha zor. | `Systems.cpp` (Faz 8) |
 | Test yok | Hiç birim testi yok. Serializer ve matematik en çok fayda sağlayacak yerler. | — |

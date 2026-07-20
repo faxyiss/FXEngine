@@ -1,4 +1,5 @@
 ﻿#include "EditorApp.h"
+#include "Platform/FileDialogs.h"
 
 #include <FXEngine/Core/Log.h>
 #include <FXEngine/Core/FileSystem.h>
@@ -6,15 +7,23 @@
 #include <FXEngine/Renderer/Renderer2D.h>
 #include <FXEngine/Scene/Components.h>
 #include <FXEngine/Scene/SceneSerializer.h>
+#include <FXEngine/Scene/PrefabSerializer.h>
 
 #include <imgui.h>
 #include <ImGuizmo.h>
 
+#include <nlohmann/json.hpp>
+
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/matrix_inverse.hpp>
 
 #include <SDL3/SDL.h>
 
+#include <algorithm>
 #include <cmath>
+#include <filesystem>
+#include <fstream>
+#include <iomanip>
 #include <random>
 
 namespace FXEd
@@ -33,7 +42,7 @@ namespace FXEd
     EditorApp::EditorApp()
         : FX::Application([]() {
               FX::WindowProps props;
-              props.Title     = "FXEditor - Faz 6";
+              props.Title     = "FXEditor - Faz 12";
               props.Width     = 1600;
               props.Height    = 900;
               props.VSync     = true;
@@ -46,7 +55,7 @@ namespace FXEd
     void EditorApp::OnInit()
     {
         FX_INFO("=====================================");
-        FX_INFO("  FXEditor - Faz 6: ImGui Editor");
+        FX_INFO("  FXEditor - Faz 12: Varlik yonetimi");
         FX_INFO("=====================================");
 
         FX::RenderCommand::Init();
@@ -92,14 +101,19 @@ namespace FXEd
         BuildScene();
 
         m_HierarchyPanel.SetContext(m_Scene.get());
-        m_HierarchyPanel.SetAvailableTextures(m_Checkerboard, m_Circle);
+        m_HierarchyPanel.SetTextureLibrary(&m_TextureLibrary);
         m_HierarchyPanel.SetSelectedEntity(GetPlayer());
+
+        m_ContentBrowser.SetContext(&m_TextureLibrary);
+
+        LoadEditorConfig();
 
         FX_INFO("");
         FX_INFO("Editor hazir. Panelleri surukleyerek yeniden duzenleyebilirsin;");
         FX_INFO("duzen imgui.ini'ye kaydedilir.");
         FX_INFO("Viewport uzerindeyken: W/A/S/D kamera, tekerlek zoom.");
-        FX_INFO("Ctrl+S kaydet, Ctrl+O yukle. Sahne dosyasi: %s", m_ScenePath.c_str());
+        FX_INFO("Ctrl+N yeni, Ctrl+O ac, Ctrl+S kaydet, Ctrl+Shift+S farkli kaydet.");
+        FX_INFO("Icerik panelinden viewport'a resim/prefab/sahne surukleyebilirsin.");
         FX_INFO("Viewport'ta sol tik ile entity sec.");
         FX_INFO("Gizmo: Z kapali, X tasi, C dondur, B olcekle (Ctrl = kademeli)");
     }
@@ -240,57 +254,238 @@ namespace FXEd
         return m_Scene->FindEntityByUUID(m_PlayerUUID);
     }
 
+    void EditorApp::SetStatus(const std::string& message)
+    {
+        m_StatusMessage = message;
+        m_StatusTimer   = 4.0f;
+    }
+
+    void EditorApp::NewScene()
+    {
+        m_Scene = std::make_unique<FX::Scene>();
+        m_PlayerUUID = FX::UUID{ 0 };
+        m_ScenePath.clear();
+
+        m_HierarchyPanel.SetContext(m_Scene.get());
+        SetStatus("Yeni bos sahne");
+    }
+
     void EditorApp::SaveScene()
     {
+        // Yol yoksa "kaydet" ile "farkli kaydet" ayni seydir. Sessizce
+        // varsayilan bir yola yazmak, kullanicinin dosyasini nereye
+        // koydugumuzu bilmemesi demek olurdu.
+        if (m_ScenePath.empty())
+        {
+            SaveSceneAs();
+            return;
+        }
+
         FX::SceneSerializer serializer(m_Scene.get(), &m_TextureLibrary);
 
         if (serializer.Serialize(m_ScenePath))
-            m_StatusMessage = "Sahne kaydedildi: " + m_ScenePath;
+        {
+            SetStatus("Kaydedildi: " + m_ScenePath);
+            PushRecentScene(m_ScenePath);
+        }
         else
-            m_StatusMessage = "KAYDEDILEMEDI! (assets/scenes/ klasoru var mi?)";
-
-        m_StatusTimer = 4.0f;
+        {
+            SetStatus("KAYDEDILEMEDI: " + m_ScenePath);
+        }
     }
 
-    void EditorApp::LoadScene()
+    void EditorApp::SaveSceneAs()
+    {
+        const std::string absolute =
+            FileDialogs::SaveFile(GetWindow(), FileDialogs::SceneFilter());
+
+        if (absolute.empty())
+            return;   // kullanici iptal etti, hata degil
+
+        // Mutlak degil GORECELI yol sakliyoruz: proje baska bir makineye
+        // kopyalandiginda "C:/Users/..." hicbir sey ifade etmez.
+        m_ScenePath = FX::FileSystem::MakeRelativeToBase(absolute);
+        SaveScene();
+    }
+
+    void EditorApp::OpenScene()
+    {
+        const std::string absolute =
+            FileDialogs::OpenFile(GetWindow(), FileDialogs::SceneFilter());
+
+        if (absolute.empty())
+            return;
+
+        OpenScene(FX::FileSystem::MakeRelativeToBase(absolute));
+    }
+
+    void EditorApp::OpenScene(const std::string& path)
     {
         FX::SceneSerializer serializer(m_Scene.get(), &m_TextureLibrary);
 
-        if (serializer.Deserialize(m_ScenePath))
+        if (!serializer.Deserialize(path))
         {
-            m_StatusMessage = "Sahne yuklendi: " + m_ScenePath;
+            SetStatus("YUKLENEMEDI: " + path);
+            return;
+        }
 
-            // ===============================================================
-            // FAZ 8 FARKI:
-            //
-            // Faz 7'de burada "m_PlayerEntity = {}" yazmak ZORUNDAYDIK.
-            // Tutamaklar yuklemeden sonra gecersizdi ama GECERLI GORUNUYORDU
-            // (EnTT kimlikleri geri donusturur), dolayisiyla korlemesine
-            // temizlemek tek guvenli secenekti - ve oyuncuya erisimi
-            // kaybediyorduk.
-            //
-            // Artik m_PlayerUUID sakliyoruz. Kimlik dosyada yaziyor, ayni
-            // degerle geri geliyor; hicbir sey temizlemeye gerek yok.
-            // Oyuncu, sahne yuklendikten sonra da bulunabilir durumda.
-            //
-            // Panel secimini yine de temizliyoruz: secili entity KULLANICI
-            // tercihiydi, yeni sahnede karsiligi olmayabilir. Bu, teknik
-            // bir zorunluluk degil, davranissal bir tercih.
-            // ===============================================================
-            m_HierarchyPanel.SetContext(m_Scene.get());
+        m_ScenePath = path;
+        SetStatus("Yuklendi: " + path);
+        PushRecentScene(path);
 
-            if (auto player = GetPlayer())
-                FX_INFO("Oyuncu yuklemeden sonra UUID ile bulundu: %llu",
-                        static_cast<unsigned long long>(m_PlayerUUID));
+        // Panel secimini temizliyoruz: secili entity KULLANICI tercihiydi,
+        // yeni sahnede karsiligi olmayabilir. m_PlayerUUID'ye dokunmuyoruz -
+        // kimlik dosyada yaziyor, ayni degerle geri geliyor (Faz 8).
+        m_HierarchyPanel.SetContext(m_Scene.get());
+
+        if (GetPlayer())
+            FX_INFO("Oyuncu yuklemeden sonra UUID ile bulundu: %llu",
+                    static_cast<unsigned long long>(m_PlayerUUID));
+    }
+
+    // -----------------------------------------------------------------------
+    // Editor tercihleri: exe'nin yaninda, imgui.ini ile ayni yerde.
+    // Sahne dosyasina yazamayiz - bunlar sahnenin degil KULLANICININ verisi
+    // ve baska bir sahne acildiginda da gecerli kalmali.
+    // -----------------------------------------------------------------------
+    void EditorApp::LoadEditorConfig()
+    {
+        const std::string path = FX::FileSystem::GetBaseDirectory() + "editor.json";
+
+        std::ifstream in(path);
+        if (!in)
+            return;   // ilk calistirma, dosya henuz yok
+
+        nlohmann::json doc;
+        try
+        {
+            in >> doc;
+        }
+        catch (const nlohmann::json::parse_error& err)
+        {
+            FX_WARN("editor.json bozuk, yok sayiliyor: %s", err.what());
+            return;
+        }
+
+        if (doc.contains("RecentScenes") && doc["RecentScenes"].is_array())
+        {
+            for (const auto& item : doc["RecentScenes"])
+            {
+                if (!item.is_string())
+                    continue;
+
+                // Silinmis dosyalari listeye alma: tiklandiginda hata
+                // verecek bir menu ogesi gostermenin anlami yok.
+                const std::string scene = item.get<std::string>();
+                if (FX::FileSystem::Exists(FX::FileSystem::ResolveAsset(scene)))
+                    m_RecentScenes.push_back(scene);
+            }
+        }
+
+        FX_INFO("editor.json okundu (%zu son sahne).", m_RecentScenes.size());
+    }
+
+    void EditorApp::SaveEditorConfig()
+    {
+        nlohmann::json doc;
+        doc["RecentScenes"] = m_RecentScenes;
+
+        std::ofstream out(FX::FileSystem::GetBaseDirectory() + "editor.json");
+        if (out)
+            out << std::setw(2) << doc << std::endl;
+    }
+
+    void EditorApp::PushRecentScene(const std::string& path)
+    {
+        // Zaten varsa cikar: tekrar eklemek listenin BASINA tasimak demek.
+        m_RecentScenes.erase(
+            std::remove(m_RecentScenes.begin(), m_RecentScenes.end(), path),
+            m_RecentScenes.end());
+
+        m_RecentScenes.push_front(path);
+
+        while (m_RecentScenes.size() > kMaxRecentScenes)
+            m_RecentScenes.pop_back();
+
+        SaveEditorConfig();
+    }
+
+    glm::vec2 EditorApp::ScreenToWorld(float screenX, float screenY) const
+    {
+        const float width  = m_ViewportBoundsMax.x - m_ViewportBoundsMin.x;
+        const float height = m_ViewportBoundsMax.y - m_ViewportBoundsMin.y;
+
+        if (width <= 0.0f || height <= 0.0f)
+            return { 0.0f, 0.0f };
+
+        // Panel-yerel piksel -> NDC (-1..1). Y ters cevriliyor: ImGui
+        // yukaridan asagi sayar, NDC asagidan yukari.
+        const float ndcX = 2.0f * (screenX - m_ViewportBoundsMin.x) / width - 1.0f;
+        const float ndcY = 1.0f - 2.0f * (screenY - m_ViewportBoundsMin.y) / height;
+
+        // Cizim yolunun TERSI: dunya -> view -> projeksiyon yerine
+        // projeksiyon+view'in tersiyle geri geliyoruz.
+        const glm::mat4 inverseVP =
+            glm::inverse(m_Camera->GetProjectionMatrix() * m_Camera->GetViewMatrix());
+
+        const glm::vec4 world = inverseVP * glm::vec4(ndcX, ndcY, 0.0f, 1.0f);
+        return { world.x, world.y };
+    }
+
+    void EditorApp::HandleContentDrop(const std::string& relativePath)
+    {
+        const std::string ext = std::filesystem::path(relativePath).extension().string();
+
+        if (ext == ".fxscene")
+        {
+            OpenScene(relativePath);
+            return;
+        }
+
+        const ImVec2 mouse = ImGui::GetMousePos();
+        const glm::vec2 world = ScreenToWorld(mouse.x, mouse.y);
+
+        if (ext == ".fxprefab")
+        {
+            FX::PrefabSerializer prefab(m_Scene.get(), &m_TextureLibrary);
+
+            FX::Entity instance = prefab.Instantiate(relativePath, { world.x, world.y, 0.2f });
+            if (instance)
+            {
+                m_HierarchyPanel.SetSelectedEntity(instance);
+                SetStatus("Prefab eklendi: " + instance.GetName());
+            }
             else
-                FX_WARN("Oyuncu bulunamadi - sahne dosyasinda yok olabilir.");
-        }
-        else
-        {
-            m_StatusMessage = "YUKLENEMEDI! Once Ctrl+S ile kaydet.";
+            {
+                SetStatus("Prefab orneklenemedi: " + relativePath);
+            }
+            return;
         }
 
-        m_StatusTimer = 4.0f;
+        auto texture = m_TextureLibrary.Load(relativePath);
+        if (!texture)
+        {
+            SetStatus("Bu dosya viewport'a birakilamaz: " + relativePath);
+            return;
+        }
+
+        FX::Entity entity =
+            m_Scene->CreateEntity(std::filesystem::path(relativePath).stem().string());
+
+        auto& tf = entity.GetComponent<FX::TransformComponent>();
+        tf.Translation = { world.x, world.y, 0.2f };
+
+        // Sprite'i resmin en-boy oranina gore olcekliyoruz. Etmezsek
+        // dikdortgen bir resim kare kutuya sikisip ezik gorunur.
+        const float aspect = static_cast<float>(texture->GetWidth()) /
+                             static_cast<float>(texture->GetHeight());
+        tf.Scale = (aspect >= 1.0f) ? glm::vec2{ 1.0f, 1.0f / aspect }
+                                    : glm::vec2{ aspect, 1.0f };
+
+        entity.AddComponent<FX::SpriteRendererComponent>(texture);
+
+        m_HierarchyPanel.SetSelectedEntity(entity);
+        SetStatus("Sprite olusturuldu: " + entity.GetName());
     }
 
     void EditorApp::UpdateCameraProjection()
@@ -438,6 +633,26 @@ namespace FXEd
         DrawViewportPanel();
         DrawStatsPanel();
         m_HierarchyPanel.OnImGuiRender();
+        m_ContentBrowser.OnImGuiRender();
+
+        // Prefab kaydetme istegi paneller cizildikten SONRA ele aliniyor:
+        // dosya diyalogu modal ve programi bloklar. ImGui cercevesinin
+        // ortasinda acmak, o kare boyunca ImGui'nin ic durumunu dondurur.
+        if (FX::Entity prefabRoot = m_HierarchyPanel.TakePrefabRequest())
+        {
+            const std::string absolute =
+                FileDialogs::SaveFile(GetWindow(), FileDialogs::PrefabFilter());
+
+            if (!absolute.empty())
+            {
+                FX::PrefabSerializer prefab(m_Scene.get(), &m_TextureLibrary);
+                const std::string rel = FX::FileSystem::MakeRelativeToBase(absolute);
+
+                SetStatus(prefab.Save(prefabRoot, rel)
+                              ? "Prefab kaydedildi: " + rel
+                              : "Prefab kaydedilemedi: " + rel);
+            }
+        }
 
         if (m_ShowDemoWindow)
             ImGui::ShowDemoWindow(&m_ShowDemoWindow);
@@ -451,10 +666,43 @@ namespace FXEd
         {
             if (ImGui::BeginMenu("Dosya"))
             {
-                if (ImGui::MenuItem("Sahneyi Kaydet", "Ctrl+S"))
+                if (ImGui::MenuItem("Yeni Sahne", "Ctrl+N"))
+                    NewScene();
+                if (ImGui::MenuItem("Sahne Ac...", "Ctrl+O"))
+                    OpenScene();
+
+                if (ImGui::BeginMenu("Son Acilanlar", !m_RecentScenes.empty()))
+                {
+                    // Menu ogeleri uzerinde gezerken listeyi degistirmek
+                    // (OpenScene -> PushRecentScene) gecersiz yineleyici
+                    // demek; istegi biriktirip dongu bittikten sonra aciyoruz.
+                    std::string toOpen;
+
+                    for (const auto& scene : m_RecentScenes)
+                    {
+                        if (ImGui::MenuItem(scene.c_str()))
+                            toOpen = scene;
+                    }
+
+                    ImGui::Separator();
+                    if (ImGui::MenuItem("Listeyi Temizle"))
+                    {
+                        m_RecentScenes.clear();
+                        SaveEditorConfig();
+                    }
+
+                    ImGui::EndMenu();
+
+                    if (!toOpen.empty())
+                        OpenScene(toOpen);
+                }
+
+                ImGui::Separator();
+                if (ImGui::MenuItem("Kaydet", "Ctrl+S"))
                     SaveScene();
-                if (ImGui::MenuItem("Sahneyi Yukle", "Ctrl+O"))
-                    LoadScene();
+                if (ImGui::MenuItem("Farkli Kaydet...", "Ctrl+Shift+S"))
+                    SaveSceneAs();
+
                 ImGui::Separator();
                 if (ImGui::MenuItem("Cikis"))
                     Close();
@@ -567,6 +815,17 @@ namespace FXEd
         // ===============================================================
         const auto texID = static_cast<ImTextureID>(m_Framebuffer->GetColorAttachmentID(0));
         ImGui::Image(texID, panelSize, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
+
+        // Icerik panelinden buraya birakma. Hedef, Image ogesinin hemen
+        // ardindan geliyor cunku BeginDragDropTarget "son cizilen oge"
+        // uzerinde calisir.
+        if (ImGui::BeginDragDropTarget())
+        {
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(kContentPayload))
+                HandleContentDrop(static_cast<const char*>(payload->Data));
+
+            ImGui::EndDragDropTarget();
+        }
 
         DrawGizmo();
 
@@ -735,7 +994,8 @@ namespace FXEd
 
         // Ctrl basili mi? SDL3'te modifier durumu event.key.mod'da gelir.
         // KMOD_CTRL, sol ve sag Ctrl'un ikisini birden kapsar.
-        const bool ctrl = (event.key.mod & SDL_KMOD_CTRL) != 0;
+        const bool ctrl  = (event.key.mod & SDL_KMOD_CTRL)  != 0;
+        const bool shift = (event.key.mod & SDL_KMOD_SHIFT) != 0;
 
         switch (event.key.key)
         {
@@ -747,12 +1007,17 @@ namespace FXEd
                 m_ScenePaused = !m_ScenePaused;
                 break;
 
+            case SDLK_N:
+                if (ctrl) NewScene();
+                break;
+
             case SDLK_S:
-                if (ctrl) SaveScene();
+                if (ctrl && shift) SaveSceneAs();
+                else if (ctrl)     SaveScene();
                 break;
 
             case SDLK_O:
-                if (ctrl) LoadScene();
+                if (ctrl) OpenScene();
                 break;
 
             // Gizmo kisayollari - sadece viewport odaktayken, cunku
@@ -777,6 +1042,8 @@ namespace FXEd
 
     void EditorApp::OnShutdown()
     {
+        SaveEditorConfig();
+
         // SIRA ONEMLI: once ImGui (GL kaynaklarini birakir),
         // sonra framebuffer ve sahne, en son renderer.
         m_ImGuiLayer.Shutdown();

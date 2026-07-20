@@ -3,6 +3,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <filesystem>
 #include <fstream>
 
 namespace FX
@@ -53,6 +54,38 @@ namespace FX
         }
 
         return GetBaseDirectory() + relativePath;
+    }
+
+    std::string FileSystem::MakeRelativeToBase(const std::string& absolutePath)
+    {
+        if (absolutePath.empty())
+            return absolutePath;
+
+        std::error_code ec;
+
+        // weakly_canonical: sembolik baglari ve "..\" parcalarini duzler.
+        // Duzlemezsek "C:/x/build/bin/../bin/assets" ile "C:/x/build/bin/assets"
+        // farkli iki yol gibi gorunur ve goreceli hesap tutmaz.
+        const auto base = std::filesystem::weakly_canonical(
+            std::filesystem::path(GetBaseDirectory()), ec);
+        const auto full = std::filesystem::weakly_canonical(
+            std::filesystem::path(absolutePath), ec);
+
+        if (ec)
+            return absolutePath;
+
+        const auto rel = std::filesystem::relative(full, base, ec);
+
+        // Bos sonuc veya ".." ile baslamasi: dosya base'in disinda.
+        if (ec || rel.empty() || rel.native().rfind(
+                std::filesystem::path("..").native(), 0) == 0)
+        {
+            FX_CORE_WARN("Varlik exe klasorunun disinda, mutlak yol saklanacak: %s",
+                         absolutePath.c_str());
+            return absolutePath;
+        }
+
+        return rel.generic_string();
     }
 
     bool FileSystem::Exists(const std::string& path)

@@ -1,4 +1,5 @@
 #include "SceneHierarchyPanel.h"
+#include "Panels/ContentBrowserPanel.h"
 
 #include <FXEngine/Scene/Components.h>
 #include <FXEngine/Core/Log.h>
@@ -23,12 +24,11 @@ namespace FXEd
         m_Selection = {};
     }
 
-    void SceneHierarchyPanel::SetAvailableTextures(
-        const std::shared_ptr<FX::Texture2D>& checker,
-        const std::shared_ptr<FX::Texture2D>& circle)
+    FX::Entity SceneHierarchyPanel::TakePrefabRequest()
     {
-        m_CheckerTexture = checker;
-        m_CircleTexture  = circle;
+        FX::Entity request = m_PrefabRequest;
+        m_PrefabRequest = {};
+        return request;
     }
 
     void SceneHierarchyPanel::OnImGuiRender()
@@ -170,6 +170,9 @@ namespace FXEd
                 m_ReparentToRoot = true;
             }
             ImGui::Separator();
+            if (ImGui::MenuItem("Prefab Olarak Kaydet..."))
+                m_PrefabRequest = entity;
+            ImGui::Separator();
             if (ImGui::MenuItem("Entity'yi Sil"))
                 m_ToDelete = entity;
             ImGui::EndPopup();
@@ -238,6 +241,58 @@ namespace FXEd
             ImGui::DragFloat("##f", &value, speed);
             ImGui::PopID();
         }
+    }
+
+    void SceneHierarchyPanel::DrawTextureSlot(FX::SpriteRendererComponent& sc)
+    {
+        ImGui::Text("Texture");
+        ImGui::SameLine(110.0f);
+
+        const ImVec2 slotSize(64.0f, 64.0f);
+
+        if (sc.Texture)
+        {
+            // UV'ler ters: OpenGL sol-alt kokenli, ImGui sol-ust bekler.
+            ImGui::Image(static_cast<ImTextureID>(sc.Texture->GetRendererID()),
+                         slotSize, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
+        }
+        else
+        {
+            ImGui::Button("Doku\nyok", slotSize);
+        }
+
+        // BIRAKMA HEDEFI. Icerik panelinden gelen yolu kutuphaneye veriyoruz;
+        // kutuphane ayni yolu ikinci kez gorurse diske gitmiyor.
+        if (ImGui::BeginDragDropTarget())
+        {
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(kContentPayload))
+            {
+                const char* path = static_cast<const char*>(payload->Data);
+
+                if (m_Library)
+                {
+                    if (auto texture = m_Library->Load(path))
+                        sc.Texture = texture;
+                    else
+                        FX_WARN("Doku yuklenemedi: %s", path);
+                }
+            }
+            ImGui::EndDragDropTarget();
+        }
+
+        ImGui::SameLine();
+        ImGui::BeginGroup();
+        if (sc.Texture)
+        {
+            ImGui::TextDisabled("%s", sc.Texture->GetPath().c_str());
+            if (ImGui::SmallButton("Dokuyu Kaldir"))
+                sc.Texture = nullptr;
+        }
+        else
+        {
+            ImGui::TextDisabled("Icerik panelinden\nbir resim surukle");
+        }
+        ImGui::EndGroup();
     }
 
     void SceneHierarchyPanel::DrawComponents(FX::Entity entity)
@@ -336,27 +391,7 @@ namespace FXEd
 
                 DrawFloatControl("Tiling", sc.TilingFactor, 0.1f);
 
-                // Texture secimi. Gercek bir editorde burada bir varlik
-                // tarayicisi olurdu; MVP icin elimizdeki iki dokuyu
-                // secmek yeterli.
-                ImGui::Text("Texture");
-                ImGui::SameLine(110.0f);
-
-                const char* current = "Yok (duz renk)";
-                if (sc.Texture == m_CheckerTexture) current = "Dama tahtasi";
-                else if (sc.Texture == m_CircleTexture) current = "Daire";
-
-                ImGui::SetNextItemWidth(-1.0f);
-                if (ImGui::BeginCombo("##Tex", current))
-                {
-                    if (ImGui::Selectable("Yok (duz renk)", sc.Texture == nullptr))
-                        sc.Texture = nullptr;
-                    if (ImGui::Selectable("Dama tahtasi", sc.Texture == m_CheckerTexture))
-                        sc.Texture = m_CheckerTexture;
-                    if (ImGui::Selectable("Daire", sc.Texture == m_CircleTexture))
-                        sc.Texture = m_CircleTexture;
-                    ImGui::EndCombo();
-                }
+                DrawTextureSlot(sc);
             }
 
             // CollapsingHeader'in 'X' dugmesi -> component'i kaldir.

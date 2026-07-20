@@ -1,0 +1,101 @@
+{
+  "Entities": [
+    {
+      "ID": 11263636746145706959,
+      "SpriteRenderer": {
+        "Color": [
+          0.44999998807907104,
+          0.75,
+          0.44999998807907104,
+          1.0
+        ],
+        "Texture": "assets/textures/checkerboard.png",
+        "TilingFactor": 1.0
+      },
+      "Tag": "Tank Govde",
+      "Transform": {
+        "Rotation": 0.0,
+        "Scale": [
+          2.0,
+          2.0
+        ],
+        "Translation": [
+          -6.0,
+          4.0,
+          0.20000000298023224
+        ]
+      },
+      "Velocity": {
+        "Angular": 0.4000000059604645,
+        "Linear": [
+          0.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "ID": 215723243135514401,
+      "Parent": 11263636746145706959,
+      "SpriteRenderer": {
+        "Color": [
+          1.0,
+          0.8999999761581421,
+          0.4000000059604645,
+          1.0
+        ],
+        "Texture": "assets/textures/circle.png",
+        "TilingFactor": 1.0
+      },
+      "Tag": "Tank Kule",
+      "Transform": {
+        "Rotation": 0.0,
+        "Scale": [
+          0.550000011920929,
+          0.550000011920929
+        ],
+        "Translation": [
+          0.0,
+          0.0,
+          0.05000000074505806
+        ]
+      },
+      "Velocity": {
+        "Angular": 1.5,
+        "Linear": [
+          0.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "ID": 7130978444597559467,
+      "Parent": 215723243135514401,
+      "SpriteRenderer": {
+        "Color": [
+          0.8999999761581421,
+          0.3499999940395355,
+          0.25,
+          1.0
+        ],
+        "Texture": "",
+        "TilingFactor": 1.0
+      },
+      "Tag": "Tank Namlu",
+      "Transform": {
+        "Rotation": 0.0,
+        "Scale": [
+          1.399999976158142,
+          0.3499999940395355
+        ],
+        "Translation": [
+          0.8999999761581421,
+          0.0,
+          0.05000000074505806
+        ]
+      }
+    }
+  ],
+  "Root": 11263636746145706959,
+  "Type": "FXPrefab",
+  "Version": 1
+}

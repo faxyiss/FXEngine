@@ -50,6 +50,11 @@ namespace FXEd
         // acilamaz, bu yuzden EditorApp'e devrediyoruz.
         bool TakeImportRequest();
 
+        // Kullanici bir dosyaya cift tikladiysa proje-goreceli yolunu
+        // doner ve istegi temizler; yoksa bos string. Dosyanin nasil
+        // acilacagina EditorApp karar veriyor.
+        std::string TakeOpenRequest();
+
         // Klasor icerigi degistiginde (disaridan kopyalama vb.) cagrilir.
         void Refresh() { m_NeedsRefresh = true; }
 
@@ -155,6 +160,10 @@ namespace FXEd
         float       m_MessageTimer = 0.0f;
         bool m_OpenNewFolderPopup = false;
         bool m_ImportRequest      = false;
+
+        // Cift tiklanan dosya. Istek biriktiriliyor cunku acma islemi
+        // sahneyi degistirebilir ya da modal bir sey acabilir.
+        std::filesystem::path m_OpenRequest;
 
         char m_NameBuffer[128]{};
         char m_SearchBuffer[64]{};

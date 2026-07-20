@@ -69,6 +69,9 @@ namespace FXEd
         void SaveEditorConfig();
         void PushRecentScene(const std::string& path);
 
+        // Icerik panelinde cift tiklanan dosyayi turune gore acar.
+        void OpenAsset(const std::string& relativePath);
+
         // Icerik panelinden viewport'a birakilan dosyayi ele alir.
         void HandleContentDrop(const std::string& relativePath, float screenX, float screenY);
 

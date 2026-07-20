@@ -34,6 +34,10 @@ namespace FXEd
         // Modal degil, ImGui cercevesi icinden cagrilabilir.
         static void RevealInFileManager(const std::string& absolutePath);
 
+        // Dosyayi isletim sisteminin varsayilan uygulamasiyla acar.
+        // Editorun anlamadigi turler (png, txt, ...) icin.
+        static void OpenExternally(const std::string& absolutePath);
+
         static const char* SceneFilter();
         static const char* PrefabFilter();
         static const char* AssetFilter();

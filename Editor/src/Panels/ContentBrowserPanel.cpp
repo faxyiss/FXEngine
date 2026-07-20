@@ -148,6 +148,17 @@ namespace FXEd
         return request;
     }
 
+    std::string ContentBrowserPanel::TakeOpenRequest()
+    {
+        if (m_OpenRequest.empty())
+            return {};
+
+        const std::string relative =
+            FX::FileSystem::MakeRelativeToProject(m_OpenRequest.string());
+        m_OpenRequest.clear();
+        return relative;
+    }
+
     void ContentBrowserPanel::RefreshIfNeeded()
     {
         if (!m_NeedsRefresh)
@@ -628,6 +639,19 @@ namespace FXEd
                                                     bool isDirectory, bool clicked,
                                                     int index)
     {
+        // Cift tik iki gorunumde iki farkli sinyalle geliyor:
+        //
+        // Izgaradaki Button bastirmayi BIRAKMA karesinde bildiriyor,
+        // IsMouseDoubleClicked ise sadece ikinci BASMA karesinde true;
+        // ikisi ayni karede bulusmadigi icin izgarada cift tik hic
+        // algilanmiyordu - orada IsItemHovered'a bakmak gerekiyor.
+        // Listedeki Selectable ise basma karesinde donuyor ama tablo
+        // satirinda IsItemHovered guvenilmez, dolayisiyla orada donus
+        // degeri dogru sinyal. Ikisini de kabul ediyoruz.
+        const bool doubleClicked =
+            ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
+            (clicked || ImGui::IsItemHovered());
+
         // Surukleme kaynagi: KLASORLER DAHIL her sey.
         //
         // Klasorler de suruklenebiliyor cunku tasima ozelligi onlari da
@@ -694,17 +718,14 @@ namespace FXEd
             ImGui::EndPopup();
         }
 
-        if (clicked)
+        // CIFT tik klasore girer / dosyayi acar, TEK tik secer.
+        //
+        // Tek tikla girmeye devam etseydik secim ile gezinme ayni
+        // eylemi paylasirdi: bir klasoru secmek imkansiz olurdu ve
+        // coklu secim klasorleri disarida birakirdi.
+        if (doubleClicked)
         {
-            // CIFT tik klasore girer, TEK tik secer.
-            //
-            // Tek tikla girmeye devam etseydik secim ile gezinme ayni
-            // eylemi paylasirdi: bir klasoru secmek imkansiz olurdu ve
-            // coklu secim klasorleri disarida birakirdi.
-            const bool enterFolder =
-                isDirectory && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
-
-            if (enterFolder)
+            if (isDirectory)
             {
                 // Klasore girme dongunun SONUNDA degil burada guvenli:
                 // m_Current degisse bile bu karede listeyi bir daha
@@ -715,9 +736,16 @@ namespace FXEd
             }
             else
             {
-                HandleSelectionClick(path, index);
+                // Acma isini EditorApp yapiyor: sahne yuklemek, prefab
+                // orneklemek ve isletim sistemine devretmek panelin
+                // bilmesi gereken seyler degil.
+                m_OpenRequest = path;
             }
+            return;
         }
+
+        if (clicked)
+            HandleSelectionClick(path, index);
     }
 
     void ContentBrowserPanel::DrawEntryGrid(const std::filesystem::directory_entry& entry,

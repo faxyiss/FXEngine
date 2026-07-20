@@ -22,6 +22,7 @@
 #include <SDL3/SDL.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -38,6 +39,13 @@ namespace FXEd
         {
             std::uniform_real_distribution<float> dist(min, max);
             return dist(s_Rng);
+        }
+
+        std::string ToLowerAscii(std::string s)
+        {
+            std::transform(s.begin(), s.end(), s.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            return s;
         }
     }
 
@@ -748,6 +756,32 @@ namespace FXEd
             HandleContentDrop(relative, screenX, screenY);
     }
 
+    void EditorApp::OpenAsset(const std::string& relativePath)
+    {
+        const std::string ext =
+            ToLowerAscii(std::filesystem::path(relativePath).extension().string());
+
+        if (ext == ".fxscene")
+        {
+            OpenScene(relativePath);
+            return;
+        }
+
+        if (ext == ".fxprefab")
+        {
+            // Suruklemenin aksine hedef nokta yok; viewport'un ortasi
+            // en az sasirtan yer.
+            HandleContentDrop(relativePath,
+                              (m_ViewportBoundsMin.x + m_ViewportBoundsMax.x) * 0.5f,
+                              (m_ViewportBoundsMin.y + m_ViewportBoundsMax.y) * 0.5f);
+            return;
+        }
+
+        // Editorun anlamadigi turler isletim sistemine gidiyor: bir png'ye
+        // cift tiklayinca sahneye sprite dusurmek beklenmeyen bir sey olurdu.
+        FileDialogs::OpenExternally(FX::FileSystem::ResolveProjectAsset(relativePath));
+    }
+
     void EditorApp::HandleContentDrop(const std::string& relativePath,
                                       float screenX, float screenY)
     {
@@ -1038,6 +1072,9 @@ namespace FXEd
             m_ImportRequested = false;
             ImportAssets();
         }
+
+        if (const std::string toOpen = m_ContentBrowser.TakeOpenRequest(); !toOpen.empty())
+            OpenAsset(toOpen);
 
         if (m_NewProjectRequested)  { m_NewProjectRequested  = false; NewProject();  }
         if (m_OpenProjectRequested) { m_OpenProjectRequested = false; OpenProject(); }

@@ -366,8 +366,11 @@ klasörünü tamamen silersen kaybolurlar.
 
 Doğrusu bir **proje klasörü** kavramı: editör, exe'nin yanını değil
 kullanıcının açtığı proje dizinini kök alır (Unity/Godot böyle çalışır).
-Kalıcı tutmak istediğin varlıkları şimdilik elle `Editor/assets/` altına
-da kopyala. Teknik borç listesine eklendi.
+
+**Bu bilinçli olarak ertelendi.** Kalıcılık şu aşamada gerekmiyor; proje
+oluşturma/açma sistemi ayrı bir faz olarak yazılacak ve varlıklara oradan
+bakılacak → **Faz 21**. `AssetManager` de ona bağlı: GUID→yol tablosunun
+taranacağı bir *proje kökü* olmadan varlık veritabanı kurulamaz.
 
 ## Onay
 - [x] Derlendi (uyarısız)

@@ -225,6 +225,27 @@ gerçek karşılığını burada göreceksin.
 
 ---
 
+## Faz 21 — Proje sistemi
+
+Şu an editör `<exe>/assets`'i kök alıyor: varlıklar `build/` altında yaşıyor
+ve sürüm kontrolüne girmiyor. **Bilinçli bir karar** — kalıcılık şimdilik
+gerekmiyor, doğru çözüm ayrı bir faz.
+
+- [ ] `.fxproject` dosyası: proje adı, varlık klasörü, başlangıç sahnesi
+- [ ] "Proje Oluştur / Proje Aç" akışı, açılışta proje seçme ekranı
+- [ ] Content browser kökü = **proje** klasörü, exe'nin yanı değil
+- [ ] `FileSystem`: motor varlıkları (shader) ile proje varlıkları ayrımı
+- [ ] Son açılan **projeler** (bugünkü son açılan sahnelerin yerini alır)
+- [ ] Bunun üstüne: `.meta` dosyaları + GUID tabanlı `AssetManager`
+
+**Öğrenilecek:** Bir editörün "kurulu olduğu yer" ile "üzerinde çalıştığı
+yer" farklı şeylerdir. Bu ayrımı yapmayan araçlar taşınabilir olmaz.
+
+> `AssetManager` (Faz 12'de ertelendi) buraya bağlı: GUID→yol tablosunun
+> taranacağı bir *proje kökü* olmadan varlık veritabanı kurulamaz.
+
+---
+
 ## Faz 20 — Kalite ve araçlar
 
 - [ ] **Undo / Redo** — komut deseni (command pattern)
@@ -254,7 +275,7 @@ MVP sırasında bilinçli olarak bıraktıklarımız:
 | Hata durumunda yedek doku yok | Texture yüklenemezse `nullptr`; mor "eksik doku" dokusu daha iyi olurdu. | `TextureLibrary.cpp` |
 | **Varlık kimliği = dosya yolu** | Dosyayı taşımak/yeniden adlandırmak tüm referansları koparır. Çözüm: `.meta` dosyaları + GUID tabanlı `AssetManager`. | `SceneSerializer`, `TextureLibrary` (Faz 12) |
 | Dosya diyalogları sadece Win32 | Linux/macOS'ta boş gövde derleniyor; `nfd` veya portal gerekli. | `Editor/src/Platform/FileDialogs.cpp` |
-| Proje klasörü kavramı yok | Editör `<exe>/assets`'i kök alıyor; içe aktarılan varlıklar `build/` altında kalıyor ve sürüm kontrolüne girmiyor. | `ContentBrowserPanel.cpp` (Faz 12) |
+| Proje klasörü kavramı yok | Editör `<exe>/assets`'i kök alıyor; içe aktarılan varlıklar `build/` altında kalıyor. **Bilinçli:** Faz 21'e bırakıldı. | `ContentBrowserPanel.cpp` (Faz 12) |
 | Dosya izleyici yok | Klasör dışarıdan değişirse panel fark etmiyor; elle "Yenile" gerekiyor. | `ContentBrowserPanel.cpp` (Faz 12) |
 | Prefab bağlantısı yok | Örnek kaynağından bağımsız; kaynak değişince örnekler güncellenmiyor (override sistemi yok). | `PrefabSerializer.cpp` (Faz 12) |
 | `GetRegistry()` çok açık | Registry'ye doğrudan `create`/`destroy` çağırmak UUID haritasını bozar. Daha dar bir erişim gerekebilir. | `Scene.h` (Faz 8) |

@@ -254,7 +254,7 @@ gerekmiyor, doğru çözüm ayrı bir faz.
       — `ResolveEngineAsset` / `ResolveProjectAsset`
 - [x] Son açılan **projeler**
 - [x] Projesiz mod hâlâ çalışıyor ama artık uyarıyor
-- [ ] Açılışta proje seçme ekranı (launcher) — şimdilik son proje otomatik açılıyor
+- [x] Açılışta proje seçme ekranı (launcher): son projeler, aç/oluştur, projesiz devam
 - [ ] `AssetDirectory` gerçekten kullanılsın (şimdilik `assets` varsayılıyor)
 - [ ] **`.meta` dosyaları + GUID tabanlı `AssetManager`** → kendi fazı olmalı
 

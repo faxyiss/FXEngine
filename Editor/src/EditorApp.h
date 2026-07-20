@@ -47,8 +47,15 @@ namespace FXEd
         bool OpenProject(const std::string& filepath);  // dogrudan yukler
         void PushRecentProject(const std::string& path);
 
-        // Acilista son projeyi acar; yoksa projesiz devam eder.
-        void LoadStartupProject();
+        // Karsilama ekrani: proje secilene kadar editor arayuzu yerine
+        // bu ciziliyor. Proje acilmadan varlik yuklemek yanlis kokten
+        // okumak demek olurdu.
+        void DrawLauncher();
+
+        // Ornek sahneyi kurar (karsilama ekranindaki "projesiz devam et").
+        void StartWithoutProject();
+
+        bool m_ShowLauncher = true;
 
         // --- Sahne dosyasi islemleri (Faz 12) ---------------------------------
         void NewScene();

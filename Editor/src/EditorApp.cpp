@@ -80,44 +80,16 @@ namespace FXEd
 
         LoadEditorConfig();
 
-        // SIRA KRITIK: proje HER SEYDEN once acilmali. Varlik yollari ve
-        // texture kutuphanesi projeye goreli cozuluyor; once yukleyip
-        // sonra proje acsaydik eski kokten gelen dokular onbellekte
-        // kalirdi.
-        LoadStartupProject();
+        // Editor BOS bir sahne ile aciliyor ve karsilama ekranini
+        // gosteriyor. Sahnenin var olmasi sart: panellerin ve render
+        // yolunun her yerinde null kontrolu yapmaktansa bos bir sahne
+        // tutmak cok daha basit.
+        NewScene();
 
-        m_HierarchyPanel.SetContext(m_Scene);
-
-        // Demo sahne SADECE projesiz modda kuruluyor. Bir proje aciksa
-        // onun kendi sahnesi (veya bos sahne) gecerlidir - kullanicinin
-        // projesine bizim ornek nesnelerimizi doldurmak yanlis olurdu.
-        if (!FX::Project::HasActive())
-        {
-            // Filtre artik varsayilan olarak Nearest; burada sadece SARMA
-            // farkli: zemin dosemesi TilingFactor ile tekrarlaniyor.
-            FX::TextureSpec tilingSpec;
-            tilingSpec.WrapS = FX::TextureWrap::Repeat;
-            tilingSpec.WrapT = FX::TextureWrap::Repeat;
-
-            // Kutuphane uzerinden yukluyoruz: sahne yuklerken serializer
-            // de ayni kutuphaneyi kullanacak, boylece ayni yol her iki
-            // yolda da AYNI texture nesnesine cozulur - Inspector'daki
-            // texture secimi isaretci karsilastirmasiyla calisiyor.
-            m_Checkerboard = m_TextureLibrary.Load("assets/textures/checkerboard.png", tilingSpec);
-            m_Circle       = m_TextureLibrary.Load("assets/textures/circle.png");
-
-            if (!m_Checkerboard || !m_Circle)
-            {
-                FX_ERROR("Ornek dokular yuklenemedi. Aranan klasor: %s",
-                         FX::FileSystem::GetProjectDirectory().c_str());
-                Close();
-                return;
-            }
-
-            BuildScene();
-            m_HierarchyPanel.SetContext(m_Scene);
-            m_HierarchyPanel.SetSelectedEntity(GetPlayer());
-        }
+        // Proje SECILMEDEN varlik yuklemiyoruz: varlik yollari ve doku
+        // onbellegi projeye goreli cozuluyor. Once yukleyip sonra proje
+        // acsaydik eski kokten gelen dokular onbellekte kalirdi.
+        m_ShowLauncher = true;
 
         FX_INFO("");
         FX_INFO("Editor hazir. Panelleri surukleyerek yeniden duzenleyebilirsin;");
@@ -285,6 +257,190 @@ namespace FXEd
     }
 
     // -----------------------------------------------------------------------
+    // Karsilama ekrani (Faz 21)
+    // -----------------------------------------------------------------------
+    void EditorApp::DrawLauncher()
+    {
+        const ImGuiViewport* vp = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(vp->WorkPos);
+        ImGui::SetNextWindowSize(vp->WorkSize);
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(40.0f, 32.0f));
+
+        ImGui::Begin("##Launcher", nullptr,
+                     ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+                     ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus);
+
+        // Genis ekranda icerik sola yapisik kalmasin: sabit genislikte
+        // bir sutun acip ortaliyoruz. Tam genislige yayilan bir liste
+        // okunmaz - goz satirin basi ile sonu arasinda kaybolur.
+        const float contentWidth = 760.0f;
+        const float avail  = ImGui::GetContentRegionAvail().x;
+        const float indent = (avail - contentWidth) * 0.5f;
+        if (indent > 0.0f)
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + indent);
+
+        // Grup DEGIL cocuk pencere: Separator ve benzeri ogeler icinde
+        // bulunduklari pencerenin genisligini kullanir. Grup icinde
+        // olsaydilar ekranin tamamina yayilir, ortalanmis icerikle
+        // hizasiz gorunurlerdi.
+        ImGui::BeginChild("##LauncherContent",
+                          ImVec2(std::min(contentWidth, avail), 0.0f));
+
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.80f, 0.35f, 1.0f));
+        ImGui::SetWindowFontScale(1.8f);
+        ImGui::TextUnformatted("FXEngine");
+        ImGui::SetWindowFontScale(1.0f);
+        ImGui::PopStyleColor();
+
+        ImGui::TextDisabled("Bir proje ac veya yeni bir tane olustur.");
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        // --- Eylemler -------------------------------------------------------
+        if (ImGui::Button("Yeni Proje...", ImVec2(150.0f, 34.0f)))
+            m_NewProjectRequested = true;
+
+        ImGui::SameLine();
+        if (ImGui::Button("Proje Ac...", ImVec2(150.0f, 34.0f)))
+            m_OpenProjectRequested = true;
+
+        ImGui::Spacing();
+        ImGui::Spacing();
+
+        // --- Son projeler ---------------------------------------------------
+        ImGui::Text("Son Projeler");
+        ImGui::Separator();
+
+        if (m_RecentProjects.empty())
+        {
+            // Bos olsa da ayni yuksekligi kapliyor: liste dolunca
+            // dugmelerin yeri degisirse kullanici her acilista farkli
+            // bir duzenle karsilasir.
+            ImGui::BeginChild("##RecentEmpty", ImVec2(0.0f, 240.0f));
+            ImGui::Spacing();
+            ImGui::TextDisabled("Henuz proje yok.");
+            ImGui::TextDisabled("\"Yeni Proje...\" ile basla veya var olan bir");
+            ImGui::TextDisabled(".fxproject dosyasini \"Proje Ac...\" ile sec.");
+            ImGui::EndChild();
+        }
+        else
+        {
+            // Liste cizilirken degistirilemez (silme/acma yineleyiciyi
+            // bozar); istekleri biriktirip dongu bittikten sonra
+            // isliyoruz. Faz 9'daki "yapiyi degistiren islemler dongu
+            // disinda" kuralinin bir baska gorunumu.
+            std::string toOpen;
+            std::string toForget;
+
+            ImGui::BeginChild("##RecentList", ImVec2(0.0f, 240.0f));
+
+            for (const auto& path : m_RecentProjects)
+            {
+                const bool exists = FX::FileSystem::Exists(path);
+                const std::string name =
+                    std::filesystem::path(path).stem().string();
+
+                ImGui::PushID(path.c_str());
+
+                // Kayip projeyi listeden gizlemek yerine GOSTERIP
+                // isaretliyoruz: kullanici projesinin nerede oldugunu
+                // hatirlamak isteyebilir, sessizce kaybolmasi kafa
+                // karistirir.
+                if (!exists)
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.4f, 0.4f, 1.0f));
+
+                // TEK TIK aciyor. Karsilama ekraninda "secmek" diye bir
+                // eylem yok - tikladigin projeyi acmak istiyorsundur.
+                // Cift tik istemek, hicbir karsiligi olmayan bir ara
+                // durum (secili ama acilmamis) uretirdi.
+                if (ImGui::Selectable(name.c_str(), false, 0, ImVec2(0.0f, 38.0f)) && exists)
+                    toOpen = path;
+
+                if (!exists)
+                    ImGui::PopStyleColor();
+
+                // Yol, adin hemen altinda kucuk ve soluk: ayni isimde
+                // iki proje olabilir, ayirt etmenin tek yolu yol.
+                const ImVec2 itemMin = ImGui::GetItemRectMin();
+                ImGui::GetWindowDrawList()->AddText(
+                    ImVec2(itemMin.x + 4.0f, itemMin.y + 19.0f),
+                    ImGui::GetColorU32(ImGuiCol_TextDisabled),
+                    exists ? path.c_str() : (path + "   (bulunamadi)").c_str());
+
+                if (ImGui::BeginPopupContextItem("##ctx"))
+                {
+                    if (exists && ImGui::MenuItem("Ac"))
+                        toOpen = path;
+                    if (ImGui::MenuItem("Listeden Kaldir"))
+                        toForget = path;
+                    ImGui::EndPopup();
+                }
+
+                ImGui::PopID();
+            }
+
+            ImGui::EndChild();
+
+            ImGui::TextDisabled("Acmak icin tikla. Sag tik: listeden kaldir.");
+
+            if (!toForget.empty())
+            {
+                m_RecentProjects.erase(
+                    std::remove(m_RecentProjects.begin(), m_RecentProjects.end(), toForget),
+                    m_RecentProjects.end());
+                SaveEditorConfig();
+            }
+
+            if (!toOpen.empty())
+                m_PendingProjectPath = toOpen;
+        }
+
+        // --- Projesiz devam ---------------------------------------------------
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        if (ImGui::Button("Projesiz Devam Et (ornek sahne)", ImVec2(280.0f, 0.0f)))
+            StartWithoutProject();
+
+        ImGui::SameLine();
+        ImGui::TextDisabled("Varliklar exe klasorunde kalir, build/ silinince kaybolur.");
+
+        ImGui::EndChild();
+
+        ImGui::End();
+        ImGui::PopStyleVar(2);
+    }
+
+    void EditorApp::StartWithoutProject()
+    {
+        FX::TextureSpec tilingSpec;
+        tilingSpec.WrapS = FX::TextureWrap::Repeat;
+        tilingSpec.WrapT = FX::TextureWrap::Repeat;
+
+        m_Checkerboard = m_TextureLibrary.Load("assets/textures/checkerboard.png", tilingSpec);
+        m_Circle       = m_TextureLibrary.Load("assets/textures/circle.png");
+
+        if (!m_Checkerboard || !m_Circle)
+        {
+            SetStatus("Ornek dokular bulunamadi.");
+            FX_ERROR("Ornek dokular yuklenemedi. Aranan klasor: %s",
+                     FX::FileSystem::GetProjectDirectory().c_str());
+            return;
+        }
+
+        BuildScene();
+        m_HierarchyPanel.SetContext(m_Scene);
+        m_HierarchyPanel.SetSelectedEntity(GetPlayer());
+
+        m_ShowLauncher = false;
+        FX_WARN("Projesiz mod: varliklar exe klasorunde tutulacak.");
+    }
+
+    // -----------------------------------------------------------------------
     // Proje islemleri (Faz 21)
     // -----------------------------------------------------------------------
     void EditorApp::NewProject()
@@ -309,6 +465,7 @@ namespace FXEd
 
             NewScene();
             m_ContentBrowser.SetContext(&m_TextureLibrary);   // kok degisti
+            m_ShowLauncher = false;
             SetStatus("Proje olusturuldu: " + name);
         }
         else
@@ -359,6 +516,7 @@ namespace FXEd
             NewScene();
         }
 
+        m_ShowLauncher = false;
         SetStatus("Proje acildi: " + project->GetConfig().Name);
         return true;
     }
@@ -378,23 +536,6 @@ namespace FXEd
             m_RecentProjects.pop_back();
 
         SaveEditorConfig();
-    }
-
-    void EditorApp::LoadStartupProject()
-    {
-        for (const auto& path : m_RecentProjects)
-        {
-            if (FX::FileSystem::Exists(path) && OpenProject(path))
-                return;
-        }
-
-        // Proje yok: FileSystem exe klasorune dusuyor, yani Faz 21
-        // oncesi davranis. Editor calisir ama ice aktarilan varliklar
-        // build/ altinda kalir - kullaniciya bunu SOYLUYORUZ, sessizce
-        // eski davranisa donmek tam da bu fazin cozdugu sorunu geri
-        // getirirdi.
-        FX_WARN("Acik proje yok. Varliklar exe klasorunde tutulacak;");
-        FX_WARN("kalici calisma icin Dosya > Yeni Proje.");
     }
 
     void EditorApp::NewScene()
@@ -750,6 +891,38 @@ namespace FXEd
                 m_FpsFrames  = 0;
                 m_FpsTimer   = 0.0f;
             }
+        }
+
+        // ===================================================================
+        // 0) KARSILAMA EKRANI
+        // ===================================================================
+        // Proje secilene kadar editor arayuzu hic cizilmiyor. Sahneyi de
+        // cizmiyoruz: hangi kokten okuyacagi henuz belli degil.
+        if (m_ShowLauncher)
+        {
+            FX::RenderCommand::SetViewport(0, 0, GetWindow().GetWidth(),
+                                           GetWindow().GetHeight());
+            FX::RenderCommand::SetClearColor({ 0.05f, 0.05f, 0.06f, 1.0f });
+            FX::RenderCommand::Clear();
+
+            m_ImGuiLayer.Begin();
+            DrawLauncher();
+            m_ImGuiLayer.End(GetWindow().GetWidth(), GetWindow().GetHeight());
+
+            // Modal diyaloglar cerceve DISINDA acilmali (bkz. Faz 12):
+            // ImGui'nin ic durumu diyalog boyunca donar ve arkasi
+            // siyah kalirdi.
+            if (m_NewProjectRequested)  { m_NewProjectRequested  = false; NewProject();  }
+            if (m_OpenProjectRequested) { m_OpenProjectRequested = false; OpenProject(); }
+
+            if (!m_PendingProjectPath.empty())
+            {
+                const std::string path = m_PendingProjectPath;
+                m_PendingProjectPath.clear();
+                OpenProject(path);
+            }
+
+            return;
         }
 
         // ===================================================================

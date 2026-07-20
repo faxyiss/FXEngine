@@ -144,6 +144,45 @@ kullanıcı doğru yola yönlendiriliyor.
 
 ---
 
+## 8. Karşılama ekranı (launcher)
+
+Editör artık boş bir sahne ve **karşılama ekranıyla** açılıyor. Proje
+seçilene kadar editör arayüzü hiç çizilmiyor.
+
+Neden otomatik son projeyi açmıyoruz? Çünkü **proje seçilmeden varlık
+yüklenemez**: varlık yolları ve doku önbelleği projeye göreli çözülüyor.
+Önce yükleyip sonra proje açmak, eski kökten gelen dokuları önbellekte
+bırakırdı. Karşılama ekranı bu sıralamayı yapı gereği doğru kılıyor.
+
+`OnRender` en başta ayrılıyor:
+
+```cpp
+if (m_ShowLauncher) { ...launcher... return; }   // sahne bile cizilmiyor
+```
+
+### Tek tık açıyor, çift tık değil
+
+İlk halinde çift tık istiyordu. Karşılama ekranında **"seçmek" diye bir
+eylem yok** — tıkladığın projeyi açmak istiyorsundur. Çift tık istemek,
+hiçbir karşılığı olmayan bir ara durum (seçili ama açılmamış) üretirdi.
+
+### Kayıp projeler gizlenmiyor
+
+Dosyası bulunamayan proje listeden silinmiyor; kırmızı ve "(bulunamadı)"
+etiketiyle gösteriliyor. Kullanıcı projesinin nerede olduğunu hatırlamak
+isteyebilir; sessizce kaybolması kafa karıştırır. Sağ tık → "Listeden
+Kaldır" ile kendisi temizliyor.
+
+### Düzen ayrıntıları
+
+İçerik 760 piksellik ortalanmış bir **çocuk pencerede**. Grup değil çocuk
+pencere, çünkü `Separator` içinde bulunduğu pencerenin genişliğini kullanır
+— grupta olsaydı ekranın tamamına yayılıp ortalanmış içerikle hizasız
+görünürdü.
+
+Liste boşken de aynı yüksekliği kaplıyor: liste dolunca düğmelerin yeri
+değişirse kullanıcı her açılışta farklı bir düzenle karşılaşır.
+
 ## Test sonuçları
 
 Geçici öz-test (sonra kaldırıldı):
@@ -169,7 +208,9 @@ doğru yere.
 - [x] Motor/proje varlık ayrımı
 - [x] Proje kapatınca exe köküne dönüş
 - [x] Projesiz mod hâlâ çalışıyor (uyarı ile)
-- [ ] Kullanıcı onayı (UI akışı elle denenmeli)
+- [x] Karşılama ekranı: son projeler, aç/oluştur, projesiz devam
+- [x] Launcher'dan proje açma (uçtan uca doğrulandı)
+- [ ] Kullanıcı onayı
 
 ## Yapılmayanlar → sonraki iş
 - **`.meta` dosyaları + GUID tabanlı `AssetManager`** — roadmap'te "bunun
@@ -177,8 +218,6 @@ doğru yere.
   **dosya yolu**: taşımak/yeniden adlandırmak referansları koparıyor.
   Doku ayarlarının dosya başına saklanamaması da (`TextureLibrary`
   uyarısı) buna bağlı.
-- **Açılışta proje seçme ekranı** — şimdilik son proje otomatik açılıyor.
-  Gerçek editörlerde bir "launcher" penceresi olur.
 - **Proje ayarları penceresi** — `Name`/`StartScene` sadece dosyadan
   düzenlenebiliyor.
 - **`AssetDirectory` gerçekten kullanılmıyor** — `.fxproject`'te saklanıyor

@@ -159,11 +159,19 @@ namespace FX
                     // PIXEL_SIZE_CHANGED kullaniyoruz, RESIZED degil.
                     // Fark: yuksek DPI ekranlarda pencere "boyutu" ile
                     // gercek piksel sayisi ayrisir; OpenGL PIKSEL ile calisir.
-                    m_Window->OnResize(static_cast<std::uint32_t>(event.window.data1),
-                                       static_cast<std::uint32_t>(event.window.data2));
-                    FX_CORE_TRACE("Pencere yeniden boyutlandi: %dx%d piksel",
-                                  event.window.data1, event.window.data2);
+                {
+                    const auto w = static_cast<std::uint32_t>(event.window.data1);
+                    const auto h = static_cast<std::uint32_t>(event.window.data2);
+
+                    m_Window->OnResize(w, h);
+                    FX_CORE_TRACE("Pencere yeniden boyutlandi: %ux%u piksel", w, h);
+
+                    // Turetilen sinifa haber ver ki kamera projeksiyonunu
+                    // yenileyebilsin. Bunu yapmazsak pencere boyutu degisince
+                    // en-boy orani bozulur ve kareler dikdortgene doner.
+                    OnWindowResize(w, h);
                     break;
+                }
 
                 case SDL_EVENT_WINDOW_MINIMIZED:
                     m_Minimized = true;

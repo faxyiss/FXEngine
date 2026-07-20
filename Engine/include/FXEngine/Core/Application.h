@@ -70,6 +70,16 @@ namespace FX
         // isler; burasi turetilen sinifin EK olarak ilgilendikleri icin.
         virtual void OnEvent(const SDL_Event& event) { (void)event; }
 
+        // Pencere piksel boyutu degisti. Motor viewport'u zaten guncelledi;
+        // burasi turetilen sinifin kamera projeksiyonunu yenilemesi icin.
+        //
+        // Neden ayri bir kanca? OnEvent icinde de yakalanabilirdi ama o zaman
+        // her turetilen sinif ayni SDL olay kodunu tekrar yazardi. Sik
+        // ihtiyac duyulan bir olayi acik bir kancaya cikarmak, API'yi
+        // kullanilabilir kilar.
+        virtual void OnWindowResize(std::uint32_t width, std::uint32_t height)
+        { (void)width; (void)height; }
+
     private:
         void ProcessEvents();
 

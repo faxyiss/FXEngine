@@ -56,7 +56,7 @@ fiziksel olarak zorlanır.
 | 0.5 | Log sistemi + assert | ✅ |
 | 1 | SDL3 pencere + GL 3.3 context + fixed-timestep döngü | ✅ |
 | 2 | Shader + VBO/VAO/EBO + tek renkli quad | ✅ |
-| 3 | stb_image texture + orthographic 2D kamera | ⬜ |
+| 3 | stb_image texture + orthographic 2D kamera | ✅ |
 | 4 | Batch renderer (dinamik vertex buffer, texture slot'ları) | ⬜ |
 | 5 | EnTT entegrasyonu (Transform, SpriteRenderer, Tag + system'ler) | ⬜ |
 | 6 | ImGui docking + Viewport / Hierarchy / Inspector panelleri | ⬜ |
@@ -86,15 +86,22 @@ cmake --build build --config Debug
 > Sonraki configure'lar saniyeler alır. Bağımlılıklar `_deps/` altında
 > cache'lenir, `build/` silinse bile tekrar indirilmez.
 
-### Kontroller (Faz 2)
+### Kontroller (Faz 3)
 
 | Tuş | İş |
 |---|---|
-| `ESC` | Çıkış |
-| `W` | Tel kafes (wireframe) aç/kapa |
-| `A` | Animasyonu durdur/başlat |
+| `W` `A` `S` `D` | Kamerayı hareket ettir |
+| `Q` `E` | Kamerayı döndür |
+| Fare tekerleği | Yakınlaş / uzaklaş |
+| `R` | Kamerayı sıfırla |
+| `T` | Tel kafes (wireframe) aç/kapa |
+| `SPACE` | Animasyonu durdur/başlat |
 | `V` | VSync aç/kapa |
-| `SPACE` | İstatistikler |
+| `TAB` | İstatistikler |
+| `ESC` | Çıkış |
+
+Test dokuları (`Editor/assets/textures/`) repoda hazır gelir; ayrıca
+indirmen gereken bir varlık yoktur.
 
 ## Notlar
 

@@ -18,6 +18,8 @@ set(FXENGINE_SOURCES
     src/Renderer/Buffer.cpp
     src/Renderer/VertexArray.cpp
     src/Renderer/RenderCommand.cpp
+    src/Renderer/Texture.cpp
+    src/Renderer/OrthographicCamera.cpp
 )
 
 set(FXENGINE_HEADERS
@@ -30,6 +32,8 @@ set(FXENGINE_HEADERS
     include/FXEngine/Renderer/Buffer.h
     include/FXEngine/Renderer/VertexArray.h
     include/FXEngine/Renderer/RenderCommand.h
+    include/FXEngine/Renderer/Texture.h
+    include/FXEngine/Renderer/OrthographicCamera.h
 )
 
 add_library(FXEngine STATIC

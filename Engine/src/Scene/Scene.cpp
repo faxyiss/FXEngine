@@ -7,6 +7,64 @@
 
 namespace FX
 {
+    namespace
+    {
+        // Tek bir component tipini kaynaktan hedefe tasir.
+        // Hedefte yoksa hic dokunmaz - "her entity her component'e sahip
+        // degil" durumu normal.
+        template<typename C>
+        void CopyComponentIfExists(Entity dst, Entity src)
+        {
+            if (src.HasComponent<C>())
+                dst.AddOrReplaceComponent<C>(src.GetComponent<C>());
+        }
+
+        // Paket acilimi: AllComponents listesindeki her tip icin
+        // yukaridakini cagirir. Listeye bir tip eklemek burada da
+        // otomatik olarak gecerli olur.
+        template<typename... C>
+        void CopyComponents(ComponentGroup<C...>, Entity dst, Entity src)
+        {
+            (CopyComponentIfExists<C>(dst, src), ...);
+        }
+    }
+
+    std::unique_ptr<Scene> Scene::Copy(Scene& source)
+    {
+        auto target = std::make_unique<Scene>();
+
+        // Tek gecis yeterli: hiyerarsi ve referanslar UUID uzerinden
+        // calisiyor ve UUID'ler korunuyor. Faz 12'deki prefab
+        // orneklemesi iki gecis gerektiriyordu cunku orada kimlikler
+        // YENIDEN URETILIYOR ve eski->yeni tablosu kurulmasi gerekiyordu.
+        // Burada boyle bir tablo yok: kimlik zaten ayni.
+        auto view = source.m_Registry.view<IDComponent>();
+        for (auto handle : view)
+        {
+            const UUID uuid = view.get<IDComponent>(handle).ID;
+            Entity src{ handle, &source };
+
+            // CreateEntityWithUUID Tag ve Transform'u zaten ekliyor;
+            // asagidaki kopyalama onlarin uzerine yaziyor.
+            Entity dst = target->CreateEntityWithUUID(uuid);
+
+            CopyComponents(AllComponents{}, dst, src);
+        }
+
+        return target;
+    }
+
+    Entity Scene::GetPrimaryCameraEntity()
+    {
+        auto view = m_Registry.view<CameraComponent>();
+        for (auto handle : view)
+        {
+            if (view.get<CameraComponent>(handle).Primary)
+                return Entity{ handle, this };
+        }
+        return {};
+    }
+
     Entity Scene::CreateEntity(const std::string& name)
     {
         // Varsayilan UUID yapicisi rastgele uretir.

@@ -85,7 +85,32 @@ namespace FXEd
         void PickEntity();
 
         // --- Sahne -------------------------------------------------------------
-        std::unique_ptr<FX::Scene> m_Scene;
+        //
+        // IKI SAHNE VAR (Faz 10):
+        //   m_EditorScene  - duzenledigin sahne. Play sirasinda DOKUNULMAZ.
+        //   m_RuntimeScene - Play'e basinca alinan kopya; oyun burada calisir.
+        //
+        // m_Scene her zaman "su an gosterilen ve guncellenen" sahneye
+        // isaret eder. Play'de kopyayi, Edit'te orijinali gosterir.
+        //
+        // Neden kopya? Cunku oyun calisirken nesneler hareket eder, silinir,
+        // olusur. Duzenlenen sahnede calistirsaydik Stop'a bastiginda
+        // sahnen geri donusu olmayan bicimde degismis olurdu - Unity'deki
+        // "play modunda yaptigin degisiklikler kayboldu" travmasinin
+        // tersi: burada calismalarin kaybolurdu.
+        std::unique_ptr<FX::Scene> m_EditorScene;
+        std::unique_ptr<FX::Scene> m_RuntimeScene;
+
+        // Sahip DEGIL, isaretci: yukaridaki ikisinden birini gosterir.
+        FX::Scene* m_Scene = nullptr;
+
+        enum class SceneState { Edit, Play };
+        SceneState m_SceneState = SceneState::Edit;
+
+        void OnScenePlay();
+        void OnSceneStop();
+
+        bool IsPlaying() const { return m_SceneState == SceneState::Play; }
 
         // FAZ 8 DEGISIKLIGI: Artik Entity tutamagi degil UUID sakliyoruz.
         //

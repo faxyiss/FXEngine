@@ -206,4 +206,55 @@ namespace FX
         FollowComponent(UUID target, float speed = 2.0f)
             : Target(target), Speed(speed) {}
     };
+
+    // -----------------------------------------------------------------------
+    // CameraComponent - "bu entity bir kamera"
+    // -----------------------------------------------------------------------
+    // Play modunda sahneye BU kameradan bakilir. Konum ve donme
+    // TransformComponent'ten gelir; burada sadece projeksiyon verisi var.
+    //
+    // Neden entity'ye bagli? Cunku kamera da sahnenin bir parcasi:
+    // oyuncuyu takip etsin istiyorsan ona parent yaparsin, sarsinti
+    // efekti istiyorsan transform'unu oynatirsin. Kamerayi sahnenin
+    // disinda tutan motorlarda bunlarin hepsi ozel kod ister.
+    struct CameraComponent
+    {
+        // Dikeyde kac birim gorunsun'un yarisi (OrthographicCamera ile ayni
+        // anlam). En-boy orani viewport'tan gelir, burada saklanmaz:
+        // ayni sahne farkli pencere boyutlarinda acilabilir.
+        float OrthographicSize = 8.0f;
+
+        // Birden fazla kamera olabilir; sahneyi hangisi cizecek?
+        // Isaretlenmis ilki kazanir (Scene::GetPrimaryCameraEntity).
+        bool Primary = true;
+
+        CameraComponent() = default;
+        CameraComponent(float size, bool primary = true)
+            : OrthographicSize(size), Primary(primary) {}
+    };
+
+    // -----------------------------------------------------------------------
+    // Component tip listesi
+    // -----------------------------------------------------------------------
+    // Sahne kopyalamanin (Scene::Copy) hangi component'leri tasiyacagi
+    // TEK BIR YERDE yazili olsun diye var.
+    //
+    // Kopyalama listesini elle yazsaydik, yeni bir component eklendiginde
+    // "play moduna gecince Velocity kayboldu" turu bir hata dogardi -
+    // Faz 12'de serilestiriciler icin cozdugumuz problemin aynisi.
+    //
+    // IDComponent listede YOK: kimlik kopyalanmaz, hedef entity
+    // olusturulurken aciktan veriliyor.
+    template<typename... T>
+    struct ComponentGroup {};
+
+    using AllComponents = ComponentGroup<
+        TagComponent,
+        TransformComponent,
+        RelationshipComponent,
+        WorldTransformComponent,
+        SpriteRendererComponent,
+        VelocityComponent,
+        FollowComponent,
+        CameraComponent>;
 }

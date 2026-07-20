@@ -99,7 +99,7 @@ namespace FXEd
 
         BuildScene();
 
-        m_HierarchyPanel.SetContext(m_Scene.get());
+        m_HierarchyPanel.SetContext(m_Scene);
         m_HierarchyPanel.SetTextureLibrary(&m_TextureLibrary);
         m_HierarchyPanel.SetSelectedEntity(GetPlayer());
 
@@ -121,7 +121,8 @@ namespace FXEd
 
     void EditorApp::BuildScene()
     {
-        m_Scene = std::make_unique<FX::Scene>();
+        m_EditorScene = std::make_unique<FX::Scene>();
+        m_Scene       = m_EditorScene.get();
 
         {
             auto floor = m_Scene->CreateEntity("Zemin");
@@ -218,6 +219,16 @@ namespace FXEd
         for (int i = 0; i < 15; ++i)
             SpawnMover();
 
+        // Play modunun bakacagi kamera. Oyuncuya parent yapiliyor:
+        // takip mantigi icin ozel bir koda gerek yok, hiyerarsi
+        // (Faz 9) zaten bunu yapiyor.
+        {
+            auto cam = m_Scene->CreateEntity("Ana Kamera");
+            cam.AddComponent<FX::CameraComponent>(6.0f, true);
+            if (FX::Entity player = GetPlayer())
+                cam.SetParent(player);
+        }
+
         FX_INFO("Sahne kuruldu: %u entity", m_Scene->GetEntityCount());
     }
 
@@ -263,11 +274,12 @@ namespace FXEd
 
     void EditorApp::NewScene()
     {
-        m_Scene = std::make_unique<FX::Scene>();
+        m_EditorScene = std::make_unique<FX::Scene>();
+        m_Scene       = m_EditorScene.get();
         m_PlayerUUID = FX::UUID{ 0 };
         m_ScenePath.clear();
 
-        m_HierarchyPanel.SetContext(m_Scene.get());
+        m_HierarchyPanel.SetContext(m_Scene);
         SetStatus("Yeni bos sahne");
     }
 
@@ -282,7 +294,7 @@ namespace FXEd
             return;
         }
 
-        FX::SceneSerializer serializer(m_Scene.get(), &m_TextureLibrary);
+        FX::SceneSerializer serializer(m_Scene, &m_TextureLibrary);
 
         if (serializer.Serialize(m_ScenePath))
         {
@@ -322,7 +334,7 @@ namespace FXEd
 
     void EditorApp::OpenScene(const std::string& path)
     {
-        FX::SceneSerializer serializer(m_Scene.get(), &m_TextureLibrary);
+        FX::SceneSerializer serializer(m_Scene, &m_TextureLibrary);
 
         if (!serializer.Deserialize(path))
         {
@@ -337,7 +349,7 @@ namespace FXEd
         // Panel secimini temizliyoruz: secili entity KULLANICI tercihiydi,
         // yeni sahnede karsiligi olmayabilir. m_PlayerUUID'ye dokunmuyoruz -
         // kimlik dosyada yaziyor, ayni degerle geri geliyor (Faz 8).
-        m_HierarchyPanel.SetContext(m_Scene.get());
+        m_HierarchyPanel.SetContext(m_Scene);
 
         if (GetPlayer())
             FX_INFO("Oyuncu yuklemeden sonra UUID ile bulundu: %llu",
@@ -466,7 +478,7 @@ namespace FXEd
 
         if (ext == ".fxprefab")
         {
-            FX::PrefabSerializer prefab(m_Scene.get(), &m_TextureLibrary);
+            FX::PrefabSerializer prefab(m_Scene, &m_TextureLibrary);
 
             FX::Entity instance = prefab.Instantiate(relativePath, { world.x, world.y, 0.2f });
             if (instance)
@@ -507,6 +519,53 @@ namespace FXEd
         SetStatus("Sprite olusturuldu: " + entity.GetName());
     }
 
+    void EditorApp::OnScenePlay()
+    {
+        if (IsPlaying())
+            return;
+
+        // Oyun KOPYADA calisir. Duzenlenen sahneye hic dokunulmuyor;
+        // Stop'ta kopyayi atmak yeterli, geri alma islemi gerekmiyor.
+        m_RuntimeScene = FX::Scene::Copy(*m_EditorScene);
+        m_Scene        = m_RuntimeScene.get();
+        m_SceneState   = SceneState::Play;
+
+        // Secim ESKI sahneye ait bir tutamak tasiyordu; yeni sahnede
+        // anlamsiz. Faz 8'de ogrendigimiz ders: tutamak sahneye bagli,
+        // kimlik degil.
+        m_HierarchyPanel.SetContext(m_Scene);
+        m_HierarchyPanel.SetSelectedEntity({});
+
+        m_ScenePaused = false;
+
+        if (FX::Entity cam = m_Scene->GetPrimaryCameraEntity())
+        {
+            FX_INFO("Play: sahne kamerasi '%s' (size=%.1f)", cam.GetName().c_str(),
+                    cam.GetComponent<FX::CameraComponent>().OrthographicSize);
+        }
+        else
+        {
+            FX_WARN("Play: sahnede isaretli kamera yok, editor kamerasi kullanilacak.");
+        }
+
+        SetStatus("Play - oyun kopya sahnede calisiyor");
+    }
+
+    void EditorApp::OnSceneStop()
+    {
+        if (!IsPlaying())
+            return;
+
+        m_Scene      = m_EditorScene.get();
+        m_SceneState = SceneState::Edit;
+        m_RuntimeScene.reset();   // kopyada olan biten burada kayboluyor
+
+        m_HierarchyPanel.SetContext(m_Scene);
+        m_HierarchyPanel.SetSelectedEntity({});
+
+        SetStatus("Stop - duzenleme sahnesine donuldu");
+    }
+
     void EditorApp::OnWindowResize(std::uint32_t, std::uint32_t)
     {
         // Framebuffer ve kamera artik viewport paneline bagli.
@@ -528,10 +587,13 @@ namespace FXEd
         if (!m_ImGuiLayer.WantsKeyboard() && (m_ViewportHovered || m_ViewportFocused))
             m_EditorCamera.OnUpdate(dt);
 
-        // Duraklatma: editorde nesneleri incelemek icin sahneyi
-        // dondurabilmek sart. Inspector'da bir degeri surukleyip
-        // etkisini gormek isterken nesnenin kacmasi istenmez.
-        if (!m_ScenePaused)
+        // FAZ 10 DEGISIKLIGI: sahne artik SADECE Play modunda calisiyor.
+        //
+        // Onceden editorde de nesneler hareket ediyordu; bir sprite'i
+        // yerlestirmeye calisirken kacmasi duzenlemeyi imkansiz kilar.
+        // Bir editorde Edit modu DURAGANDIR - bu bir eksiklik degil,
+        // tanimin kendisi.
+        if (IsPlaying() && !m_ScenePaused)
             m_Scene->OnUpdate(dt);
     }
 
@@ -580,16 +642,51 @@ namespace FXEd
 
         FX::Renderer2D::ResetStats();
 
-        // Izgara sahneden ONCE: derinlik testi kapali oldugu icin sirayi
-        // cizim belirliyor, yani izgara sprite'larin arkasinda kaliyor.
-        DrawGrid();
+        // Play modunda SAHNENIN kamerasindan bakiliyor; oyunun gercekte
+        // nasil gorunecegini ancak boyle gorursun. Sahnede isaretli bir
+        // kamera yoksa editor kamerasina dusuyoruz - siyah ekran
+        // gostermektense calismaya devam etmek daha faydali.
+        const FX::OrthographicCamera* renderCamera = &m_EditorCamera.GetCamera();
+        FX::OrthographicCamera sceneCamera{ -1.0f, 1.0f, -1.0f, 1.0f };
 
-        m_Scene->OnRender(m_EditorCamera.GetCamera());
+        if (IsPlaying())
+        {
+            if (FX::Entity camEntity = m_Scene->GetPrimaryCameraEntity())
+            {
+                const auto& cc = camEntity.GetComponent<FX::CameraComponent>();
 
-        // Secim cercevesi sahneden SONRA: ayni sebeple her zaman ustte.
-        DrawSelectionOutline();
+                glm::mat4 world{ 1.0f };
+                if (camEntity.HasComponent<FX::WorldTransformComponent>())
+                    world = camEntity.GetComponent<FX::WorldTransformComponent>().Matrix;
+                else
+                    world = camEntity.GetComponent<FX::TransformComponent>().GetTransform();
 
-        PickEntity();
+                const float aspect = (m_ViewportSize.y > 0.0f)
+                                   ? m_ViewportSize.x / m_ViewportSize.y : 1.0f;
+
+                sceneCamera.SetProjectionFromAspect(aspect, cc.OrthographicSize);
+                sceneCamera.SetPosition({ world[3][0], world[3][1], 0.0f });
+
+                renderCamera = &sceneCamera;
+            }
+        }
+        else
+        {
+            // Izgara sahneden ONCE: derinlik testi kapali oldugu icin sirayi
+            // cizim belirliyor, yani izgara sprite'larin arkasinda kaliyor.
+            DrawGrid();
+        }
+
+        m_Scene->OnRender(*renderCamera);
+
+        // Duzenleme yardimcilari Play'de gorunmez: oyunun gercek
+        // goruntusunu kirletirler.
+        if (!IsPlaying())
+        {
+            // Secim cercevesi sahneden SONRA: ayni sebeple her zaman ustte.
+            DrawSelectionOutline();
+            PickEntity();
+        }
 
         m_Framebuffer->Unbind();
 
@@ -627,7 +724,7 @@ namespace FXEd
 
             if (!absolute.empty())
             {
-                FX::PrefabSerializer prefab(m_Scene.get(), &m_TextureLibrary);
+                FX::PrefabSerializer prefab(m_Scene, &m_TextureLibrary);
                 const std::string rel = FX::FileSystem::MakeRelativeToBase(absolute);
 
                 SetStatus(prefab.Save(prefabRoot, rel)
@@ -709,7 +806,7 @@ namespace FXEd
                 if (ImGui::MenuItem("Sahneyi Sifirla"))
                 {
                     BuildScene();
-                    m_HierarchyPanel.SetContext(m_Scene.get());
+                    m_HierarchyPanel.SetContext(m_Scene);
                 }
                 ImGui::EndMenu();
             }
@@ -857,6 +954,42 @@ namespace FXEd
                           ImGuiChildFlags_AlwaysUseWindowPadding,
                           ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
+        // --- Play / Stop ---------------------------------------------------
+        // Arac cubugunun EN BASINDA: editordeki en onemli tek dugme.
+        {
+            const bool playing = IsPlaying();
+
+            ImGui::PushStyleColor(ImGuiCol_Button,
+                playing ? ImVec4(0.65f, 0.22f, 0.22f, 1.0f)
+                        : ImVec4(0.20f, 0.55f, 0.25f, 1.0f));
+
+            if (ImGui::Button(playing ? "Stop" : "Play", ImVec2(52.0f, 0.0f)))
+            {
+                if (playing) OnSceneStop();
+                else         OnScenePlay();
+            }
+
+            ImGui::PopStyleColor();
+            ImGui::SetItemTooltip(playing
+                ? "Duzenleme sahnesine don (kopyadaki degisiklikler atilir)"
+                : "Sahnenin bir kopyasini calistir");
+
+            ImGui::SameLine();
+
+            // Duraklatma sadece Play'de anlamli.
+            ImGui::BeginDisabled(!playing);
+            if (ImGui::Button(m_ScenePaused ? "Devam" : "Duraklat", ImVec2(64.0f, 0.0f)))
+                m_ScenePaused = !m_ScenePaused;
+            ImGui::EndDisabled();
+
+            ImGui::SameLine(0.0f, 14.0f);
+        }
+
+        // Play modunda duzenleme araclari kapali: kopyada yapilan
+        // duzenleme Stop'ta zaten kaybolurdu, kullaniciya bunu
+        // yaptirmak yaniltici olur.
+        ImGui::BeginDisabled(IsPlaying());
+
         const auto toolButton = [this](const char* label, int op, const char* tip)
         {
             const bool active = (m_GizmoOperation == op);
@@ -909,6 +1042,8 @@ namespace FXEd
             ImGui::SetNextItemWidth(80.0f);
             ImGui::DragFloat("##SnapValue", value, 0.05f, 0.01f, 90.0f, fmt);
         }
+
+        ImGui::EndDisabled();
 
         // Toolbar uzerindeyken viewport "hovered" SAYILMAMALI: yoksa
         // butona tiklamak ayni zamanda arkadaki entity'yi seciyor ve
@@ -1095,7 +1230,7 @@ namespace FXEd
         const auto handle = static_cast<entt::entity>(pixel);
         if (m_Scene->GetRegistry().valid(handle))
         {
-            FX::Entity picked{ handle, m_Scene.get() };
+            FX::Entity picked{ handle, m_Scene };
             m_HierarchyPanel.SetSelectedEntity(picked);
             FX_INFO("Secildi: %s", picked.GetComponent<FX::TagComponent>().Tag.c_str());
         }
@@ -1104,7 +1239,7 @@ namespace FXEd
     void EditorApp::DrawGizmo()
     {
         FX::Entity selected = m_HierarchyPanel.GetSelectedEntity();
-        if (!selected || m_GizmoOperation < 0)
+        if (IsPlaying() || !selected || m_GizmoOperation < 0)
             return;
         if (!selected.HasComponent<FX::TransformComponent>())
             return;
@@ -1187,6 +1322,7 @@ namespace FXEd
         ImGui::Text("Sahne");
         ImGui::Separator();
         ImGui::Text("Entity      : %u", m_Scene->GetEntityCount());
+        ImGui::Text("Mod         : %s", IsPlaying() ? "Play (kopya)" : "Edit");
         ImGui::Text("Durum       : %s", m_ScenePaused ? "duraklatildi" : "calisiyor");
 
         ImGui::Spacing();
@@ -1329,7 +1465,12 @@ namespace FXEd
         // sonra framebuffer ve sahne, en son renderer.
         m_ImGuiLayer.Shutdown();
         m_Framebuffer.reset();
-        m_Scene.reset();
+
+        // m_Scene sadece isaretci; sahiplik bu ikisinde.
+        m_Scene = nullptr;
+        m_RuntimeScene.reset();
+        m_EditorScene.reset();
+
         FX::Renderer2D::Shutdown();
 
         FX_INFO("Editor kapaniyor.");

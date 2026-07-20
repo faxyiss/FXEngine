@@ -17,6 +17,7 @@
 #include <entt/entt.hpp>
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <unordered_map>
 
@@ -36,6 +37,17 @@ namespace FX
         // yazilir - sessizce olmaz.
         Scene(const Scene&)            = delete;
         Scene& operator=(const Scene&) = delete;
+
+        // Derin kopya. Kaynak sahne DEGISMEZ.
+        //
+        // UUID'ler KORUNUR (prefab orneklemenin tersi, Faz 12): kopya
+        // ayni sahnenin baska bir zamandaki hali, yeni nesneler degil.
+        // Korunmasaydi FollowComponent gibi entity referanslari kopyada
+        // hedeflerini bulamazdi.
+        //
+        // Play moduna gecerken kullaniliyor: oyun KOPYADA calisir,
+        // duzenlenen sahneye dokunulmaz.
+        static std::unique_ptr<Scene> Copy(Scene& source);
 
         // Yeni bir UUID uretir.
         Entity CreateEntity(const std::string& name = "Entity");
@@ -71,6 +83,10 @@ namespace FX
         // Cizim. Kamera disaridan geliyor cunku Faz 5'te kamera hala
         // editorun; Faz 6'da sahne icindeki bir CameraComponent'e tasinacak.
         void OnRender(const OrthographicCamera& camera);
+
+        // Primary isaretli ilk CameraComponent'e sahip entity.
+        // Yoksa gecersiz Entity doner - cagiran `if (e)` ile bakmali.
+        Entity GetPrimaryCameraEntity();
 
         // Editor panelleri (Faz 6) icin gerekli olacak.
         // Motorun editoru bilmesi DEGIL bu - sadece veriye erisim aciyor.

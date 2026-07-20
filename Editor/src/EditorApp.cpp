@@ -2,6 +2,7 @@
 #include "Platform/FileDialogs.h"
 
 #include <FXEngine/Core/Log.h>
+#include <FXEngine/Core/Input.h>
 #include <FXEngine/Core/FileSystem.h>
 #include <FXEngine/Core/Project.h>
 #include <FXEngine/Asset/AssetManager.h>
@@ -1854,9 +1855,9 @@ namespace FXEd
         glm::mat4 transform = parentWorld * tc.GetTransform();
 
         // Kademe ya toolbar'dan surekli acik, ya da Ctrl ile anlik.
-        const bool* keys = SDL_GetKeyboardState(nullptr);
-        const bool snap  = m_SnapEnabled ||
-                           keys[SDL_SCANCODE_LCTRL] || keys[SDL_SCANCODE_RCTRL];
+        const bool snap = m_SnapEnabled ||
+                          FX::Input::IsKeyPressed(FX::Key::LeftCtrl) ||
+                          FX::Input::IsKeyPressed(FX::Key::RightCtrl);
 
         float snapValue = m_SnapTranslate;
         if (m_GizmoOperation == ImGuizmo::ROTATE)     snapValue = m_SnapRotate;
@@ -2031,8 +2032,12 @@ namespace FXEd
         ImGui::End();
     }
 
-    void EditorApp::OnEvent(const SDL_Event& event)
+    void EditorApp::OnRawEvent(const SDL_Event& event)
     {
+        // Burada SADECE SDL_Event isteyen isler kaldi (Faz 13b): ImGui
+        // backend'i ve isletim sistemi surukle-birakma. Kisayollar ve
+        // kamera artik motor olaylarini kullaniyor - OnEvent'e bak.
+
         // ISLETIM SISTEMINDEN SURUKLE-BIRAK.
         // ImGui'den ONCE bakiyoruz: bu bir OS olayi, ImGui'nin fare
         // durumuyla ilgisi yok ve ImGui onu tuketmez. Native surukleme
@@ -2045,98 +2050,110 @@ namespace FXEd
             return;
         }
 
+        // ImGui her olayi gormeli (ic durumunu guncelliyor). Tuketip
+        // tuketmedigini motora bildiriyoruz; tukettiyse ayni girdi
+        // OnEvent'te ikinci kez islenmez.
+        const bool consumed = m_ImGuiLayer.OnEvent(event);
+
         // TEKERLEK, WantCaptureMouse'a TABI DEGIL.
         //
         // Viewport'un kendisi de bir ImGui penceresi oldugu icin fare
-        // uzerindeyken WantCaptureMouse HEP true doner. Asagidaki genel
-        // kontrole biraksaydik zoom hicbir zaman calismazdi - nitekim
-        // calismiyordu da.
-        //
-        // ImGui olayi yine gorsun (ic durumu guncellensin) ama karari biz
-        // verelim: olcut "ImGui fareyi istiyor mu" degil, "fare viewport'ta
-        // mi". Diger panellerde tekerlek kaydirmaya kaliyor.
+        // uzerindeyken WantCaptureMouse HEP true doner. Genel kontrole
+        // biraksaydik zoom hicbir zaman calismazdi - nitekim calismiyordu
+        // da. Olcut "ImGui fareyi istiyor mu" degil, "fare viewport'ta mi".
         if (event.type == SDL_EVENT_MOUSE_WHEEL)
+            return;
+
+        if (consumed)
+            MarkRawEventHandled();
+    }
+
+    void EditorApp::OnEvent(FX::Event& event)
+    {
+        FX::EventDispatcher dispatcher(event);
+
+        dispatcher.Dispatch<FX::MouseScrolledEvent>(
+            [this](FX::MouseScrolledEvent& e)
+            {
+                if (!m_ViewportHovered)
+                    return false;
+
+                m_EditorCamera.OnMouseScroll(e.GetYOffset(), e.GetMouseX(), e.GetMouseY());
+                return true;
+            });
+
+        dispatcher.Dispatch<FX::KeyPressedEvent>(
+            [this](FX::KeyPressedEvent& e) { return OnKeyPressed(e); });
+    }
+
+    bool EditorApp::OnKeyPressed(FX::KeyPressedEvent& e)
+    {
+        // Basili tutmak kisayolu tekrarlamamali: Ctrl+S'i basili tutmak
+        // on kez kaydetmesin.
+        if (e.IsRepeat())
+            return false;
+
+        const bool ctrl  = e.GetMods().Ctrl;
+        const bool shift = e.GetMods().Shift;
+
+        switch (e.GetKey())
         {
-            m_ImGuiLayer.OnEvent(event);
-
-            // Koordinat olayin kendisinden: SDL pencere-goreli verir,
-            // tek viewport'ta bu ImGui'nin ekran koordinatiyla ayni.
-            if (m_ViewportHovered)
-                m_EditorCamera.OnMouseScroll(event.wheel.y,
-                                             event.wheel.mouse_x, event.wheel.mouse_y);
-            return;
-        }
-
-        // ImGui once gorsun. true donerse olayi tuketmis demektir.
-        if (m_ImGuiLayer.OnEvent(event))
-            return;
-
-        if (event.type != SDL_EVENT_KEY_DOWN || event.key.repeat)
-            return;
-
-        // Ctrl basili mi? SDL3'te modifier durumu event.key.mod'da gelir.
-        // KMOD_CTRL, sol ve sag Ctrl'un ikisini birden kapsar.
-        const bool ctrl  = (event.key.mod & SDL_KMOD_CTRL)  != 0;
-        const bool shift = (event.key.mod & SDL_KMOD_SHIFT) != 0;
-
-        switch (event.key.key)
-        {
-            case SDLK_ESCAPE:
+            case FX::Key::Escape:
                 Close();
-                break;
+                return true;
 
-            case SDLK_SPACE:
+            case FX::Key::Space:
                 m_ScenePaused = !m_ScenePaused;
-                break;
+                return true;
 
-            case SDLK_N:
-                if (ctrl) NewScene();
-                break;
+            case FX::Key::N:
+                if (ctrl) { NewScene(); return true; }
+                return false;
 
-            case SDLK_S:
-                if (ctrl && shift) SaveSceneAs();
-                else if (ctrl)     SaveScene();
-                break;
+            case FX::Key::S:
+                if (ctrl && shift) { SaveSceneAs(); return true; }
+                if (ctrl)          { SaveScene();   return true; }
+                return false;
 
-            case SDLK_O:
-                if (ctrl) OpenScene();
-                break;
+            case FX::Key::O:
+                if (ctrl) { OpenScene(); return true; }
+                return false;
 
-            case SDLK_I:
-                // Kisayol ImGui cercevesinin DISINDA isleniyor (OnEvent),
-                // bu yuzden diyalogu dogrudan acmak guvenli.
-                if (ctrl) ImportAssets();
-                break;
+            case FX::Key::I:
+                // Kisayol ImGui cercevesinin DISINDA isleniyor, bu yuzden
+                // diyalogu dogrudan acmak guvenli.
+                if (ctrl) { ImportAssets(); return true; }
+                return false;
 
-            case SDLK_DELETE:
-                if (m_ViewportHovered) DeleteSelection();
-                break;
+            case FX::Key::Delete:
+                if (m_ViewportHovered) { DeleteSelection(); return true; }
+                return false;
 
             // Gizmo kisayollari - sadece viewport odaktayken, cunku
             // W/E/R ayni zamanda kamera tuslari.
-            case SDLK_F:
-                if (m_ViewportHovered) FocusOnSelection();
-                break;
+            case FX::Key::F:
+                if (m_ViewportHovered) { FocusOnSelection(); return true; }
+                return false;
 
-            case SDLK_G:
-                if (m_ViewportHovered) m_ShowGrid = !m_ShowGrid;
-                break;
+            case FX::Key::G:
+                if (m_ViewportHovered) { m_ShowGrid = !m_ShowGrid; return true; }
+                return false;
 
-            case SDLK_Z:
-                if (m_ViewportHovered) m_GizmoOperation = -1;
-                break;
-            case SDLK_X:
-                if (m_ViewportHovered) m_GizmoOperation = ImGuizmo::TRANSLATE;
-                break;
-            case SDLK_C:
-                if (m_ViewportHovered) m_GizmoOperation = ImGuizmo::ROTATE;
-                break;
-            case SDLK_B:
-                if (m_ViewportHovered) m_GizmoOperation = ImGuizmo::SCALE;
-                break;
+            case FX::Key::Z:
+                if (m_ViewportHovered) { m_GizmoOperation = -1; return true; }
+                return false;
+            case FX::Key::X:
+                if (m_ViewportHovered) { m_GizmoOperation = ImGuizmo::TRANSLATE; return true; }
+                return false;
+            case FX::Key::C:
+                if (m_ViewportHovered) { m_GizmoOperation = ImGuizmo::ROTATE; return true; }
+                return false;
+            case FX::Key::B:
+                if (m_ViewportHovered) { m_GizmoOperation = ImGuizmo::SCALE; return true; }
+                return false;
 
             default:
-                break;
+                return false;
         }
     }
 

@@ -16,6 +16,8 @@ set(FXENGINE_SOURCES
     src/Core/FileSystem.cpp
     src/Core/Project.cpp
     src/Core/FileWatcher.cpp
+    src/Core/Input.cpp
+    src/Events/EventTranslator.cpp
     src/Asset/AssetManager.cpp
     src/Core/UUID.cpp
     src/Renderer/Shader.cpp
@@ -43,6 +45,13 @@ set(FXENGINE_HEADERS
     include/FXEngine/Core/FileSystem.h
     include/FXEngine/Core/Project.h
     include/FXEngine/Core/FileWatcher.h
+    include/FXEngine/Core/KeyCodes.h
+    include/FXEngine/Core/Input.h
+    include/FXEngine/Events/Event.h
+    include/FXEngine/Events/KeyEvent.h
+    include/FXEngine/Events/MouseEvent.h
+    include/FXEngine/Events/WindowEvent.h
+    src/Events/EventTranslator.h
     include/FXEngine/Asset/Asset.h
     include/FXEngine/Asset/AssetManager.h
     include/FXEngine/Core/UUID.h

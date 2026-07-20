@@ -1,6 +1,8 @@
 #include "FXEngine/Core/Application.h"
 #include "FXEngine/Core/Log.h"
 
+#include "Events/EventTranslator.h"
+
 #include <glad/glad.h>
 #include <SDL3/SDL.h>
 
@@ -134,6 +136,8 @@ namespace FX
         FX_CORE_INFO("Ana dongu bitti.");
     }
 
+    // TranslateSDLEvent burada kullaniliyor; bildirimi src/ altinda cunku
+    // motor kullanicisinin SDL_Event gormesi gerekmiyor.
     void Application::ProcessEvents()
     {
         SDL_Event event;
@@ -189,7 +193,24 @@ namespace FX
             // Motor kendi isini bitirdi; simdi turetilen sinif da gorsun.
             // Sirasi onemli: motor kritik olaylari (cikis, boyut) her halukarda
             // isler, turetilen sinif bunlari engelleyemez.
-            OnEvent(event);
+            //
+            // HAM olay once: ImGui gibi SDL bekleyen tuketiciler var ve
+            // onlarin motor olayindan ogrenemeyecegi seyler (metin girisi,
+            // dosya birakma) burada. Ceviremedigimiz olaylar da yalnizca
+            // bu yoldan gorunur.
+            OnRawEvent(event);
+
+            // Sonra motor olayi: SDL bilmeyen kod bunu kullanir.
+            // Ham islem olayi tukettiyse (ImGui klavyeyi istiyorsa)
+            // ikinci kez islenmesin diye Handled ile geliyor olabilir -
+            // bu karari turetilen sinif OnRawEvent icinde veriyor.
+            if (auto translated = Detail::TranslateSDLEvent(event))
+            {
+                translated->Handled = m_RawEventHandled;
+                OnEvent(*translated);
+            }
+
+            m_RawEventHandled = false;
         }
     }
 }

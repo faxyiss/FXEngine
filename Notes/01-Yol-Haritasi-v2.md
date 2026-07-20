@@ -167,22 +167,26 @@ Faz 22'nin bıraktığı tutarlılık açığı.
 
 ---
 
-## Faz 13 — Girdi soyutlaması + olay sistemi
+## Faz 13 — Girdi soyutlaması + olay sistemi 🟡 13a + 13b TAMAM
 
-Şu an `EditorApp` doğrudan `SDL_GetKeyboardState` çağırıyor. Motor
-kullanıcısının SDL bilmesi gerekmemeli.
+- [x] **13a** `FX::Key` / `MouseButton` enum'ları + `FX::Input`
+      (`IsKeyPressed`, `IsMouseButtonPressed`, `GetMousePosition`).
+      Değerler SDL scancode'larıyla aynı; birim testleriyle korunuyor.
+- [x] **13b** Motor içi `Event` sınıfları + `EventDispatcher` + SDL →
+      motor olayı çeviri katmanı. `Application` iki kanca sunuyor:
+      `OnRawEvent` (ImGui + OS sürükle-bırak) ve `OnEvent`. Editörde ham
+      SDL girdi kullanımı sıfırlandı.
+- [ ] **13c** `Layer` / `LayerStack` — **ertelendi**: editörün tek
+      katmanı var, ikincisi ancak Faz 16'da doğacak
+- [ ] **13d** Girdi eşlemesi (action mapping) — **ertelendi**: gerçek
+      ihtiyaçlar 16c'deki örnek oyunda görülecek
 
-- [ ] **13a** `FX::KeyCode` / `MouseButton` enum'ları + `FX::Input`
-      (`IsKeyPressed`, `GetMousePosition`) — sorgu tabanlı katman
-- [ ] **13b** Motor içi `Event` sınıfları (`WindowResize`, `KeyPressed`,
-      `MouseMoved`) + SDL → motor olayı çeviri katmanı
-- [ ] **13c** `Layer` / `LayerStack` — olayların katmanlar arası akışı
-      ve tüketilmesi
-- [ ] **13d** Girdi eşlemesi (action mapping): "Zıpla" = Space **veya**
-      gamepad A
+Ayrıntılar: [Faz-13-Notlar.md](Faz-13-Notlar.md)
 
-**Öğrenilecek:** Platform soyutlaması nerede biter. Aşırı soyutlamanın
-maliyeti (her SDL enum'unu kopyalamak gerçekten değer mi?).
+**Öğrenilen:** Platform soyutlaması nerede biter. Enum değerlerini SDL ile
+aynı tutmak "sızıntı" gibi görünür ama sızan şey SDL'in kendisi değil
+sayıları — çeviri tek bir cast'e iniyor. Asıl aşırı soyutlama riski
+`LayerStack`'teydi ve o yüzden ertelendi.
 
 ---
 
@@ -388,18 +392,20 @@ MVP sırasında bilinçli olarak bıraktıklarımız:
 
 # Güncel sıra
 
+Borç turu (0.1–0.6) ve 13a–13b tamamlandı. Kalan:
+
 ```
-0.1 ✅ → 0.4 → 0.2 → 0.3 → 0.5
-      → 13a-d → 16a-c → 0.6
-      → 14 → 15 → 17a-d → 18b-d → 19 → 23 → 20a-d
+16a → 16b → 16c → 14 → 15 → 18b → 17a-d
+    → 18c → 20a → 20b → 19 → 23 → 18d → 13c → 13d → 20c → 20d
 ```
 
 **Neden bu sıra:**
-- 0.4 önce, çünkü küçük ve varlık tablosunun diskle tutarlılığı şu an
-  tamamen içerik panelinin doğru çağrı yapmasına bağlı — kırılgan.
-- 0.2 → 0.3 → (…) → 20 zinciri kırılmamalı; Undo'yu tek seçim
-  varsayımıyla yazmak tüm komutları çöpe atar.
-- 0.6 (Faz 22 artıkları) Faz 16'dan sonraya bırakıldı: acil değil ve
-  script fazı motoru gerçekten *oyun* çalıştırır hale getiriyor.
-- 18b, 17c'nin ön koşulu (collider debug çizimi daire istiyor);
-  18d, 0.4'ün dosya izleyicisini kullanıyor.
+- **16 mümkün olduğunca erken:** motor sahne düzenleyip çalıştırabiliyor
+  ama hâlâ *oyun* çalıştıramıyor. 16c'deki örnek oyun, hangi API'lerin
+  eksik olduğunu tasarım tartışmasından hızlı gösterir.
+- **18b (`DrawCircle`) fizikten önce:** 17c'nin collider debug çizimi
+  daireyi bekliyor.
+- **Undo (20a-b) fizikten sonra, metin/sesten önce:** her yeni faz
+  Undo'nun kapsamını büyütüyor; fizik component'lerini de kapsasın ama
+  daha fazla ertelemek maliyeti artırır. Ön koşulları (0.2, 0.3) hazır.
+- **13c/13d ve 18d en sona:** üçü de şu an var olmayan bir soruna çözüm.

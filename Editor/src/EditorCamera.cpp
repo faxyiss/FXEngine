@@ -1,7 +1,8 @@
 #include "EditorCamera.h"
 
+#include <FXEngine/Core/Input.h>
+
 #include <imgui.h>
-#include <SDL3/SDL.h>
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -55,13 +56,13 @@ namespace FXEd
 
     void EditorCamera::OnUpdate(float dt)
     {
-        const bool* keys = SDL_GetKeyboardState(nullptr);
-
+        // Surekli hareket SORGU tabanli girdi ister: "basildi mi" degil,
+        // "su an basili mi". Faz 13a'nin FX::Input'u tam olarak bunun icin.
         float dx = 0.0f, dy = 0.0f;
-        if (keys[SDL_SCANCODE_A]) dx -= 1.0f;
-        if (keys[SDL_SCANCODE_D]) dx += 1.0f;
-        if (keys[SDL_SCANCODE_S]) dy -= 1.0f;
-        if (keys[SDL_SCANCODE_W]) dy += 1.0f;
+        if (FX::Input::IsKeyPressed(FX::Key::A)) dx -= 1.0f;
+        if (FX::Input::IsKeyPressed(FX::Key::D)) dx += 1.0f;
+        if (FX::Input::IsKeyPressed(FX::Key::S)) dy -= 1.0f;
+        if (FX::Input::IsKeyPressed(FX::Key::W)) dy += 1.0f;
 
         const float len = std::sqrt(dx * dx + dy * dy);
         if (len <= 0.0f)

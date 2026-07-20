@@ -13,6 +13,7 @@
 // ===========================================================================
 
 #include "FXEngine/Core/Window.h"
+#include "FXEngine/Events/Event.h"
 
 #include <memory>
 
@@ -66,9 +67,19 @@ namespace FX
         // her yeri degistirmek zorunda kalmayalim.
         virtual void OnRender(float alpha) { (void)alpha; }
 
-        // Ham SDL olaylari. Motor pencere kapatma/boyutlandirmayi zaten
-        // isler; burasi turetilen sinifin EK olarak ilgilendikleri icin.
-        virtual void OnEvent(const SDL_Event& event) { (void)event; }
+        // HAM SDL olaylari. Yalnizca SDL_Event bekleyen tuketiciler
+        // (ImGui backend'i, dosya birakma) icin. Yeni kod bunun yerine
+        // OnEvent(Event&) kullanmali.
+        virtual void OnRawEvent(const SDL_Event& event) { (void)event; }
+
+        // MOTOR olaylari (Faz 13b). SDL'den bagimsiz; oyun ve editor
+        // mantigi buraya yazilir.
+        virtual void OnEvent(Event& event) { (void)event; }
+
+        // Ham islemede olay tuketildiyse (orn. ImGui klavyeyi istiyor)
+        // turetilen sinif bunu cagirir; motor olayi Handled gelir ve
+        // ayni girdi iki kez islenmez.
+        void MarkRawEventHandled() { m_RawEventHandled = true; }
 
         // Pencere piksel boyutu degisti. Motor viewport'u zaten guncelledi;
         // burasi turetilen sinifin kamera projeksiyonunu yenilemesi icin.
@@ -86,6 +97,9 @@ namespace FX
         std::unique_ptr<Window> m_Window;
         bool m_Running    = true;
         bool m_Minimized  = false;
+
+        // Tek bir olay icin gecerli; her olaydan sonra sifirlanir.
+        bool m_RawEventHandled = false;
 
         // Sabit adim: saniyede 60 mantik guncellemesi.
         // constexpr -> derleme zamaninda hesaplanir, calisma zamani maliyeti yok.

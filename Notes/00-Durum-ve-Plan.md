@@ -27,23 +27,20 @@ build/      CMake çıktısı
 
 ## 2. Nerede kaldık
 
-MVP (Faz 0–7) ve şu fazlar tamam: **8, 9, 10, 11, 12, 21, 22** + Faz 18'in
-çizgi/ızgara kısmı.
+MVP (Faz 0–7) ve şu fazlar tamam: **8, 9, 10, 11, 12, 21, 22**,
+**borç turu 0.1–0.6**, **13a + 13b** + Faz 18'in çizgi/ızgara kısmı.
 
-### Bu oturumda yapılanlar (17 commit)
+### Son oturumda yapılanlar
 
 | Commit | İş |
 |---|---|
-| `f03d78b` | Faz 12 bitirildi: doku yükleme hataları, varsayılan Nearest |
-| `1b0d469` `59751bc` | Viewport kamerası: fare ile kaydırma, imlece zoom, Q/E kaldırıldı |
-| `f209fbc` | **Faz 18 (kısmi):** çizgi render, ızgara, seçim çerçevesi, F odaklan |
-| `930a5bb` `11e8343` `1c759d9` | **Faz 10:** Play/Stop, `Scene::Copy`, `CameraComponent`, `EditorCamera` |
-| `c736e8c` | Kamera gizmosu (görüş alanı + ikon, viewport'tan seçilebilir) |
-| `7021b9f` `863dc25` | **Faz 21:** proje sistemi, `.fxproject`, karşılama ekranı |
-| `e24d0db` `4f3e184` `cd7f042` | İçerik paneli: taşıma, liste görünümü, çoklu seçim |
-| `b1d7d7a` `c346c32` `5d2b18a` | **Faz 22:** `AssetManager`, GUID kimlik, `.meta` dosyaları |
-
-Toplam: 43 dosya, ~4850 satır eklendi.
+| `759e1b6` | İçerik paneli: ızgarada çift tık çalışmıyordu; dosya açma eklendi |
+| `72f8b57` | **0.4** `FX::FileWatcher` — dışarıdan taşımada GUID korunuyor |
+| `54d81bf` | **0.2** `SelectionContext` — seçim panelden çıktı |
+| `f03e08a` | **0.3** Entity çoklu seçimi (Ctrl/Shift, gizmoda delta, toplu silme) |
+| `b0d9079` | **0.5** Catch2 + motor çekirdeği testleri |
+| `d9d51b8` | **0.6** Doku ayarları arayüzü, `StartScene` GUID (`.fxproject` v2) |
+| (bu) | **13a + 13b** `FX::Input`, `Event` sistemi, SDL çeviri katmanı |
 
 ### Şu an çalışan özellikler
 
@@ -58,7 +55,11 @@ Toplam: 43 dosya, ~4850 satır eklendi.
 - **Viewport:** ızgara, seçim çerçevesi, gizmo (taşı/döndür/ölçekle),
   sağ tuşla kaydırma, imlece zoom, `F` odaklan, `G` ızgara
 - **İçerik paneli:** ızgara/liste görünümü, çoklu seçim, sürükle-bırak
-  taşıma, içe aktarma, önizleme
+  taşıma, içe aktarma, önizleme, çift tıkla açma, dosya izleyici
+- **Seçim:** `SelectionContext` (sahibi `EditorApp`), entity çoklu seçimi,
+  gizmoyla toplu dönüşüm
+- **Girdi:** `FX::Input` (sorgu) + `FX::Event` (olay); editörde ham SDL
+  girdi kullanımı yok
 
 ---
 
@@ -152,8 +153,9 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 | 0.5 | Catch2 + `UUID`/`Scene`/`SceneSerializer`/`AssetManager` testleri | ✅ 26 test / 80 assertion |
 | 0.6 | Faz 22 artıkları (Inspector doku ayarları, `StartScene` GUID, `AssetDirectory`) | ✅ `.fxproject` sürüm 2 |
 
-**Borç turu bitti.** Sıradaki: **Faz 13a** (`KeyCode`/`MouseButton` +
-`FX::Input`) — ya da 13a+13b yapıp doğrudan 16'ya (script) geçmek.
+**Borç turu ve 13a+13b bitti. Sıradaki: Faz 16a** — `ScriptableEntity`,
+`NativeScriptComponent`, `ScriptSystem` (yalnız Play modunda).
+13c/13d ertelendi, gerekçesi [Faz-13-Notlar.md](Faz-13-Notlar.md)'de.
 
 ### Bölünmüş fazlar
 

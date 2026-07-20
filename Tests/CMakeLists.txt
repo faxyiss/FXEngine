@@ -16,6 +16,7 @@ add_executable(FXTests
     SceneSerializer.test.cpp
     AssetManager.test.cpp
     Project.test.cpp
+    Input.test.cpp
     TestSupport.h)
 
 target_link_libraries(FXTests PRIVATE FXEngine Catch2::Catch2WithMain)

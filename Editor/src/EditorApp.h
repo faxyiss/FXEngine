@@ -12,6 +12,8 @@
 #include <FXEngine/Scene/Scene.h>
 #include <FXEngine/Scene/Entity.h>
 #include <FXEngine/Core/UUID.h>
+#include <FXEngine/Events/KeyEvent.h>
+#include <FXEngine/Events/MouseEvent.h>
 
 #include "SelectionContext.h"
 #include "ImGuiLayer.h"
@@ -35,7 +37,14 @@ namespace FXEd
         void OnShutdown()           override;
         void OnUpdate(float dt)     override;
         void OnRender(float alpha)  override;
-        void OnEvent(const SDL_Event& event) override;
+        // Ham SDL: yalnizca ImGui backend'i ve isletim sistemi
+        // surukle-birakma icin (Faz 13b'den sonra ikisi kaldi).
+        void OnRawEvent(const SDL_Event& event) override;
+
+        // Motor olaylari: kisayollar ve kamera.
+        void OnEvent(FX::Event& event) override;
+
+        bool OnKeyPressed(FX::KeyPressedEvent& e);
         void OnWindowResize(std::uint32_t width, std::uint32_t height) override;
 
     private:

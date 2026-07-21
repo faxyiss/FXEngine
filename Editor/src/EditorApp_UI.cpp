@@ -183,11 +183,35 @@ namespace FXEd
                     m_ImGuiLayer.ResetLayout();
 
                 ImGui::Separator();
-                ImGui::MenuItem("Proje Ayarlari", nullptr, &m_ShowProjectSettings,
-                                FX::Project::HasActive());
-                ImGui::MenuItem("Tercihler", nullptr, &m_ShowPreferences);
-                ImGui::Separator();
                 ImGui::MenuItem("ImGui Demo", nullptr, &m_ShowDemoWindow);
+                ImGui::EndMenu();
+            }
+
+            // Ayarlar KENDI menusunde. Once "Gorunum"un altindaydi ama
+            // orasi neyin gorunecegini actigin yer; projeyi
+            // yapilandirdigin yer degil - kimse orada aramaz.
+            if (ImGui::BeginMenu("Ayarlar"))
+            {
+                const bool hasProject = FX::Project::HasActive();
+
+                ImGui::MenuItem("Proje Ayarlari...", nullptr, &m_ShowProjectSettings,
+                                hasProject);
+                if (!hasProject)
+                {
+                    // Pasif bir menu ogesi sebebini soylemezse kullanici
+                    // "bozuk mu?" diye dusunur (bkz. "Baslangic Sahnesi Yap").
+                    ImGui::TextDisabled("  (once bir proje ac)");
+                }
+                else
+                {
+                    ImGui::TextDisabled("  .fxproject - surum kontrolune girer");
+                }
+
+                ImGui::Separator();
+
+                ImGui::MenuItem("Tercihler...", nullptr, &m_ShowPreferences);
+                ImGui::TextDisabled("  editor.json - yalnizca bu makine");
+
                 ImGui::EndMenu();
             }
 

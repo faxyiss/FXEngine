@@ -30,18 +30,21 @@ A-1'in ikizi. `PrefabSerializer::Instantiate` var ama script'ten
 - [ ] Script'ten `Instantiate(prefabAdı/GUID, konum)`
 - [ ] Yeni entity aynı karede mi yaşamaya başlasın, sonraki karede mi? (karar)
 
-### A-3. Script alanı olarak entity referansı
+### A-3. Script alanı olarak entity referansı ✅ (2026-07-22)
 
-**Sorun:** 16c'deki üç script de her karede `FindEntityByName("Player")`
-çağırıyor. Hem `O(n)`, hem kırılgan: entity'yi yeniden adlandırınca oyun
-**sessizce** bozuluyor.
+`ScriptFieldVisitor::Visit(name, EntityRef&)`, `ScriptFieldValue::Type::Entity`
+(UUID tutar), Inspector'da entity seçici, uçtan uca serileştirme + apply.
+`EntityRef` kendi header'ına çıkarıldı (`Components.h ↔ ScriptFields.h`
+dairesel bağımlılığını kırmak için). Entity seçici combo'su
+`EntityRefCombo` olarak component ve script alanlarınca paylaşılıyor.
+Birim testi: reflect → serialize → deserialize → apply → resolve.
 
-Parçalar zaten var: `EntityRef` (Faz 8), `FieldType::EntityRef` (A1).
-Eksik olan tek şey `ScriptFieldVisitor`'da `Visit(name, EntityRef&)`.
-
-- [ ] Visitor'a `EntityRef` aşırı yüklemesi
-- [ ] Inspector'da entity seçici (component alanlarındakinin aynısı)
-- [ ] Serileştirme (`ScriptFieldValue`'ya UUID türü)
+Script artık `FindEntityByName` yerine:
+```cpp
+FX::EntityRef m_Target;
+void OnReflect(FX::ScriptFieldVisitor& v) override { v.Visit("Hedef", m_Target); }
+// kullanim: GetScene()->FindEntityByUUID(m_Target.Target)
+```
 
 ---
 

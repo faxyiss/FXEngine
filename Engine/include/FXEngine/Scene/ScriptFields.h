@@ -18,6 +18,8 @@
 // A1'deki alan tablosuyla ayni felsefe.
 // ===========================================================================
 
+#include "FXEngine/Scene/EntityRef.h"
+
 #include <glm/glm.hpp>
 
 #include <string>
@@ -39,13 +41,19 @@ namespace FX
         virtual void Visit(const char* name, glm::vec3& value)   { (void)name; (void)value; }
         virtual void Visit(const char* name, glm::vec4& value)   { (void)name; (void)value; }
         virtual void Visit(const char* name, std::string& value) { (void)name; (void)value; }
+
+        // Hedef entity: script tarafinda FindEntityByName yerine. Inspector'da
+        // entity secici cizilir, deger UUID olarak kaydedilir, Play'de
+        // instance'a uygulanir. 16c'deki her karede ada gore arama bunu
+        // gerektirdi.
+        virtual void Visit(const char* name, EntityRef& value)   { (void)name; (void)value; }
     };
 
     // Bir script alaninin override degeri. NativeScriptComponent'te
     // ad -> deger olarak tutulur, sahne dosyasina serilestirilir.
     struct ScriptFieldValue
     {
-        enum class Type { Float, Int, Bool, Vec2, Vec3, Vec4, String };
+        enum class Type { Float, Int, Bool, Vec2, Vec3, Vec4, String, Entity };
         Type        Kind = Type::Float;
         float       F  = 0.0f;
         int         I  = 0;
@@ -54,6 +62,7 @@ namespace FX
         glm::vec3   V3 { 0.0f };
         glm::vec4   V4 { 0.0f };
         std::string S;
+        UUID        E{ 0 };   // Entity turu icin: hedefin UUID'si
     };
 
     using ScriptFieldMap = std::unordered_map<std::string, ScriptFieldValue>;
@@ -80,6 +89,8 @@ namespace FX
         { if (const auto* e = Find(name, ScriptFieldValue::Type::Vec4))   v = e->V4; }
         void Visit(const char* name, std::string& v) override
         { if (const auto* e = Find(name, ScriptFieldValue::Type::String)) v = e->S; }
+        void Visit(const char* name, EntityRef& v) override
+        { if (const auto* e = Find(name, ScriptFieldValue::Type::Entity)) v.Target = e->E; }
 
     private:
         const ScriptFieldValue* Find(const char* name, ScriptFieldValue::Type kind) const

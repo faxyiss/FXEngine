@@ -41,49 +41,51 @@ namespace FXEd::ComponentDrawer
             if (value > f.Max) value = f.Max;
         }
 
-        // --- Hedef secici (EntityRef) ---------------------------------------
+        // --- Hedef secici (entity combo'su) ---------------------------------
         // Entity'yi ADIYLA gosteriyoruz ama sakladigimiz sey UUID.
         // Arayuz okunabilir olmali, veri modeli kalici - ikisi ayni sey
         // olmak zorunda degil.
-        bool DrawEntityRef(const FX::FieldInfo& f, FX::EntityRef& ref, FX::Entity owner)
+        //
+        // Etiket cizilmis olarak gelir; bu yardimci yalnizca combo'yu cizer.
+        // Hem component EntityRef alanlari (Follow) hem de script EntityRef
+        // alanlari (A-3) bunu kullaniyor - iki kopya er gec ayrisirdi.
+        // Doner: hedef bu karede degistiyse true.
+        bool EntityRefCombo(const char* id, FX::UUID& target, FX::Scene* scene,
+                            FX::Entity exclude)
         {
-            FX::Scene* scene = owner.GetScene();
             if (!scene)
                 return false;
 
             bool changed = false;
-
-            FX::Entity target = scene->FindEntityByUUID(ref.Target);
+            FX::Entity current = scene->FindEntityByUUID(target);
 
             std::string preview = "Yok";
-            if (ref.IsSet())
+            if (target.IsValid())
             {
                 // Hedef dolu ama entity bulunamiyor: silinmis olabilir.
                 // Sessizce gizlemek yerine acikca gosteriyoruz.
-                preview = target
-                    ? target.GetName()
+                preview = current
+                    ? current.GetName()
                     : std::string("<kayip: ") +
-                      std::to_string(static_cast<std::uint64_t>(ref.Target)) + ">";
+                      std::to_string(static_cast<std::uint64_t>(target)) + ">";
             }
 
-            Label(f.Label);
-
-            if (!ImGui::BeginCombo("##ref", preview.c_str()))
+            if (!ImGui::BeginCombo(id, preview.c_str()))
                 return false;
 
-            if (ImGui::Selectable("Yok", !ref.IsSet()))
+            if (ImGui::Selectable("Yok", !target.IsValid()))
             {
-                ref.Clear();
+                target = FX::UUID(0);
                 changed = true;
             }
 
             auto view = scene->GetRegistry().view<FX::TagComponent, FX::IDComponent>();
-            for (auto id : view)
+            for (auto handle : view)
             {
-                FX::Entity candidate{ id, scene };
+                FX::Entity candidate{ handle, scene };
 
-                // Kendini takip etmek anlamsiz - secenegi hic sunma.
-                if (candidate == owner)
+                // Kendini secmek genelde anlamsiz - secenegi hic sunma.
+                if (exclude && candidate == exclude)
                     continue;
 
                 const auto uuid = candidate.GetComponent<FX::IDComponent>().ID;
@@ -91,9 +93,9 @@ namespace FXEd::ComponentDrawer
                 // Ayni isimde birden fazla entity olabilir; ImGui'nin ID
                 // yiginina UUID'yi itiyoruz ki secimler karismasin.
                 ImGui::PushID(static_cast<int>(static_cast<std::uint64_t>(uuid)));
-                if (ImGui::Selectable(candidate.GetName().c_str(), uuid == ref.Target))
+                if (ImGui::Selectable(candidate.GetName().c_str(), uuid == target))
                 {
-                    ref.Target = uuid;
+                    target  = uuid;
                     changed = true;
                 }
                 ImGui::PopID();
@@ -101,6 +103,12 @@ namespace FXEd::ComponentDrawer
 
             ImGui::EndCombo();
             return changed;
+        }
+
+        bool DrawEntityRef(const FX::FieldInfo& f, FX::EntityRef& ref, FX::Entity owner)
+        {
+            Label(f.Label);
+            return EntityRefCombo("##ref", ref.Target, owner.GetScene(), owner);
         }
 
         // Doner: bu alan bu karede degistiyse true (coklu secim yaymasi icin).
@@ -526,7 +534,10 @@ namespace FXEd::ComponentDrawer
         class ScriptFieldInspector : public FX::ScriptFieldVisitor
         {
         public:
-            explicit ScriptFieldInspector(FX::ScriptFieldMap& map) : m_Map(map) {}
+            // owner: EntityRef alani icin entity secici sahneye buradan
+            // ulasiyor. Diger tipler kullanmiyor.
+            ScriptFieldInspector(FX::ScriptFieldMap& map, FX::Entity owner)
+                : m_Map(map), m_Owner(owner) {}
 
             void Visit(const char* name, float& v) override
             {
@@ -577,6 +588,15 @@ namespace FXEd::ComponentDrawer
                 }
                 End();
             }
+            void Visit(const char* name, FX::EntityRef& v) override
+            {
+                Begin(name);
+                // exclude bos: script kendi entity'sini hedef gostermek
+                // isteyebilir (Follow'un aksine anlamli bir durum).
+                if (EntityRefCombo("##v", v.Target, m_Owner.GetScene(), FX::Entity{}))
+                    Set(name, T::Entity).E = v.Target;
+                End();
+            }
 
         private:
             using T = FX::ScriptFieldValue::Type;
@@ -603,10 +623,11 @@ namespace FXEd::ComponentDrawer
             }
 
             FX::ScriptFieldMap& m_Map;
+            FX::Entity          m_Owner;
             bool m_HeaderDrawn = false;
         };
 
-        void DrawScriptFields(FX::NativeScriptComponent& nsc)
+        void DrawScriptFields(FX::NativeScriptComponent& nsc, FX::Entity owner)
         {
             if (nsc.ScriptName.empty() || !FX::ScriptRegistry::Contains(nsc.ScriptName))
                 return;
@@ -624,7 +645,7 @@ namespace FXEd::ComponentDrawer
             FX::ScriptFieldApplier applier(nsc.Fields);
             probe->OnReflect(applier);
 
-            ScriptFieldInspector inspector(nsc.Fields);
+            ScriptFieldInspector inspector(nsc.Fields, owner);
             probe->OnReflect(inspector);
 
             delete probe;   // ayni CRT (/MD): DLL'de new, burada delete guvenli
@@ -671,8 +692,7 @@ namespace FXEd::ComponentDrawer
 
             // Script'in OnReflect ile actigi alanlar (m_Speed gibi). Deger
             // component'te veri olarak duruyor, Play'de instance'a uygulaniyor.
-            DrawScriptFields(nsc);
-            (void)owner;
+            DrawScriptFields(nsc, owner);
         }
 
         void DrawFollowExtras(void*, FX::Entity owner)

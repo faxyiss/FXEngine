@@ -191,6 +191,7 @@ namespace FX
                         case ScriptFieldValue::Type::Vec3:   fj = { {"t", "v3"}, {"v", { v.V3.x, v.V3.y, v.V3.z }} }; break;
                         case ScriptFieldValue::Type::Vec4:   fj = { {"t", "v4"}, {"v", { v.V4.x, v.V4.y, v.V4.z, v.V4.w }} }; break;
                         case ScriptFieldValue::Type::String: fj = { {"t", "s"}, {"v", v.S} }; break;
+                        case ScriptFieldValue::Type::Entity: fj = { {"t", "e"}, {"v", static_cast<std::uint64_t>(v.E)} }; break;
                         }
                         fields[name] = fj;
                     }
@@ -223,6 +224,8 @@ namespace FX
                         else if (t == "v4" && v.is_array() && v.size() == 4)
                         { val.Kind = ScriptFieldValue::Type::Vec4; val.V4 = { v[0], v[1], v[2], v[3] }; }
                         else if (t == "s")  { val.Kind = ScriptFieldValue::Type::String; val.S = v.get<std::string>(); }
+                        else if (t == "e" && v.is_number_unsigned())
+                        { val.Kind = ScriptFieldValue::Type::Entity; val.E = UUID(v.get<std::uint64_t>()); }
                         else continue;
 
                         nsc.Fields[name] = std::move(val);

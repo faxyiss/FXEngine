@@ -40,6 +40,20 @@ namespace
         }
     };
 
+    // A-3: EntityRef script alani. Hedefi FindEntityByName yerine
+    // kaydedilmis referanstan okuyor.
+    class TargetingScript : public FX::ScriptableEntity
+    {
+    public:
+        FX::EntityRef m_Target;
+
+        // Test dogrudan cagiriyor: normalde motor cagirir, protected.
+        void OnReflect(FX::ScriptFieldVisitor& v) override
+        {
+            v.Visit("Hedef", m_Target);
+        }
+    };
+
     // Testler kayit defterine bagli; her testte yeniden kaydetmek
     // yerine bir kez, ilk kullanimda.
     void EnsureRegistered()
@@ -50,6 +64,7 @@ namespace
 
         FX::ScriptRegistry::Register<CountingScript>("Counting");
         FX::ScriptRegistry::Register<MoveRightScript>("MoveRight");
+        FX::ScriptRegistry::Register<TargetingScript>("Targeting");
         done = true;
     }
 }
@@ -229,4 +244,59 @@ TEST_CASE("Script adi sahne dosyasina yazilip geri okunuyor", "[script][serializ
     loaded.OnRuntimeStart();
     CHECK(g_Counters.Created == 1);
     loaded.OnRuntimeStop();
+}
+
+TEST_CASE("EntityRef script alani kaydedilip Play'de uygulaniyor", "[script][serializer]")
+{
+    // A-3: script'in "Hedef" alani sahneye UUID olarak yazilmali ve
+    // yuklendikten sonra da dogru entity'yi gostermeli.
+    FXTest::TempProject project;
+    EnsureRegistered();
+
+    FX::UUID avciID, hedefID;
+    {
+        FX::Scene scene;
+        FX::Entity avci  = scene.CreateEntity("Avci");
+        FX::Entity hedef = scene.CreateEntity("Hedef");
+        avciID  = avci.GetUUID();
+        hedefID = hedef.GetUUID();
+
+        auto& nsc = avci.AddComponent<FX::NativeScriptComponent>("Targeting");
+
+        // Editor'un yapacagi sey: alan haritasina UUID yaz.
+        FX::ScriptFieldValue val;
+        val.Kind = FX::ScriptFieldValue::Type::Entity;
+        val.E    = hedefID;
+        nsc.Fields["Hedef"] = val;
+
+        FX::SceneSerializer serializer(&scene, nullptr);
+        REQUIRE(serializer.Serialize("assets/scenes/hedef.fxscene"));
+    }
+
+    FX::Scene loaded;
+    FX::SceneSerializer serializer(&loaded, nullptr);
+    REQUIRE(serializer.Deserialize("assets/scenes/hedef.fxscene"));
+
+    FX::Entity avci = loaded.FindEntityByUUID(avciID);
+    REQUIRE(avci);
+
+    // Alan UUID olarak geri okundu mu?
+    const auto& nsc = avci.GetComponent<FX::NativeScriptComponent>();
+    const auto it = nsc.Fields.find("Hedef");
+    REQUIRE(it != nsc.Fields.end());
+    CHECK(it->second.Kind == FX::ScriptFieldValue::Type::Entity);
+    CHECK(static_cast<std::uint64_t>(it->second.E) ==
+          static_cast<std::uint64_t>(hedefID));
+
+    // Applier degeri instance'a yaziyor mu?
+    TargetingScript probe;
+    FX::ScriptFieldApplier applier(nsc.Fields);
+    probe.OnReflect(applier);
+    CHECK(static_cast<std::uint64_t>(probe.m_Target.Target) ==
+          static_cast<std::uint64_t>(hedefID));
+
+    // Ve o UUID gercekten yuklenen sahnedeki Hedef'i gosteriyor.
+    FX::Entity resolved = loaded.FindEntityByUUID(probe.m_Target.Target);
+    REQUIRE(resolved);
+    CHECK(resolved.GetName() == "Hedef");
 }

@@ -18,6 +18,7 @@
 
 #include "FXEngine/Renderer/Texture.h"
 #include "FXEngine/Core/UUID.h"
+#include "FXEngine/Scene/EntityRef.h"
 #include "FXEngine/Scene/ScriptFields.h"
 
 #include <memory>
@@ -167,33 +168,8 @@ namespace FX
     };
 
     // -----------------------------------------------------------------------
-    // EntityRef - baska bir entity'ye KALICI referans
-    // -----------------------------------------------------------------------
-    // BU, FAZ 8'IN ASIL SEBEBIDIR.
-    //
-    // Neden dogrudan Entity (veya entt::entity) saklamiyoruz?
-    //   1) entt::entity yuklemede degisir -> dosyaya yazilamaz
-    //   2) Hedef silinirse tutamak GECERSIZ olur ama GECERLI GORUNUR
-    //      (EnTT kimlikleri geri donusturur) -> sessizce yanlis entity'ye
-    //      baglanirsin. Faz 7'de bu tuzagi bizzat yasadik.
-    //
-    // UUID saklayip GEC COZUMLEME (lazy resolve) yapmak ikisini de cozer:
-    // hedef yoksa arama basarisiz olur ve bunu ANLARIZ.
-    //
-    // Bilincli olarak Scene'i BILMIYOR - sadece bir UUID tasiyor. Cozumleme
-    // Scene::FindEntityByUUID ile cagiran tarafta yapilir. Boylece
-    // Components.h, Scene.h'i include etmek zorunda kalmiyor (dairesel
-    // bagimlilik olurdu).
-    struct EntityRef
-    {
-        UUID Target{ 0 };   // 0 = hedef yok
-
-        EntityRef() = default;
-        EntityRef(UUID target) : Target(target) {}
-
-        bool IsSet() const { return Target.IsValid(); }
-        void Clear() { Target = UUID(0); }
-    };
+    // EntityRef artik kendi header'inda (FXEngine/Scene/EntityRef.h) -
+    // ScriptFields.h de ona ihtiyac duydugu icin ortak alt basliga alindi.
 
     // -----------------------------------------------------------------------
     // FollowComponent - "su entity'yi takip et"

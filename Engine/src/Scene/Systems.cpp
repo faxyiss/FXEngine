@@ -154,6 +154,15 @@ namespace FX
             }
 
             nsc.Instance->m_Entity = Entity{ entityID, &scene };
+
+            // Editörde ayarlanan alan override'larini OnCreate'ten ONCE
+            // uygula: script kendi OnCreate'inde bu degerlere guvenebilsin.
+            if (!nsc.Fields.empty())
+            {
+                ScriptFieldApplier applier(nsc.Fields);
+                nsc.Instance->OnReflect(applier);
+            }
+
             nsc.Instance->OnCreate();
         }
     }

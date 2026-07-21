@@ -18,6 +18,7 @@
 // ===========================================================================
 
 #include "FXEngine/Scene/Entity.h"
+#include "FXEngine/Scene/ScriptFields.h"
 
 namespace FX
 {
@@ -25,6 +26,15 @@ namespace FX
     {
     public:
         virtual ~ScriptableEntity() = default;
+
+        // Script'in editörden ayarlanabilir / kaydedilebilir alanlarini
+        // bildirir. Varsayilan: hic alan yok. Script override eder:
+        //   void OnReflect(FX::ScriptFieldVisitor& v) override {
+        //       v.Visit("Hiz", m_Speed);
+        //   }
+        // Ayni gezi hem Inspector cizimi hem serilestirme hem de DLL
+        // yeniden yuklendiginde deger uygulama icin kullaniliyor.
+        virtual void OnReflect(ScriptFieldVisitor& visitor) { (void)visitor; }
 
         // Script kendi entity'sine buradan ulasir; GetComponent<T>()
         // yazmak entity.GetComponent<T>() yazmaktan kisa ve script

@@ -6,6 +6,8 @@
 #include <FXEngine/Core/Log.h>
 #include <FXEngine/Scene/Components.h>
 #include <FXEngine/Scene/Scene.h>
+#include <FXEngine/Scene/ScriptableEntity.h>
+#include <FXEngine/Scene/ScriptFields.h>
 #include <FXEngine/Scene/ScriptRegistry.h>
 
 #include <imgui.h>
@@ -517,6 +519,117 @@ namespace FXEd::ComponentDrawer
             ImGui::TextDisabled("Konum ve donme Transform'dan gelir.");
         }
 
+        // Script alanlarini cizen ziyaretci. Widget'a bagli deger, GECICI
+        // bir instance'in canli uyesi (override ya da varsayilanla dolu);
+        // degisince nsc.Fields haritasina yaziliyor. Ilk alanda basligi
+        // bir kez ciziyor - hic alani olmayan script'te baslik gorunmesin.
+        class ScriptFieldInspector : public FX::ScriptFieldVisitor
+        {
+        public:
+            explicit ScriptFieldInspector(FX::ScriptFieldMap& map) : m_Map(map) {}
+
+            void Visit(const char* name, float& v) override
+            {
+                Begin(name);
+                if (ImGui::DragFloat("##v", &v, 0.05f)) Set(name, T::Float).F = v;
+                End();
+            }
+            void Visit(const char* name, int& v) override
+            {
+                Begin(name);
+                if (ImGui::DragInt("##v", &v)) Set(name, T::Int).I = v;
+                End();
+            }
+            void Visit(const char* name, bool& v) override
+            {
+                Begin(name);
+                if (ImGui::Checkbox("##v", &v)) Set(name, T::Bool).B = v;
+                End();
+            }
+            void Visit(const char* name, glm::vec2& v) override
+            {
+                Begin(name);
+                if (ImGui::DragFloat2("##v", glm::value_ptr(v), 0.05f)) Set(name, T::Vec2).V2 = v;
+                End();
+            }
+            void Visit(const char* name, glm::vec3& v) override
+            {
+                Begin(name);
+                if (ImGui::DragFloat3("##v", glm::value_ptr(v), 0.05f)) Set(name, T::Vec3).V3 = v;
+                End();
+            }
+            void Visit(const char* name, glm::vec4& v) override
+            {
+                Begin(name);
+                if (ImGui::DragFloat4("##v", glm::value_ptr(v), 0.05f)) Set(name, T::Vec4).V4 = v;
+                End();
+            }
+            void Visit(const char* name, std::string& v) override
+            {
+                Begin(name);
+                char buffer[256];
+                std::memset(buffer, 0, sizeof(buffer));
+                std::strncpy(buffer, v.c_str(), sizeof(buffer) - 1);
+                if (ImGui::InputText("##v", buffer, sizeof(buffer)))
+                {
+                    v = buffer;
+                    Set(name, T::String).S = v;
+                }
+                End();
+            }
+
+        private:
+            using T = FX::ScriptFieldValue::Type;
+
+            void Begin(const char* name)
+            {
+                if (!m_HeaderDrawn)
+                {
+                    ImGui::SeparatorText("Script Alanlari");
+                    m_HeaderDrawn = true;
+                }
+                ImGui::PushID(name);
+                Label(name);
+            }
+            void End() { ImGui::PopID(); }
+
+            // Haritada alani dogru TIPLE olusturur/gunceller ve referansini
+            // verir; cagiran uygun uyeyi dolduruyor.
+            FX::ScriptFieldValue& Set(const char* name, T kind)
+            {
+                FX::ScriptFieldValue& e = m_Map[name];
+                e.Kind = kind;
+                return e;
+            }
+
+            FX::ScriptFieldMap& m_Map;
+            bool m_HeaderDrawn = false;
+        };
+
+        void DrawScriptFields(FX::NativeScriptComponent& nsc)
+        {
+            if (nsc.ScriptName.empty() || !FX::ScriptRegistry::Contains(nsc.ScriptName))
+                return;
+
+            // Edit modunda instance yok; alan listesini ve tiplerini
+            // ogrenmek icin GECICI bir instance uretip reflect ediyoruz.
+            // Ucuz (birkac alan) ve her kare yeniden yapiliyor - deger
+            // haritada kalici oldugu icin sorun degil.
+            FX::ScriptableEntity* probe = FX::ScriptRegistry::Create(nsc.ScriptName);
+            if (!probe)
+                return;
+
+            // Once mevcut override'lari uygula: widget'lar guncel degeri
+            // gostersin (override yoksa script'in varsayilani).
+            FX::ScriptFieldApplier applier(nsc.Fields);
+            probe->OnReflect(applier);
+
+            ScriptFieldInspector inspector(nsc.Fields);
+            probe->OnReflect(inspector);
+
+            delete probe;   // ayni CRT (/MD): DLL'de new, burada delete guvenli
+        }
+
         void DrawScriptExtras(void* component, FX::Entity owner)
         {
             auto& nsc = *static_cast<FX::NativeScriptComponent*>(component);
@@ -555,6 +668,10 @@ namespace FXEd::ComponentDrawer
             // calismiyor?" sorusunu bastan cevapliyor.
             ImGui::TextDisabled(nsc.Instance ? "Durum: calisiyor"
                                              : "Durum: Play'de baslayacak");
+
+            // Script'in OnReflect ile actigi alanlar (m_Speed gibi). Deger
+            // component'te veri olarak duruyor, Play'de instance'a uygulaniyor.
+            DrawScriptFields(nsc);
             (void)owner;
         }
 

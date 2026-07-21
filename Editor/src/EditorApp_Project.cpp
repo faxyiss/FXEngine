@@ -119,15 +119,23 @@ namespace FXGame
         void OnUpdate(float dt) override
         {
             auto& tf = GetComponent<FX::TransformComponent>();
-
-            // Ornek: saniyede 1 birim saga.
-            tf.Translation.x += 1.0f * dt;
+            tf.Translation.x += m_Speed * dt;
         }
 
         // Stop'ta veya entity silindiginde bir kez.
         void OnDestroy() override
         {
         }
+
+        // Editörden ayarlanabilir alanlar. Burada bildirdigin her alan
+        // Inspector'da gorunur, sahneye kaydedilir ve Play'de uygulanir.
+        void OnReflect(FX::ScriptFieldVisitor& v) override
+        {
+            v.Visit("Hiz", m_Speed);
+        }
+
+    private:
+        float m_Speed = 1.0f;   // birim/saniye
     };
 }
 )TPL";

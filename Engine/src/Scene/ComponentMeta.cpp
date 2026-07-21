@@ -168,7 +168,66 @@ namespace FX
         ComponentRegistry::Register<NativeScriptComponent>("NativeScript", "Native Script")
             // Ad, kayitli script'ler listesinden secilir; serbest metin
             // kutusu yanlis ad yazmayi mumkun kilardi.
-            .Field<&NativeScriptComponent::ScriptName>("Name", "Script").CustomUI();
+            .Field<&NativeScriptComponent::ScriptName>("Name", "Script").CustomUI()
+            // Script alan override'lari (ad -> deger) alan tablosunun ifade
+            // edemedigi veri: SaveExtra/LoadExtra ile JSON'a yaziliyor.
+            .Extra(
+                [](const void* comp, json& out)
+                {
+                    const auto& nsc = *static_cast<const NativeScriptComponent*>(comp);
+                    if (nsc.Fields.empty())
+                        return;
+
+                    json fields = json::object();
+                    for (const auto& [name, v] : nsc.Fields)
+                    {
+                        json fj;
+                        switch (v.Kind)
+                        {
+                        case ScriptFieldValue::Type::Float:  fj = { {"t", "f"}, {"v", v.F} }; break;
+                        case ScriptFieldValue::Type::Int:    fj = { {"t", "i"}, {"v", v.I} }; break;
+                        case ScriptFieldValue::Type::Bool:   fj = { {"t", "b"}, {"v", v.B} }; break;
+                        case ScriptFieldValue::Type::Vec2:   fj = { {"t", "v2"}, {"v", { v.V2.x, v.V2.y }} }; break;
+                        case ScriptFieldValue::Type::Vec3:   fj = { {"t", "v3"}, {"v", { v.V3.x, v.V3.y, v.V3.z }} }; break;
+                        case ScriptFieldValue::Type::Vec4:   fj = { {"t", "v4"}, {"v", { v.V4.x, v.V4.y, v.V4.z, v.V4.w }} }; break;
+                        case ScriptFieldValue::Type::String: fj = { {"t", "s"}, {"v", v.S} }; break;
+                        }
+                        fields[name] = fj;
+                    }
+                    out["Fields"] = fields;
+                },
+                [](void* comp, const json& in, TextureLibrary*)
+                {
+                    auto& nsc = *static_cast<NativeScriptComponent*>(comp);
+                    nsc.Fields.clear();
+
+                    if (!in.contains("Fields") || !in["Fields"].is_object())
+                        return;
+
+                    for (const auto& [name, fj] : in["Fields"].items())
+                    {
+                        if (!fj.contains("t") || !fj.contains("v"))
+                            continue;
+
+                        const std::string t = fj["t"].get<std::string>();
+                        const json& v = fj["v"];
+                        ScriptFieldValue val;
+
+                        if      (t == "f")  { val.Kind = ScriptFieldValue::Type::Float;  val.F = v.get<float>(); }
+                        else if (t == "i")  { val.Kind = ScriptFieldValue::Type::Int;    val.I = v.get<int>(); }
+                        else if (t == "b")  { val.Kind = ScriptFieldValue::Type::Bool;   val.B = v.get<bool>(); }
+                        else if (t == "v2" && v.is_array() && v.size() == 2)
+                        { val.Kind = ScriptFieldValue::Type::Vec2; val.V2 = { v[0], v[1] }; }
+                        else if (t == "v3" && v.is_array() && v.size() == 3)
+                        { val.Kind = ScriptFieldValue::Type::Vec3; val.V3 = { v[0], v[1], v[2] }; }
+                        else if (t == "v4" && v.is_array() && v.size() == 4)
+                        { val.Kind = ScriptFieldValue::Type::Vec4; val.V4 = { v[0], v[1], v[2], v[3] }; }
+                        else if (t == "s")  { val.Kind = ScriptFieldValue::Type::String; val.S = v.get<std::string>(); }
+                        else continue;
+
+                        nsc.Fields[name] = std::move(val);
+                    }
+                });
 
         FX_CORE_INFO("ComponentRegistry: %zu component kayitli.", Entries().size());
     }

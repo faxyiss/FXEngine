@@ -133,6 +133,7 @@ edilmeli.
 ### Orta
 | Sorun | Nerede |
 |---|---|
+| ~~Script alanları Inspector'dan ayarlanamıyor~~ | ✅ `OnReflect` + `NativeScriptComponent::Fields` ([Faz-ScriptAlanlari-Notlar.md](Faz-ScriptAlanlari-Notlar.md)). **Not:** vtable değişti, projelerde bir kez "Derle" gerekiyor |
 | Prefab bağlantısı yok (örnek kaynağından bağımsız, override sistemi yok) | `PrefabSerializer` |
 | Linux/macOS dosya diyalogları boş gövde, dosya izleyici yok | `FileDialogs.cpp`, `FileWatcher.cpp` |
 | ~~Çoklu seçimde Inspector yalnızca birincili düzenliyor~~ | ✅ kapatıldı: değişen alan + component ekleme/silme tüm seçili entity'lere uygulanıyor (`ComponentDrawer`, `SceneHierarchyPanel`) |

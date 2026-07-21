@@ -18,6 +18,7 @@
 
 #include "FXEngine/Renderer/Texture.h"
 #include "FXEngine/Core/UUID.h"
+#include "FXEngine/Scene/ScriptFields.h"
 
 #include <memory>
 #include <string>
@@ -252,6 +253,12 @@ namespace FX
     struct NativeScriptComponent
     {
         std::string ScriptName;
+
+        // Script alanlarinin editörde ayarlanan override degerleri
+        // (ad -> deger). VERI: instance'ta degil burada durur, cunku DLL
+        // yeniden yuklendiginde instance yok olup yeniden yaratiliyor.
+        // Serilestirilir; Play'de OnCreate'ten once instance'a uygulanir.
+        ScriptFieldMap Fields;
 
         ScriptableEntity* Instance = nullptr;
 

@@ -166,19 +166,17 @@ namespace FX
         }
 
         // Prefab ICINE bakan referanslari yeni kimliklere cevir. Disariya
-        // bakan bir referans varsa dokunmuyoruz: sahnede o entity hala
-        // duruyor olabilir ve kullanicinin kastettigi sey odur.
-        for (auto& kv : remap)
-        {
-            Entity entity = kv.second;
-            if (!entity.HasComponent<FollowComponent>())
-                continue;
+        // bakan referanslara dokunulmuyor (RemapReferences tabloda olmayani
+        // birakiyor). Ortak yardimci hem component EntityRef alanlarini hem
+        // de script Entity alanlarini kapsiyor - eskiden burasi yalnizca
+        // FollowComponent'i ceviriyordu ve script referanslarini iskaliyordu.
+        std::unordered_map<UUID, UUID> uuidRemap;
+        uuidRemap.reserve(remap.size());
+        for (auto& [oldID, newEntity] : remap)
+            uuidRemap[oldID] = newEntity.GetUUID();
 
-            auto& fc = entity.GetComponent<FollowComponent>();
-            auto it = remap.find(fc.Target.Target);
-            if (it != remap.end())
-                fc.Target.Target = it->second.GetUUID();
-        }
+        for (auto& [oldID, newEntity] : remap)
+            Detail::RemapReferences(newEntity, uuidRemap);
 
         newRoot.GetComponent<TransformComponent>().Translation = position;
 

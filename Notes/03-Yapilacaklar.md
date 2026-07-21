@@ -50,31 +50,30 @@ void OnReflect(FX::ScriptFieldVisitor& v) override { v.Visit("Hedef", m_Target);
 
 ## B. Editör — sahne düzenleme
 
-### B-1. Hiyerarşide sıra değiştirme
+### B-1. Hiyerarşide sıra değiştirme ✅ kısmen (2026-07-22)
 
-Şu an sıra: çocuklar `RelationshipComponent`'in çocuk listesi sırasında,
-**kökler ise `entt` view sırasında** — yani kullanıcının denetiminde değil.
+`Entity::MoveInParent(±1)` çocuğu listede kaydırıyor, hiyerarşi menüsünde
+"Yukarı/Aşağı Taşı", Undo'ya bağlı. **Serileştirme artık hiyerarşi (DFS)
+sırasında yazıyor** → çocuk sırası kaydet/yükle sonrası korunuyor
+(eskiden entt sırasına dönüyordu). 3 birim testi.
 
-- [ ] Çocuklar için "Üste Al" / "Alta Koy" (liste içinde kaydırma)
-- [ ] Sürükle-bırakla iki satır **arasına** bırakma (şu an sadece "üzerine"
-      bırakma var, o da parent yapıyor)
-- [ ] **Kökler için sıra kavramı yok** — çözülmesi gerek: ya bir
-      `SceneOrder` alanı ya da köklerin de bir listede tutulması.
-      Sahne dosyası formatını etkiler (sürüm 5?)
-- [ ] Sıra serileştirilmeli, yoksa her yüklemede karışır
-- [ ] Undo'ya bağlanmalı
+**Kalan (B-1b):**
+- [ ] **Kökler için sıra yok** — hâlâ entt view sırasında. Kök sırası bir
+      yerde tutulmalı (sahne formatı sürüm 5) — MoveInParent kökte no-op
+- [ ] Sürükle-bırakla iki satır **arasına** bırakma (şu an sadece "üzerine",
+      o da parent yapıyor)
 
-### B-2. Hiyerarşide kopyala / yapıştır / çoğalt
+### B-2. Hiyerarşide kopyala / yapıştır / çoğalt ✅ (2026-07-22)
 
-İçerik panelinde var (Ctrl+C/X/V), hiyerarşide **yok**.
+`Scene::DuplicateEntity` (yeni UUID'ler, iç referansları içe çeviriyor,
+kaynağın kardeşi), Ctrl+D çoğalt / Ctrl+C-Ctrl+V kopyala-yapıştır,
+hiyerarşi menüsü + Düzen menüsü, hepsi Undo'ya bağlı, çoklu seçim tek adım.
+Ortak `Detail::RemapReferences` hem Follow hem A-3 script referanslarını
+çeviriyor — bu arada **PrefabSerializer'ın script EntityRef alanını ıskalayan
+gizli açığı da kapandı**. 5 birim testi.
 
-- [ ] Ctrl+C / Ctrl+V / Ctrl+D (çoğalt) — entity ağacını kopyalar
-- [ ] Kopyada **yeni UUID'ler** üretilmeli (prefab örneklemenin yaptığı gibi;
-      `EntitySnapshot` UUID *korur*, bu yüzden doğrudan kullanılamaz — kimlik
-      yeniden üretme adımı gerekiyor)
-- [ ] İç referanslar kopyanın içine bakmalı (A→B referansı, kopyada A'→B')
-- [ ] Yapıştırma hedefi: seçili entity'nin altına mı, kardeşi olarak mı? (karar)
-- [ ] Undo'ya bağlanmalı
+**Kalan:** pano UUID tutuyor (aynı sahne içi); sahneler arası kopyalama
+snapshot gerektirir — sonraki tur.
 
 ### B-3. Undo'nun kalanı
 

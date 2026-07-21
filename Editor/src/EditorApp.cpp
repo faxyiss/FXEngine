@@ -463,10 +463,17 @@ namespace FXEd
             case FX::Key::Y:
                 if (ctrl) { RedoEdit(); return true; }
                 return false;
+            case FX::Key::D:
+                if (ctrl) { DuplicateSelection(); return true; }
+                return false;
+            case FX::Key::V:
+                if (ctrl) { PasteClipboard(); return true; }
+                return false;
             case FX::Key::X:
                 if (m_ViewportHovered) { m_GizmoOperation = ImGuizmo::TRANSLATE; return true; }
                 return false;
             case FX::Key::C:
+                if (ctrl) { CopySelection(); return true; }
                 if (m_ViewportHovered) { m_GizmoOperation = ImGuizmo::ROTATE; return true; }
                 return false;
             case FX::Key::B:

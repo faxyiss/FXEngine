@@ -585,6 +585,62 @@ namespace FXEd
         SetStatus(std::to_string(deleted) + " entity silindi (Ctrl+Z ile geri)");
     }
 
+    void EditorApp::DuplicateSelection()
+    {
+        if (IsPlaying() || m_Selection.IsEmpty())
+            return;
+
+        // Yalnizca KOKLERI cogalt: secimde hem parent hem cocugu varsa,
+        // cocuk zaten parent'in alt agacinda kopyalaniyor - ikinci kez
+        // cogaltmak cift kopya olurdu.
+        std::vector<FX::Entity> roots;
+        for (FX::Entity e : m_Selection.GetAll())
+        {
+            bool ancestorSelected = false;
+            for (FX::Entity other : m_Selection.GetAll())
+                if (other != e && other.IsAncestorOf(e)) { ancestorSelected = true; break; }
+            if (!ancestorSelected)
+                roots.push_back(e);
+        }
+
+        const int n = Structural::DuplicateEntities(roots, "Cogalt");
+        SetStatus(std::to_string(n) + " entity cogaltildi");
+    }
+
+    void EditorApp::CopySelection()
+    {
+        if (m_Selection.IsEmpty())
+            return;
+
+        m_EntityClipboard.clear();
+        for (FX::Entity e : m_Selection.GetAll())
+            m_EntityClipboard.push_back(e.GetUUID());
+
+        SetStatus(std::to_string(m_EntityClipboard.size()) + " entity kopyalandi");
+    }
+
+    void EditorApp::PasteClipboard()
+    {
+        if (IsPlaying() || m_EntityClipboard.empty())
+            return;
+
+        // Pano UUID tutuyor; kaynak entity'ler o zamandan beri silinmis
+        // olabilir - hala var olanlari cogaltiyoruz.
+        std::vector<FX::Entity> sources;
+        for (FX::UUID id : m_EntityClipboard)
+            if (FX::Entity e = m_Scene->FindEntityByUUID(id))
+                sources.push_back(e);
+
+        if (sources.empty())
+        {
+            SetStatus("Pano bos ya da kaynak entity'ler artik yok.");
+            return;
+        }
+
+        const int n = Structural::DuplicateEntities(sources, "Yapistir");
+        SetStatus(std::to_string(n) + " entity yapistirildi");
+    }
+
     void EditorApp::ApplyGizmoDelta(const glm::mat4& delta, FX::Entity primary)
     {
         for (FX::Entity entity : m_Selection.GetAll())

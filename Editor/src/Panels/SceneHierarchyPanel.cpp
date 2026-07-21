@@ -58,6 +58,9 @@ namespace FXEd
         // dizi altimizdan degisir. Bu yuzden silme istegini bir
         // degiskende biriktirip dongu BITTIKTEN SONRA uyguluyoruz.
         m_ToDelete.clear();
+        m_ToDuplicate.clear();
+        m_ReorderEntity = {};
+        m_ReorderDir    = 0;
         m_VisibleOrder.clear();
         m_ClickTarget    = {};
         m_ReparentChild  = {};
@@ -129,6 +132,29 @@ namespace FXEd
         {
             Structural::CreateEntity("Yeni Entity", m_CreateChildOf);
             m_CreateChildOf = {};
+        }
+
+        if (m_ReorderEntity && m_ReorderDir != 0)
+        {
+            Structural::MoveInParent(m_ReorderEntity, m_ReorderDir);
+            m_ReorderEntity = {};
+            m_ReorderDir    = 0;
+        }
+
+        if (!m_ToDuplicate.empty())
+        {
+            // Yalnizca kokleri cogalt: secimde hem parent hem cocugu varsa
+            // cocuk zaten parent'in alt agacinda kopyalanir.
+            std::vector<FX::Entity> roots;
+            for (FX::Entity e : m_ToDuplicate)
+            {
+                bool ancestorSelected = false;
+                for (FX::Entity other : m_ToDuplicate)
+                    if (other != e && other.IsAncestorOf(e)) { ancestorSelected = true; break; }
+                if (!ancestorSelected)
+                    roots.push_back(e);
+            }
+            Structural::DuplicateEntities(roots, "Cogalt");
         }
 
         if (m_ReparentChild)
@@ -282,6 +308,19 @@ namespace FXEd
             {
                 m_ReparentChild  = entity;
                 m_ReparentToRoot = true;
+            }
+            if (ImGui::MenuItem("Cogalt"))
+            {
+                if (multi) m_ToDuplicate = m_Selection->GetAll();
+                else       m_ToDuplicate.push_back(entity);
+            }
+
+            // Siralama yalnizca bir parent'i olan (kok olmayan) entity'de
+            // anlamli; kok sirasi henuz cozulmedi.
+            if (entity.GetParent())
+            {
+                if (ImGui::MenuItem("Yukari Tasi"))  { m_ReorderEntity = entity; m_ReorderDir = -1; }
+                if (ImGui::MenuItem("Asagi Tasi"))   { m_ReorderEntity = entity; m_ReorderDir = +1; }
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Prefab Olarak Kaydet..."))

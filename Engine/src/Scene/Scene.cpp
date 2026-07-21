@@ -4,6 +4,8 @@
 #include "FXEngine/Scene/Components.h"
 #include "FXEngine/Scene/Systems.h"
 
+#include "Scene/EntitySerialization.h"
+
 #include <algorithm>
 
 namespace FX
@@ -44,6 +46,79 @@ namespace FX
             scripts.get<NativeScriptComponent>(handle).Instance = nullptr;
 
         return target;
+    }
+
+    Entity Scene::DuplicateEntity(Entity source)
+    {
+        if (!source || !source.HasComponent<IDComponent>())
+            return {};
+
+        // Kaynak alt agacini KOK once topl (parent cocuktan once islensin).
+        std::vector<Entity> subtree;
+        {
+            std::vector<Entity> stack{ source };
+            while (!stack.empty())
+            {
+                Entity e = stack.back();
+                stack.pop_back();
+                subtree.push_back(e);
+                for (Entity child : e.GetChildren())
+                    stack.push_back(child);
+            }
+        }
+
+        // 1. gecis: yeni kimliklerle olustur, component'leri KOPYALA.
+        std::unordered_map<UUID, UUID> remap;   // eski UUID -> yeni UUID
+        std::unordered_map<UUID, Entity> newByOld;
+
+        for (Entity src : subtree)
+        {
+            Entity dst = CreateEntity();   // yeni UUID
+            for (const ComponentInfo& info : ComponentRegistry::GetAll())
+                info.CopyTo(dst, src);
+
+            // CopyTo, Relationship'i de ESKI UUID'lerle kopyaladi; hiyerarsiyi
+            // ikinci geciste SetParent ile yeniden kuracagiz, o yuzden bu
+            // kopyayi temizliyoruz - yoksa parent'in cocuk listesinde hem
+            // eski hem yeni kimlikler kalirdi.
+            if (dst.HasComponent<RelationshipComponent>())
+                dst.RemoveComponent<RelationshipComponent>();
+
+            // Script ornegi kopyalanmaz, yalnizca veri (Scene::Copy gibi).
+            if (dst.HasComponent<NativeScriptComponent>())
+                dst.GetComponent<NativeScriptComponent>().Instance = nullptr;
+
+            const UUID oldID = src.GetComponent<IDComponent>().ID;
+            remap[oldID]     = dst.GetComponent<IDComponent>().ID;
+            newByOld[oldID]  = dst;
+        }
+
+        // 2. gecis: hiyerarsiyi kur. Kok, kaynagin KARDESI olur.
+        Entity newRoot = newByOld[source.GetComponent<IDComponent>().ID];
+
+        for (Entity src : subtree)
+        {
+            Entity dst = newByOld[src.GetComponent<IDComponent>().ID];
+
+            if (src == source)
+            {
+                // Kaynak bir cocuksa kopya da ayni parent'in cocugu olur.
+                if (Entity parent = source.GetParent())
+                    dst.SetParent(parent);
+            }
+            else if (Entity srcParent = src.GetParent())
+            {
+                // Ic parent: mutlaka remap'te (alt agacin tamami tarandi).
+                dst.SetParent(newByOld[srcParent.GetComponent<IDComponent>().ID]);
+            }
+        }
+
+        // 3. gecis: ic referanslari yeni kimliklere cevir (Follow, EntityRef,
+        // script Entity alanlari). Disariya bakanlar oldugu gibi kalir.
+        for (auto& [oldID, dst] : newByOld)
+            Detail::RemapReferences(dst, remap);
+
+        return newRoot;
     }
 
     Entity Scene::GetPrimaryCameraEntity()

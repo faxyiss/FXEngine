@@ -56,6 +56,18 @@ namespace FX
         // Yeni bir UUID uretir.
         Entity CreateEntity(const std::string& name = "Entity");
 
+        // Bir entity'yi (ve TUM alt agacini) YENI kimliklerle cogaltir.
+        // Kopya, kaynagin KARDESI olur (ayni parent). Doner: kopyanin koku.
+        //
+        // Scene::Copy'den farki kimlik: orada UUID'ler KORUNUR (ayni sahnenin
+        // baska bir hali), burada YENIDEN URETILIR (yeni nesneler, iki ornek
+        // ayni kimlige sahip olamaz - prefab orneklemenin mantigi).
+        //
+        // Ic referanslar (Follow hedefi, EntityRef script alanlari) kopyanin
+        // ICINE cevrilir; disariya bakan referanslar oldugu gibi kalir.
+        // Script ORNEKLERI kopyalanmaz (Scene::Copy gibi) - yalnizca veri.
+        Entity DuplicateEntity(Entity source);
+
         // BELIRLI bir UUID ile olusturur - sahne YUKLERKEN kullanilir.
         // Dosyadaki kimligi korumak sart: korumazsak entity'ler arasi
         // referanslar (EntityRef) yuklemeden sonra bozulur.

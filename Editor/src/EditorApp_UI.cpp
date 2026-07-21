@@ -120,6 +120,16 @@ namespace FXEd
                     UndoEdit();
                 if (ImGui::MenuItem("Yeniden Yap", "Ctrl+Shift+Z", false, m_Commands.CanRedo()))
                     RedoEdit();
+
+                ImGui::Separator();
+
+                const bool hasSel = !m_Selection.IsEmpty();
+                if (ImGui::MenuItem("Kopyala", "Ctrl+C", false, hasSel))
+                    CopySelection();
+                if (ImGui::MenuItem("Yapistir", "Ctrl+V", false, !m_EntityClipboard.empty() && !IsPlaying()))
+                    PasteClipboard();
+                if (ImGui::MenuItem("Cogalt", "Ctrl+D", false, hasSel && !IsPlaying()))
+                    DuplicateSelection();
                 ImGui::EndMenu();
             }
 

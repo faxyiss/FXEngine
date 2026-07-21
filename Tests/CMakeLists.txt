@@ -17,6 +17,8 @@ add_executable(FXTests
     ComponentMeta.test.cpp
     EntitySnapshot.test.cpp
     DeferredDestroy.test.cpp
+    Duplicate.test.cpp
+    ChildOrder.test.cpp
     AssetManager.test.cpp
     Project.test.cpp
     Input.test.cpp

@@ -86,6 +86,46 @@ namespace FX::Detail
         }
     }
 
+    void RemapReferences(Entity entity, const std::unordered_map<UUID, UUID>& remap)
+    {
+        // Tabloda yoksa DOKUNMA: disariya bakan referans hala gecerli.
+        auto lookup = [&](UUID old) -> UUID
+        {
+            const auto it = remap.find(old);
+            return it != remap.end() ? it->second : old;
+        };
+
+        // Component EntityRef alanlari - alan tablosundan (A1). Follow.Target
+        // ve ileride eklenecek her EntityRef alani buradan gecer.
+        for (const ComponentInfo& info : ComponentRegistry::GetAll())
+        {
+            if (!info.Has(entity))
+                continue;
+
+            void* comp = info.GetPtr(entity);
+            for (const FieldInfo& f : info.Fields)
+            {
+                if (f.Type != FieldType::EntityRef)
+                    continue;
+
+                auto* ref = static_cast<EntityRef*>(f.Get(comp));
+                ref->Target = lookup(ref->Target);
+            }
+        }
+
+        // Script Entity alanlari (A-3) - alan tablosunda degil, dinamik
+        // bir haritada yasiyorlar.
+        if (entity.HasComponent<NativeScriptComponent>())
+        {
+            auto& nsc = entity.GetComponent<NativeScriptComponent>();
+            for (auto& [name, val] : nsc.Fields)
+            {
+                if (val.Kind == ScriptFieldValue::Type::Entity)
+                    val.E = lookup(val.E);
+            }
+        }
+    }
+
     json SerializeComponent(const ComponentInfo& info, Entity entity)
     {
         json obj = json::object();

@@ -9,6 +9,7 @@
 #include <nlohmann/json.hpp>
 
 #include <filesystem>
+#include <functional>
 #include <utility>
 #include <vector>
 #include <fstream>
@@ -43,16 +44,37 @@ namespace FX
         auto& registry = m_Scene->GetRegistry();
         auto view = registry.view<TagComponent>();
 
-        // EnTT view'lari TERS SIRADA gezer (en son eklenen ilk gelir).
-        // Sahnenin olusturma sirasini korumak icin ters ceviriyoruz -
-        // boylece kaydet/yukle sonrasi Hierarchy paneli ayni sirada gorunur.
-        std::vector<entt::entity> ordered;
-        ordered.reserve(view.size());
+        // HIYERARSI SIRASINDA yaziyoruz: once kokler (olusturma sirasinda),
+        // sonra her kokun alt agaci COCUK LISTESI sirasinda (DFS). Neden?
+        // Yukleme cocuklari SetParent ile DOSYA sirasinda ekliyor; dosya
+        // hiyerarsi sirasindaysa kullanicinin "Yukari/Asagi Tasi" ile
+        // verdigi cocuk sirasi (RelationshipComponent.Children) kaydedilip
+        // geri geliyor (B-1). Eskiden dosya duz entt sirasindaydi ve
+        // yeniden siralama kaydet/yukle sonrasi kayboluyordu.
+        //
+        // EnTT view'lari TERS gezer (en son eklenen ilk gelir); kokleri
+        // olusturma sirasinda tutmak icin ters ceviriyoruz.
+        std::vector<entt::entity> rootsReversed;
+        rootsReversed.reserve(view.size());
         for (auto id : view)
-            ordered.push_back(id);
+        {
+            Entity e{ id, m_Scene };
+            const bool isRoot = !e.HasComponent<RelationshipComponent>() ||
+                                !e.GetComponent<RelationshipComponent>().Parent.IsValid();
+            if (isRoot)
+                rootsReversed.push_back(id);
+        }
 
-        for (auto it = ordered.rbegin(); it != ordered.rend(); ++it)
-            entities.push_back(Detail::SerializeEntity(Entity{ *it, m_Scene }));
+        // DFS: parent'i cocuklarindan ONCE, cocuklari kendi siralarinda yaz.
+        std::function<void(Entity)> writeSubtree = [&](Entity e)
+        {
+            entities.push_back(Detail::SerializeEntity(e));
+            for (Entity child : e.GetChildren())
+                writeSubtree(child);
+        };
+
+        for (auto it = rootsReversed.rbegin(); it != rootsReversed.rend(); ++it)
+            writeSubtree(Entity{ *it, m_Scene });
 
         root["Entities"] = entities;
 

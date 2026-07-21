@@ -109,6 +109,17 @@ namespace FXEd
         // Secili tum entity'leri siler (Delete tusu).
         void DeleteSelection();
 
+        // Secili entity'leri (ve alt agaclarini) cogaltir (Ctrl+D).
+        void DuplicateSelection();
+
+        // Secimi panoya alir (Ctrl+C) / panodakileri cogaltir (Ctrl+V).
+        // Pano UUID tutuyor: yapistirma, kaynak entity'ler HALA varsa
+        // onlari cogaltir. Ayni sahne icinde calisir - sahneler arasi
+        // kopyalama snapshot gerektirir, sonraki tura.
+        void CopySelection();
+        void PasteClipboard();
+        std::vector<FX::UUID> m_EntityClipboard;
+
         // m_Scene degistikten SONRA cagrilir: sahneye bagli her tuketiciyi
         // (panel, yapisal komutlar) yeni sahneye baglar. Tek yerde durmasi
         // sart - alti farkli sahne degisim noktasi var ve birinde unutulan

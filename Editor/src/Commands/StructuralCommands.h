@@ -61,9 +61,19 @@ namespace FXEd
         // aliniyor, redo onu geri koyuyor.
         void PushCreated(FX::Entity entity, const std::string& label);
 
+        // Verilenleri (ve alt agaclarini) cogaltir: her biri kaynaginin
+        // kardesi, yeni kimliklerle. Kopyalar secilir; tamami TEK undo
+        // adimi. Doner: yeni koklerin sayisi.
+        int DuplicateEntities(const std::vector<FX::Entity>& sources,
+                              const std::string& label = "Cogalt");
+
         // Verilenleri (ve alt agaclarini) siler. Zaten silinmis olanlar
         // atlanir. Doner: gercekten silinen sayisi.
         int DestroyEntities(const std::vector<FX::Entity>& entities);
+
+        // entity'yi parent'inin cocuk listesinde bir sira tasir (-1 yukari,
+        // +1 asagi). Geri alinabilir. Uctaysa is yapmaz.
+        void MoveInParent(FX::Entity entity, int direction);
 
         // Component'i eksik olan hedeflere ekler / sahip olanlardan siler.
         void AddComponent(const FX::ComponentInfo& info,

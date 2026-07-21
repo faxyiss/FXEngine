@@ -89,6 +89,59 @@ namespace FXEd::Structural
         s_Ctx.Commands->Push(std::move(cmd));
     }
 
+    int DuplicateEntities(const std::vector<FX::Entity>& sources,
+                          const std::string& label)
+    {
+        if (!Ready())
+            return 0;
+
+        std::vector<FX::EntitySnapshot> snaps;
+        std::vector<FX::UUID>           ids;
+
+        for (FX::Entity src : sources)
+        {
+            FX::Entity dup = s_Ctx.Scene->DuplicateEntity(src);
+            if (!dup)
+                continue;
+
+            // Redo, kopyayi yeniden URETMEK yerine snapshot'i geri koyuyor:
+            // ayni UUID geri gelsin ki iki redo iki kopya yaratmasin ve
+            // arada ona bakan komutlar hedefini bulsun (PushCreated ile ayni
+            // gerekce).
+            snaps.push_back(FX::EntitySnapshot::Capture(dup));
+            ids.push_back(dup.GetUUID());
+        }
+
+        if (snaps.empty())
+            return 0;
+
+        SelectByIds(ids);
+
+        const int count = static_cast<int>(snaps.size());
+
+        EditCommand cmd;
+        cmd.Name = (count > 1) ? (label + " (" + std::to_string(count) + ")") : label;
+        cmd.Undo = [ids]()
+        {
+            for (FX::UUID id : ids)
+                if (FX::Entity e = Find(id))
+                {
+                    s_Ctx.Selection->Remove(e);
+                    s_Ctx.Scene->DestroyEntity(e);
+                }
+            s_Ctx.Selection->Prune();
+        };
+        cmd.Redo = [snaps, ids]()
+        {
+            for (const FX::EntitySnapshot& s : snaps)
+                s.Restore(*s_Ctx.Scene, s_Ctx.Library);
+            SelectByIds(ids);
+        };
+        s_Ctx.Commands->Push(std::move(cmd));
+
+        return count;
+    }
+
     int DestroyEntities(const std::vector<FX::Entity>& entities)
     {
         if (!Ready())
@@ -138,6 +191,30 @@ namespace FXEd::Structural
         s_Ctx.Commands->Push(std::move(cmd));
 
         return count;
+    }
+
+    void MoveInParent(FX::Entity entity, int direction)
+    {
+        if (!Ready() || !entity)
+            return;
+
+        const FX::UUID id = entity.GetUUID();
+        if (!entity.MoveInParent(direction))
+            return;   // uctaydi, komut yazma
+
+        // Geri alma ters yon: swap kendi tersidir, bir daha ayni yonun
+        // tersine tasimak eski sirayi geri getirir.
+        EditCommand cmd;
+        cmd.Name = (direction < 0) ? "Yukari tasi" : "Asagi tasi";
+        cmd.Undo = [id, direction]()
+        {
+            if (FX::Entity e = Find(id)) e.MoveInParent(-direction);
+        };
+        cmd.Redo = [id, direction]()
+        {
+            if (FX::Entity e = Find(id)) e.MoveInParent(direction);
+        };
+        s_Ctx.Commands->Push(std::move(cmd));
     }
 
     void AddComponent(const FX::ComponentInfo& info,

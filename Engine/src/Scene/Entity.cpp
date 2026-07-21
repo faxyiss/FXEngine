@@ -63,6 +63,34 @@ namespace FX
         return false;
     }
 
+    bool Entity::MoveInParent(int direction)
+    {
+        if (!*this || direction == 0)
+            return false;
+
+        Entity parent = GetParent();
+        if (!parent)
+            return false;   // kok sirasi ayri bir sorun (B-1'in kalan kismi)
+
+        auto& children = parent.GetComponent<RelationshipComponent>().Children;
+        const UUID myID = GetUUID();
+
+        const auto it = std::find(children.begin(), children.end(), myID);
+        if (it == children.end())
+            return false;
+
+        const std::size_t idx = static_cast<std::size_t>(it - children.begin());
+        const std::size_t target = static_cast<std::size_t>(
+            static_cast<long long>(idx) + (direction < 0 ? -1 : 1));
+
+        // Uctaysa (basta ve yukari, ya da sonda ve asagi) tasima yok.
+        if (direction < 0 ? (idx == 0) : (idx + 1 >= children.size()))
+            return false;
+
+        std::swap(children[idx], children[target]);
+        return true;
+    }
+
     void Entity::SetParent(Entity parent)
     {
         if (!*this)

@@ -108,6 +108,13 @@ namespace FX
         std::vector<Entity> GetChildren() const;
         bool HasChildren() const;
 
+        // Bu entity'yi parent'inin cocuk listesinde bir sira YUKARI (-1) ya
+        // da ASAGI (+1) tasir. Sira Hierarchy'de gorunen sirayi ve (hiyerarsi
+        // sirali serilestirme sayesinde) dosyaya yazilan sirayi belirler.
+        // Parent'i yoksa (kok) su an is yapmaz - kok sirasi ayri bir sorun.
+        // Doner: gercekten tasindi mi (uctaysa false).
+        bool MoveInParent(int direction);
+
         // this, other'in ustunde bir yerde mi? Dongu kontrolu icin.
         bool IsAncestorOf(Entity other) const;
 

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(cmake*)",
+      "PowerShell(Get-Process FXEditor*)",
+      "PowerShell(git add*)",
+      "PowerShell(git commit*)",
+      "PowerShell(& *FXTests.exe*)",
+      "PowerShell(Get-ChildItem*)",
+      "PowerShell(Select-String*)"
+    ]
+  }
+}

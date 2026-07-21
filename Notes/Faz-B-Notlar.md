@@ -199,8 +199,103 @@ B-3'ün başlangıç noktası olarak bilerek bırakıldı.
 
 ---
 
-## B-3 — (sırada) Editör DLL'i yüklüyor
+## B-3 — Editör DLL'i yüklüyor + EnTT risk ölçümü (2026-07-21) ✅
 
-İlk iş plandaki en ciddi risk: **EnTT tip kimliğini DLL sınırında ölçmek.**
-DLL'den `GetComponent<TransformComponent>()` çağırıp gerçekten aynı veriye
-eriştiğini görmeden devam edilmeyecek.
+### En ciddi risk ölçüldü ve GEÇTİ
+
+Aşama B'nin en ciddi riski EnTT tip kimliğinin DLL sınırında tutup
+tutmadığıydı (`registry.get<T>()` tip kimliğine dayanıyor; iki tarafta
+farklı çıkarsa component'ler **sessizce bulunamaz**). Plan "teoriye
+güvenmeyeceğiz" diyordu. Ölçüm bir **gidiş-dönüş** olarak yazıldı:
+
+```
+Editör: entity + TransformComponent(x=42) yaratır, DLL'e Scene* + UUID gönderir
+DLL:    FindEntityByUUID → GetComponent<TransformComponent>() → 42 görür → 99 yazar
+Editör: aynı component'ten 99 okuyabiliyorsa geçti
+```
+
+Tek çağrı iki şeyi birden ölçüyor: **tip kimliği** (`get<TransformComponent>`
+doğru storage'ı buluyor mu) ve **ortak bellek** (aynı heap). Sonuç:
+
+```
+Game.dll: EnTT tip kimligi ve veri erisimi DLL sinirinda dogrulandi.
+Game.dll yuklendi, 1 script kayitli.
+```
+
+`FXEngineSelfTest`, `Game.dll`'in kalıcı bir export'u (`GameMain.cpp`
+şablonunda). Her yüklemede çalışıyor — bir gün derleyici/EnTT/CRT
+değişip kimlik bozulursa **sessiz component kaybı yerine görünür bir
+hata** verecek (§7 "sessiz yanlışlık yerine görünür uyarı").
+
+### DLL yükleme: `GameLibrary`
+
+`Editor/src/Game/GameLibrary.{h,cpp}`. `LoadLibraryA` → `GetProcAddress`
+→ `FreeLibrary`. `windows.h` header'a sızmıyor: `HMODULE` `.cpp`'de
+`void*` olarak tutuluyor.
+
+Yükleme sırası (B-4/B-5 bunu genişletecek):
+```
+Unload()  → ScriptRegistry::Clear() + FreeLibrary
+LoadLibrary(<proje>/.fxbuild/out/Game.dll)
+GetProcAddress FXRegisterScripts → çağır
+```
+
+Bu adımda DLL **doğrudan** yükleniyor (gölge kopya B-4). Windows dosyayı
+kilitler; yeniden derleme henüz mümkün değil.
+
+### Yükleme ne zaman
+
+Proje açılışında (`OpenProject` ve `NewProject`), **sahne yüklenmeden
+önce**: sahne dosyası script adlarını çözmeye çalışıyor, o an kayıtlı
+olmalılar. `Game.dll` yoksa (henüz derlenmemiş proje) sessizce değil ama
+hata da değil — `FX_INFO` ile bilgi, çünkü Derle düğmesi (B-5) gelene
+kadar bu normal.
+
+### Boşaltma sırası tuzağı (planın "sarkan örnek" riski)
+
+Script örneklerinin vtable'ları `Game.dll`'i işaret ediyor. DLL sahneden
+**önce** boşaltılırsa sahne yıkıcısı geçersiz vtable'lara dokunur. Üye
+yıkım sırası bunu **yanlış** yapardı: `m_GameLibrary` sahnelerden sonra
+tanımlı, dolayısıyla önce yıkılırdı. Bu yüzden `OnShutdown`'da **açıkça**
+önce sahneler bırakılıyor, sonra `m_GameLibrary.Unload()`. Play sırasında
+yeniden yükleme koruması ayrıca B-6'da.
+
+### Küçük ama gerekli düzeltme
+
+`RunSelfTest` ilk denemede assert patlattı: `CreateEntity` zaten bir
+`TransformComponent` ekliyor, üzerine `AddComponent` "zaten var" assert'i.
+`AddOrReplaceIfMissing` ile düzeltildi. (Motorun kendi davranışını
+doğrulamak, onu kullanırken varsayımlarımızı da test ediyor.)
+
+### Doğrulama
+
+Temiz bir geçici proje (scratchpad/BTest, tek `Spin.h`) üzerinde:
+
+| Ne | Sonuç |
+|---|---|
+| Self-test | ✅ "DLL sinirinda dogrulandi" |
+| DLL script'i kayıtlı mı | ✅ 1 script (`Spin`, `FXGame::Spin`) |
+| `FXTests` | ✅ 51 / 238 |
+| Projesiz açılış | ✅ hâlâ açılıyor, builtin script'ler duruyor |
+
+> **Not — FXTest2/assets/scripts/Spin.h şu an derlenmiyor** (kullanıcının
+> düzenlemesi: eksik `;` ve `CameraComponent::Size` diye üye yok, doğrusu
+> `OrthographicSize`). Doğrulama bu yüzden ayrı bir temiz projeyle yapıldı.
+> Bu bozuk dosya B-5'in **derleme hatasını editörde göster** adımı için
+> gerçek bir test örneği; bilerek dokunulmadı.
+
+### Bilerek bu adımda YAPILMAYANLAR
+
+- **Gölge kopya + Yeniden Yükle** → B-4.
+- **Editörden Derle düğmesi** → B-5 (şimdilik `cmake` elle çalıştırıldı).
+- **Editörün builtin script'lerinin kaldırılması** (Spin/Move) → B-6.
+  Şu an projesiz modda hâlâ duruyorlar; proje açılınca `Clear()` ile
+  yerlerini DLL'inkiler alıyor. "New Script"i projeye yönlendirmek de
+  B-6'nın işi.
+
+---
+
+## B-6 — (sırada) Editör builtin script'leri projeye taşınır
+
+`Editor/src/Scripts/` boşaltılacak, `RegisterEditorScripts` kaldırılacak,
+A4'ün "Yeni Script"i `<proje>/assets/scripts/`'e yazacak.

@@ -473,8 +473,12 @@ hızı her gün acıtıyor, Undo ara sıra.
       bir yerde tekrarlanmıyor. Namespace `FXGame`. DLL tek sembol dışa
       aktarıyor: `FXRegisterScripts`. **Editör henüz yüklemiyor.**
       Yan kazanç: `FXEditor.exe <yol.fxproject>`.
-- [ ] **B-3** — `FXRegisterScripts()` dışa aktarımı; ilk iş EnTT tip
-      kimliğini DLL sınırında ölçmek
+- [x] **B-3 — Editör DLL'i yüklüyor + EnTT risk ölçümü.** En ciddi risk
+      GEÇTİ: `FXEngineSelfTest` gidiş-dönüşü ile EnTT tip kimliğinin ve
+      veri erişiminin DLL sınırında tuttuğu ölçüldü. `GameLibrary`
+      (`LoadLibrary`/`FreeLibrary`) proje açılışında `Game.dll`'i yüklüyor,
+      script'leri kaydediyor. Boşaltma sahnelerden sonra (sarkan vtable
+      koruması). DLL doğrudan yükleniyor (gölge kopya B-4).
 - [ ] **B-4** — gölge kopya + `FreeLibrary`/`LoadLibrary` döngüsü
 - [ ] **B-5** — editörden "Derle" düğmesi, çıktı bir konsol panelinde
 - [ ] **B-6** — Play koruması + otomatik Stop

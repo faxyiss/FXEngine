@@ -18,6 +18,7 @@
 #include "SelectionContext.h"
 #include "ImGuiLayer.h"
 #include "EditorCamera.h"
+#include "Game/GameLibrary.h"
 #include "Panels/SceneHierarchyPanel.h"
 #include "Panels/ContentBrowserPanel.h"
 
@@ -58,6 +59,10 @@ namespace FXEd
         // cagriliyor - iskele URETILEN bir sey, eski projeler de yeni
         // motorla derlenebilmeli.
         void PrepareGameBuild();
+
+        // B-3: <proje>/.fxbuild/out/Game.dll varsa yukler, self-test'i
+        // calistirir ve script'lerini kaydeder. Proje acilinca cagriliyor.
+        void LoadGameLibrary();
 
         // Ertelenmis proje istekleri; ImGui cercevesi kapandiktan sonra.
         void ProcessProjectRequests();
@@ -288,6 +293,10 @@ namespace FXEd
         // JSON'daki yollari texture'a cevirmek icin gerekli, ve ayni
         // dosyanin tekrar tekrar yuklenmesini onler.
         FX::TextureLibrary m_TextureLibrary;
+
+        // Oyun kodunu tasiyan Game.dll (B-3). Aktif projeye ait; proje
+        // degisince yeniden yuklenir.
+        GameLibrary m_GameLibrary;
 
         // Karsilama ekranindaki logo. MOTOR varligi, projeye ait degil:
         // proje acilmadan once yuklenip tutuluyor, cunku proje acilinca

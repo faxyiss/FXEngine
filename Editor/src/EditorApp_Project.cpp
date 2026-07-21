@@ -8,6 +8,7 @@
 #include <FXEngine/Core/Project.h>
 #include <FXEngine/Asset/AssetManager.h>
 #include <FXEngine/Scene/Components.h>
+#include <FXEngine/Scene/ScriptRegistry.h>
 #include <FXEngine/Scene/SceneSerializer.h>
 #include <FXEngine/Scene/PrefabSerializer.h>
 
@@ -365,6 +366,7 @@ namespace FXEd
         {
             PushRecentProject(project->GetFilePath());
             PrepareGameBuild();
+            LoadGameLibrary();
 
             NewScene();
             m_ContentBrowser.SetContext(&m_TextureLibrary);   // kok degisti
@@ -382,6 +384,31 @@ namespace FXEd
         std::string error;
         if (!GameProject::WriteBuildFiles(&error))
             FX_WARN("Oyun derleme iskelesi kurulamadi: %s", error.c_str());
+    }
+
+    void EditorApp::LoadGameLibrary()
+    {
+        const std::string dll = GameProject::DllPath();
+
+        std::string error;
+        if (!m_GameLibrary.Load(dll, &error))
+        {
+            // Henuz derlenmemis bir proje icin bu NORMAL: Derle'ye
+            // basilana kadar (B-5) Game.dll yok. Sessiz gecmiyoruz ama
+            // hata da degil.
+            FX_INFO("Oyun kutuphanesi yuklenmedi: %s", error.c_str());
+            return;
+        }
+
+        std::string detail;
+        const bool ok = m_GameLibrary.RunSelfTest(&detail);
+        if (ok)
+            FX_INFO("Game.dll: %s", detail.c_str());
+        else
+            FX_ERROR("Game.dll self-test BASARISIZ: %s", detail.c_str());
+
+        const auto& names = FX::ScriptRegistry::GetNames();
+        FX_INFO("Game.dll yuklendi, %zu script kayitli.", names.size());
     }
 
     void EditorApp::OpenProject()
@@ -403,6 +430,10 @@ namespace FXEd
 
         PushRecentProject(project->GetFilePath());
         PrepareGameBuild();
+
+        // Script'ler sahneden ONCE kayitli olmali: sahne yuklemesi
+        // (StartScene) script adlarini cozmeye calisacak.
+        LoadGameLibrary();
 
         // Doku onbellegi ESKI projenin yollarini tutuyor. Temizlemezsek
         // yeni projedeki "assets/textures/x.png" eski projenin ayni

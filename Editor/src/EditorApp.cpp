@@ -458,6 +458,13 @@ namespace FXEd
         m_RuntimeScene.reset();
         m_EditorScene.reset();
 
+        // Sahneler birakildiktan SONRA DLL bosaltilir (B-3): calisan
+        // script'lerin vtable'lari Game.dll'i isaret ediyor; DLL once
+        // gitseydi sahne yikicisi gecersiz vtable'lara dokunurdu.
+        // Bunu OnShutdown'da acikca yapiyoruz cunku uye yikim sirasi
+        // (m_GameLibrary sahnelerden SONRA tanimli) tersini yapardi.
+        m_GameLibrary.Unload();
+
         FX::Renderer2D::Shutdown();
 
         FX_INFO("Editor kapaniyor.");

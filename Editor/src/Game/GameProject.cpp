@@ -138,15 +138,40 @@ namespace FXGame
 }
 )FXH";
 
-        const char* kGameMain = R"FXCPP(// URETILEN DOSYA - FXEditor tarafindan yazildi (Asama B-2).
+        const char* kGameMain = R"FXCPP(// URETILEN DOSYA - FXEditor tarafindan yazildi (Asama B-2/B-3).
 
 #include <GameRegistrations.h>
 
-// Editorun DLL'de aradigi TEK sembol. Isim bozulmasin diye extern "C":
+#include <FXEngine/Scene/Scene.h>
+#include <FXEngine/Scene/Entity.h>
+#include <FXEngine/Scene/Components.h>
+
+// Editorun DLL'de aradigi semboller. Isim bozulmasin diye extern "C":
 // GetProcAddress'e C++ mangling'i ile ad vermek derleyiciye bagimli olurdu.
+
 extern "C" __declspec(dllexport) void FXRegisterScripts()
 {
     FXGame::RegisterScripts();
+}
+
+// EnTT tip kimliginin DLL sinirinda tuttugunu ve DLL'in editorun yarattigi
+// component verisine ERISEBILDIGINI olcer (Asama B en ciddi riski). Editor
+// bir entity + TransformComponent (x=42) yaratip buraya gonderir; bu kod
+// component'i DLL tarafindan okur, 42 gorurse 99 yazar. Editor 99'u geri
+// okuyabiliyorsa gidis-donus calisiyor demektir.
+extern "C" __declspec(dllexport) int FXEngineSelfTest(FX::Scene* scene,
+                                                      unsigned long long uuid)
+{
+    if (!scene)
+        return 0;
+    FX::Entity e = scene->FindEntityByUUID(uuid);
+    if (!e || !e.HasComponent<FX::TransformComponent>())
+        return 0;
+    auto& t = e.GetComponent<FX::TransformComponent>();
+    if (t.Translation.x != 42.0f)
+        return 0;
+    t.Translation.x = 99.0f;
+    return 1;
 }
 )FXCPP";
 

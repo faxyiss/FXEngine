@@ -273,6 +273,7 @@ namespace FXEd
         DrawProjectSettingsWindow();
         DrawPreferencesWindow();
         DrawNewScriptModal();
+
         m_HierarchyPanel.OnImGuiRender();
         m_ContentBrowser.OnImGuiRender();
 

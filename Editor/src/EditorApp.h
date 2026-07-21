@@ -110,7 +110,16 @@ namespace FXEd
         void DrawNewScriptModal();
         bool CreateScriptFile(const std::string& name, std::string& outPath);
 
-        bool m_ShowNewScript = false;
+        // ISTEK bayragi: bir kez tuketilip ImGui::OpenPopup cagriliyor.
+        // "Acik mi?" durumunu ImGui'nin kendisi tutuyor - biz de tutup
+        // her karede OpenPopup cagirsaydik popup her kare sifirlanir ve
+        // dugme tiklamalari (basma+birakma iki kare surer) hic
+        // tamamlanmazdi.
+        bool m_NewScriptRequested = false;
+
+        // Metin kutusuna odak yalnizca ACILIS karesinde verilmeli.
+        bool m_FocusScriptName = false;
+
         char m_NewScriptName[64] = "";
 
         // Sonsuz izgara. Aralik zoom'a gore 1-2-5-10 serisinde secilir.

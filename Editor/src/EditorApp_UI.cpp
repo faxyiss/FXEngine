@@ -92,10 +92,7 @@ namespace FXEd
 
                 ImGui::Separator();
                 if (ImGui::MenuItem("Yeni Script..."))
-                {
-                    m_NewScriptName[0] = '\0';
-                    m_ShowNewScript = true;
-                }
+                    m_NewScriptRequested = true;
 
                 ImGui::Separator();
                 if (ImGui::MenuItem("Varlik Ice Aktar...", "Ctrl+I"))
@@ -753,12 +750,20 @@ namespace FXEd
 
     void EditorApp::DrawNewScriptModal()
     {
-        if (!m_ShowNewScript)
-            return;
-
-        ImGui::OpenPopup("Yeni Script");
+        // OpenPopup YALNIZCA istek aninda. Her karede cagirmak popup'i
+        // her kare yeniden acar ve hicbir dugme tiklamasi tamamlanmaz.
+        if (m_NewScriptRequested)
+        {
+            m_NewScriptRequested = false;
+            m_NewScriptName[0]   = '\0';
+            m_FocusScriptName    = true;
+            ImGui::OpenPopup("Yeni Script");
+        }
 
         ImGui::SetNextWindowSize(ImVec2(460.0f, 0.0f), ImGuiCond_Appearing);
+
+        // Kapali oldugunda false doner; Escape ile kapanmasi da boylece
+        // calisiyor - kendi bayragimiz onu yeniden acmiyor.
         if (!ImGui::BeginPopupModal("Yeni Script", nullptr,
                                     ImGuiWindowFlags_AlwaysAutoResize))
             return;
@@ -769,7 +774,13 @@ namespace FXEd
         ImGui::Text("Ad");
         ImGui::SameLine(60.0f);
         ImGui::SetNextItemWidth(-1.0f);
-        ImGui::SetKeyboardFocusHere();
+
+        if (m_FocusScriptName)
+        {
+            m_FocusScriptName = false;
+            ImGui::SetKeyboardFocusHere();
+        }
+
         ImGui::InputText("##scriptname", m_NewScriptName, sizeof(m_NewScriptName));
 
         const std::string name = m_NewScriptName;
@@ -829,17 +840,13 @@ namespace FXEd
                 SetStatus("Script OLUSTURULAMADI: " + name + ".h");
             }
 
-            m_ShowNewScript = false;
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndDisabled();
 
         ImGui::SameLine();
         if (ImGui::Button("Vazgec", ImVec2(120.0f, 0.0f)))
-        {
-            m_ShowNewScript = false;
             ImGui::CloseCurrentPopup();
-        }
 
         ImGui::EndPopup();
     }

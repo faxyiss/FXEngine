@@ -1,5 +1,6 @@
 #include "Panels/ComponentDrawer.h"
 #include "Panels/ContentBrowserPanel.h"   // kContentPayload
+#include "Commands/CommandStack.h"
 
 #include <FXEngine/Asset/AssetManager.h>
 #include <FXEngine/Core/Log.h>
@@ -13,6 +14,8 @@
 
 #include <cstring>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace FXEd::ComponentDrawer
 {
@@ -202,6 +205,173 @@ namespace FXEd::ComponentDrawer
             case FX::FieldType::String: *static_cast<std::string*>(dst) = *static_cast<const std::string*>(src); break;
             case FX::FieldType::EntityRef: *static_cast<FX::EntityRef*>(dst) = *static_cast<const FX::EntityRef*>(src); break;
             }
+        }
+
+        // --- Undo/Redo: alan degeri yakalama --------------------------------
+        // Bir alanin degerini tipten bagimsiz tutan kap. Undo, degistirilen
+        // alanin ESKI ve YENI degerini saklamak zorunda; tek tip yeterli
+        // olmadigi icin hepsini bir arada tutuyoruz (kucuk israf, basit kod).
+        struct FieldValue
+        {
+            FX::FieldType Type{};
+            bool          B{};
+            int           I{};
+            float         F{};
+            glm::vec2     V2{};
+            glm::vec3     V3{};
+            glm::vec4     V4{};
+            std::string   S;
+            FX::EntityRef Ref;
+        };
+
+        FieldValue ReadFieldValue(const FX::FieldInfo& f, void* comp)
+        {
+            FieldValue v;
+            v.Type = f.Type;
+            const void* p = f.Get(comp);
+            switch (f.Type)
+            {
+            case FX::FieldType::Bool:   v.B = *static_cast<const bool*>(p); break;
+            case FX::FieldType::Int:    v.I = *static_cast<const int*>(p); break;
+            case FX::FieldType::Float:  v.F = *static_cast<const float*>(p); break;
+            case FX::FieldType::Vec2:   v.V2 = *static_cast<const glm::vec2*>(p); break;
+            case FX::FieldType::Vec3:   v.V3 = *static_cast<const glm::vec3*>(p); break;
+            case FX::FieldType::Vec4:
+            case FX::FieldType::Color:  v.V4 = *static_cast<const glm::vec4*>(p); break;
+            case FX::FieldType::String: v.S = *static_cast<const std::string*>(p); break;
+            case FX::FieldType::EntityRef: v.Ref = *static_cast<const FX::EntityRef*>(p); break;
+            }
+            return v;
+        }
+
+        bool FieldValuesEqual(const FieldValue& a, const FieldValue& b)
+        {
+            if (a.Type != b.Type)
+                return false;
+            switch (a.Type)
+            {
+            case FX::FieldType::Bool:   return a.B == b.B;
+            case FX::FieldType::Int:    return a.I == b.I;
+            case FX::FieldType::Float:  return a.F == b.F;
+            case FX::FieldType::Vec2:   return a.V2 == b.V2;
+            case FX::FieldType::Vec3:   return a.V3 == b.V3;
+            case FX::FieldType::Vec4:
+            case FX::FieldType::Color:  return a.V4 == b.V4;
+            case FX::FieldType::String: return a.S == b.S;
+            case FX::FieldType::EntityRef: return a.Ref.Target == b.Ref.Target;
+            }
+            return true;
+        }
+
+        // Entity + component + alan ADIYLA bir degeri yazar. Ad tabanli:
+        // komut closure'i ham isaretci degil kimlik tutmali (entity silinmis
+        // olabilir; o zaman sessizce atlanir).
+        void ApplyFieldByName(FX::Entity e, const std::string& compName,
+                              const char* fieldName, const FieldValue& v)
+        {
+            if (!e)
+                return;
+            FX::ComponentInfo* info = FX::ComponentRegistry::Find(compName);
+            if (!info || !info->Has(e))
+                return;
+            void* comp = info->GetPtr(e);
+            if (!comp)
+                return;
+            for (const FX::FieldInfo& f : info->Fields)
+            {
+                if (std::strcmp(f.Name, fieldName) != 0)
+                    continue;
+                switch (f.Type)
+                {
+                case FX::FieldType::Bool:   *static_cast<bool*>(f.Get(comp)) = v.B; break;
+                case FX::FieldType::Int:    *static_cast<int*>(f.Get(comp)) = v.I; break;
+                case FX::FieldType::Float:  *static_cast<float*>(f.Get(comp)) = v.F; break;
+                case FX::FieldType::Vec2:   *static_cast<glm::vec2*>(f.Get(comp)) = v.V2; break;
+                case FX::FieldType::Vec3:   *static_cast<glm::vec3*>(f.Get(comp)) = v.V3; break;
+                case FX::FieldType::Vec4:
+                case FX::FieldType::Color:  *static_cast<glm::vec4*>(f.Get(comp)) = v.V4; break;
+                case FX::FieldType::String: *static_cast<std::string*>(f.Get(comp)) = v.S; break;
+                case FX::FieldType::EntityRef: *static_cast<FX::EntityRef*>(f.Get(comp)) = v.Ref; break;
+                }
+                return;
+            }
+        }
+
+        struct FieldEdit
+        {
+            FX::Entity  Entity;
+            FieldValue  Old;
+        };
+
+        // Suren surukleme boyunca ESKI degerler burada bekliyor; birakilinca
+        // (IsItemDeactivatedAfterEdit) komut olusturuluyor. Ayni anda tek
+        // widget aktif oldugu icin tek bir bekleyen edit yeterli.
+        struct PendingFieldEdit
+        {
+            bool                    Active = false;
+            std::string             ComponentName;
+            const char*             FieldName = nullptr;
+            const char*             FieldLabel = nullptr;
+            std::vector<FieldEdit>  Targets;   // birincil + coklu secim
+        };
+
+        PendingFieldEdit s_Pending;
+        CommandStack*    s_Commands = nullptr;   // FXEd::CommandStack
+
+        // Bir alan degisikligini (birincil + hedefler icin eski->yeni) komut
+        // olarak yigina yazar. old ve new degerleri closure'a kopyalaniyor.
+        void PushFieldCommand(const std::string& compName, const char* fieldName,
+                              const char* fieldLabel,
+                              const std::vector<FieldEdit>& edits)
+        {
+            if (!s_Commands || edits.empty())
+                return;
+
+            // Yeni degerleri simdi (canli) oku.
+            struct Entry { FX::Entity e; FieldValue oldV, newV; };
+            std::vector<Entry> entries;
+            bool anyChanged = false;
+
+            for (const FieldEdit& fe : edits)
+            {
+                if (!fe.Entity)
+                    continue;
+                FX::ComponentInfo* info = FX::ComponentRegistry::Find(compName);
+                if (!info || !info->Has(fe.Entity))
+                    continue;
+                void* comp = info->GetPtr(fe.Entity);
+                if (!comp)
+                    continue;
+
+                const FX::FieldInfo* field = nullptr;
+                for (const FX::FieldInfo& f : info->Fields)
+                    if (std::strcmp(f.Name, fieldName) == 0) { field = &f; break; }
+                if (!field)
+                    continue;
+
+                Entry en{ fe.Entity, fe.Old, ReadFieldValue(*field, comp) };
+                if (!FieldValuesEqual(en.oldV, en.newV))
+                    anyChanged = true;
+                entries.push_back(std::move(en));
+            }
+
+            if (!anyChanged)
+                return;   // deger gercekten degismedi: gereksiz komut yok
+
+            const std::string comp = compName;
+            const std::string fname = fieldName;
+
+            FXEd::EditCommand cmd;
+            cmd.Name = std::string("Duzenle: ") + (fieldLabel ? fieldLabel : fieldName);
+            cmd.Undo = [comp, fname, entries]() {
+                for (const Entry& e : entries)
+                    ApplyFieldByName(e.e, comp, fname.c_str(), e.oldV);
+            };
+            cmd.Redo = [comp, fname, entries]() {
+                for (const Entry& e : entries)
+                    ApplyFieldByName(e.e, comp, fname.c_str(), e.newV);
+            };
+            s_Commands->Push(std::move(cmd));
         }
 
         // --- Ozel arayuzler --------------------------------------------------
@@ -403,9 +573,10 @@ namespace FXEd::ComponentDrawer
         }
     }
 
-    void RegisterEditorUI(FX::TextureLibrary* library)
+    void RegisterEditorUI(FX::TextureLibrary* library, CommandStack* commands)
     {
-        s_Library = library;
+        s_Library  = library;
+        s_Commands = commands;
 
         auto bind = [](const char* name,
                        std::function<void(void*, FX::Entity)> fn)
@@ -434,7 +605,23 @@ namespace FXEd::ComponentDrawer
             if (f.HiddenInInspector)
                 continue;
 
+            // Undo icin ESKI degerleri widget'tan ONCE yakala (birincil +
+            // hedefler). Bu karede henuz degismedikleri icin gercek eski.
+            const FieldValue primaryOld = ReadFieldValue(f, component);
+            std::vector<FieldEdit> edits;
+            edits.push_back({ entity, primaryOld });
+            for (FX::Entity other : alsoApplyTo)
+                if (info.Has(other))
+                    if (void* oc = info.GetPtr(other))
+                        edits.push_back({ other, ReadFieldValue(f, oc) });
+
             const bool changed = DrawField(f, component, entity);
+
+            // Bu alanin widget'i suren surukleme desteklermi? Suruklenebilir
+            // olanlar (sayilar, renk, metin, onay kutusu) baslat/birak ile
+            // TEK adim; EntityRef combo'su aninda kesinlesir.
+            const bool activated   = ImGui::IsItemActivated();
+            const bool deactivated = ImGui::IsItemDeactivatedAfterEdit();
 
             // Coklu secim: bu alan degistiyse ayni component'e sahip diger
             // entity'lere de yaz. Sadece degisen alan - digerleri korunur.
@@ -447,6 +634,35 @@ namespace FXEd::ComponentDrawer
                         continue;
                     if (void* otherComp = info.GetPtr(other))
                         CopyFieldValue(f, f.Get(otherComp), srcField);
+                }
+            }
+
+            // --- Undo/Redo yakalama ---
+            if (f.Type == FX::FieldType::EntityRef)
+            {
+                // Combo secimi aninda kesinlesir: degistiyse hemen komut.
+                if (changed)
+                    PushFieldCommand(info.Name, f.Name, f.Label, edits);
+            }
+            else
+            {
+                if (activated)
+                {
+                    // Surukleme/duzenleme basladi: eski degerleri sakla.
+                    s_Pending.Active        = true;
+                    s_Pending.ComponentName = info.Name;
+                    s_Pending.FieldName     = f.Name;
+                    s_Pending.FieldLabel    = f.Label;
+                    s_Pending.Targets       = edits;
+                }
+                if (deactivated && s_Pending.Active &&
+                    s_Pending.FieldName == f.Name &&
+                    s_Pending.ComponentName == info.Name)
+                {
+                    // Birakildi: eski (saklanan) -> yeni (canli) komutu.
+                    PushFieldCommand(s_Pending.ComponentName, s_Pending.FieldName,
+                                     s_Pending.FieldLabel, s_Pending.Targets);
+                    s_Pending.Active = false;
                 }
             }
         }

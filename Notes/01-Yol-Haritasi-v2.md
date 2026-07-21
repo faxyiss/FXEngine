@@ -450,7 +450,13 @@ Sonra:    16c → 14 → 15 → 18b → 17a-d → 18c → 19 → 23 → 18d
       İçerik panelinde sağ tık **yapılmadı**: script'ler projede değil,
       Aşama B'de oraya taşınınca anlamlı olacak.
       Ayrıntı: [Faz-A4-Notlar.md](Faz-A4-Notlar.md)
-- [ ] **A5 — Undo/Redo** (eski 20a + 20b). A1'den sonra çok ucuzlar.
+- [x] **A5 — Undo/Redo** (eski 20a + 20b). `CommandStack` (closure tabanlı
+      do/undo) + Inspector alan düzenleme (generic, A1 alan tablosuyla) +
+      gizmo dönüşümü. Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y, "Düzen" menüsü.
+      Çoklu seçimle uyumlu. Sahne/Play değişince yığın temizleniyor.
+      **Yapılmayan (sonraki tur):** entity silme/oluşturma ve component
+      ekle/sil geri alma (yapısal, serileştirme gerektiriyor).
+      Ayrıntı: [Faz-A5-Notlar.md](Faz-A5-Notlar.md)
 
 ## Aşama B — İterasyon hızı
 

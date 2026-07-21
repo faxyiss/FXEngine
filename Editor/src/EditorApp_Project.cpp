@@ -565,6 +565,10 @@ namespace FXGame
         m_Scene       = m_EditorScene.get();
         m_ScenePath.clear();
 
+        // Undo gecmisi eski sahnenin entity'lerine referans tutuyor;
+        // yeni sahnede anlamsiz ve tehlikeli.
+        m_Commands.Clear();
+
         m_HierarchyPanel.SetContext(m_Scene);
         SetStatus("Yeni bos sahne");
     }
@@ -631,6 +635,9 @@ namespace FXGame
         m_ScenePath = path;
         SetStatus("Yuklendi: " + path);
         PushRecentScene(path);
+
+        // Undo gecmisi eski sahneye aitti.
+        m_Commands.Clear();
 
         // Panel secimini temizliyoruz: secili entity KULLANICI tercihiydi,
         // yeni sahnede karsiligi olmayabilir.

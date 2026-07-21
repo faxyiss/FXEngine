@@ -18,9 +18,12 @@
 #include "SelectionContext.h"
 #include "ImGuiLayer.h"
 #include "EditorCamera.h"
+#include "Commands/CommandStack.h"
 #include "Game/GameLibrary.h"
 #include "Panels/SceneHierarchyPanel.h"
 #include "Panels/ContentBrowserPanel.h"
+
+#include <glm/glm.hpp>
 
 #include <deque>
 #include <memory>
@@ -243,6 +246,21 @@ namespace FXEd
         // degil. Panellerden once tanimli olmali - onlara isaretcisini
         // veriyoruz.
         SelectionContext    m_Selection;
+
+        // Undo/Redo (A5). Inspector alan duzenlemeleri (ComponentDrawer)
+        // ve gizmo donusumleri buraya komut yaziyor.
+        CommandStack        m_Commands;
+
+        // Gizmo suruklemesi TEK undo adimidir: baslangicta secili
+        // entity'lerin transform'lari yakalaniyor, birakildiginda
+        // eski->yeni bir komut yaziliyor. Her kare degil, sadece geçis.
+        bool m_GizmoWasUsing = false;
+        struct GizmoSnapshot { FX::Entity Entity; glm::vec3 Translation; float Rotation; glm::vec2 Scale; };
+        std::vector<GizmoSnapshot> m_GizmoStart;
+        void PushGizmoCommand();   // birakildiginda cagriliyor
+
+        void UndoEdit();
+        void RedoEdit();
 
         ImGuiLayer          m_ImGuiLayer;
         SceneHierarchyPanel m_HierarchyPanel;

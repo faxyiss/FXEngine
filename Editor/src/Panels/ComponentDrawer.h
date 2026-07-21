@@ -14,11 +14,17 @@
 
 #include <vector>
 
+namespace FXEd
+{
+    class CommandStack;
+}
+
 namespace FXEd::ComponentDrawer
 {
     // Editore ozgu cizicileri meta tabloya baglar. Editor acilista bir
-    // kez cagirir; kutuphane isaretcisi doku slotunun ihtiyaci.
-    void RegisterEditorUI(FX::TextureLibrary* library);
+    // kez cagirir; kutuphane isaretcisi doku slotunun ihtiyaci, komut
+    // yigini ise alan duzenlemelerini Undo/Redo'ya baglamak icin.
+    void RegisterEditorUI(FX::TextureLibrary* library, CommandStack* commands);
 
     // Bir component'in tum gorunur alanlarini ve ozel arayuzunu cizer.
     //

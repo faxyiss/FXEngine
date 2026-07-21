@@ -479,7 +479,23 @@ namespace FXEd
                              glm::value_ptr(delta),
                              snap ? snapValues : nullptr);
 
-        if (ImGuizmo::IsUsing())
+        const bool usingNow = ImGuizmo::IsUsing();
+
+        // Surukleme BASLADI: transform'lar bu karede yazilmadan ONCE tum
+        // secili entity'lerin ESKI degerlerini yakala (undo icin tek adim).
+        if (usingNow && !m_GizmoWasUsing)
+        {
+            m_GizmoStart.clear();
+            for (FX::Entity e : m_Selection.GetAll())
+            {
+                if (!e.HasComponent<FX::TransformComponent>())
+                    continue;
+                const auto& t = e.GetComponent<FX::TransformComponent>();
+                m_GizmoStart.push_back({ e, t.Translation, t.Rotation, t.Scale });
+            }
+        }
+
+        if (usingNow)
         {
             // Dunya -> yerel: parent'in tersiyle carp.
             const glm::mat4 local = glm::inverse(parentWorld) * transform;
@@ -495,6 +511,63 @@ namespace FXEd
             if (m_Selection.Count() > 1)
                 ApplyGizmoDelta(delta, selected);
         }
+
+        // Surukleme BIRAKILDI: eski (yakalanan) -> yeni (canli) tek komut.
+        if (!usingNow && m_GizmoWasUsing)
+            PushGizmoCommand();
+
+        m_GizmoWasUsing = usingNow;
+    }
+
+    void EditorApp::PushGizmoCommand()
+    {
+        if (m_GizmoStart.empty())
+            return;
+
+        // Eski + yeni degerleri kimlikle (UUID degil, tutamak+sahne yeterli:
+        // gizmo sirasinda sahne degismez) topla. Gercekten degisen yoksa
+        // komut yazma.
+        struct Rec { FX::Entity e; glm::vec3 t0, t1; float r0, r1; glm::vec2 s0, s1; };
+        std::vector<Rec> recs;
+        bool anyChanged = false;
+
+        for (const GizmoSnapshot& snap : m_GizmoStart)
+        {
+            FX::Entity e = snap.Entity;
+            if (!e || !e.HasComponent<FX::TransformComponent>())
+                continue;
+            const auto& t = e.GetComponent<FX::TransformComponent>();
+            Rec r{ e, snap.Translation, t.Translation,
+                   snap.Rotation, t.Rotation, snap.Scale, t.Scale };
+            if (r.t0 != r.t1 || r.r0 != r.r1 || r.s0 != r.s1)
+                anyChanged = true;
+            recs.push_back(r);
+        }
+
+        m_GizmoStart.clear();
+
+        if (!anyChanged)
+            return;
+
+        auto apply = [](const std::vector<Rec>& rs, bool useNew)
+        {
+            for (const Rec& r : rs)
+            {
+                FX::Entity e = r.e;
+                if (!e || !e.HasComponent<FX::TransformComponent>())
+                    continue;
+                auto& tc = e.GetComponent<FX::TransformComponent>();
+                tc.Translation = useNew ? r.t1 : r.t0;
+                tc.Rotation    = useNew ? r.r1 : r.r0;
+                tc.Scale       = useNew ? r.s1 : r.s0;
+            }
+        };
+
+        EditCommand cmd;
+        cmd.Name = (recs.size() > 1) ? "Gizmo: tasima (coklu)" : "Gizmo: tasima";
+        cmd.Undo = [recs, apply]() { apply(recs, false); };
+        cmd.Redo = [recs, apply]() { apply(recs, true); };
+        m_Commands.Push(std::move(cmd));
     }
 
     void EditorApp::DeleteSelection()

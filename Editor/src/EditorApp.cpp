@@ -74,7 +74,7 @@ namespace FXEd
         // Component meta tablosuna editore ozgu cizicileri bagla (A1):
         // doku slotu, kamera tekilligi, script listesi. Motor bunlari
         // bilmez; tablo yalnizca tasiyicidir.
-        ComponentDrawer::RegisterEditorUI(&m_TextureLibrary);
+        ComponentDrawer::RegisterEditorUI(&m_TextureLibrary, &m_Commands);
 
         // Logo proje acilmadan ONCE yukleniyor: o sirada varlik koku
         // hala exe klasoru (bkz. FileSystem::GetProjectDirectory).
@@ -133,6 +133,9 @@ namespace FXEd
         m_Scene        = m_RuntimeScene.get();
         m_SceneState   = SceneState::Play;
 
+        // Undo gecmisi duzenleme sahnesine ait; kopyada anlamsiz.
+        m_Commands.Clear();
+
         // Secim ESKI sahneye ait bir tutamak tasiyordu; yeni sahnede
         // anlamsiz. Faz 8'de ogrendigimiz ders: tutamak sahneye bagli,
         // kimlik degil.
@@ -173,6 +176,9 @@ namespace FXEd
         m_Scene      = m_EditorScene.get();
         m_SceneState = SceneState::Edit;
         m_RuntimeScene.reset();   // kopyada olan biten burada kayboluyor
+
+        // Play sirasinda birikmis komutlar kopyaya aitti.
+        m_Commands.Clear();
 
         m_HierarchyPanel.SetContext(m_Scene);
         m_Selection.Clear();
@@ -435,7 +441,15 @@ namespace FXEd
                 return false;
 
             case FX::Key::Z:
+                // Ctrl+Z geri al, Ctrl+Shift+Z yeniden yap. Kisayol GLOBAL
+                // (viewport'a bagli degil) - inspector'da duzenledikten
+                // sonra da geri alinabilsin.
+                if (ctrl && shift) { RedoEdit(); return true; }
+                if (ctrl)          { UndoEdit(); return true; }
                 if (m_ViewportHovered) { m_GizmoOperation = -1; return true; }
+                return false;
+            case FX::Key::Y:
+                if (ctrl) { RedoEdit(); return true; }
                 return false;
             case FX::Key::X:
                 if (m_ViewportHovered) { m_GizmoOperation = ImGuizmo::TRANSLATE; return true; }
@@ -450,6 +464,32 @@ namespace FXEd
             default:
                 return false;
         }
+    }
+
+    void EditorApp::UndoEdit()
+    {
+        const std::string name = m_Commands.Undo();
+        if (name.empty())
+        {
+            SetStatus("Geri alinacak bir sey yok.");
+            return;
+        }
+        // Komut bir entity'yi silmis/geri getirmis olabilir; secim
+        // gecersiz tutamak tasiyabilir.
+        m_Selection.Prune();
+        SetStatus("Geri alindi: " + name);
+    }
+
+    void EditorApp::RedoEdit()
+    {
+        const std::string name = m_Commands.Redo();
+        if (name.empty())
+        {
+            SetStatus("Yeniden yapilacak bir sey yok.");
+            return;
+        }
+        m_Selection.Prune();
+        SetStatus("Yeniden yapildi: " + name);
     }
 
     void EditorApp::OnShutdown()

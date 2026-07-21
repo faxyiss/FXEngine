@@ -128,7 +128,7 @@ edilmeli.
 ### Yüksek
 | Sorun | Nerede | Not |
 |---|---|---|
-| **Undo/Redo yok** | editörün tamamı | Gizmo ile yanlış sürükleme geri alınamıyor. Komut deseni; editörün tamamına dokunan mimari değişiklik. |
+| ~~**Undo/Redo yok**~~ | ✅ A5: `CommandStack` + Inspector alan düzenleme + gizmo dönüşümü geri alınabiliyor (Ctrl+Z/Ctrl+Shift+Z). Yapısal işlemler (entity/component ekle-sil) sonraki tur. [Faz-A5-Notlar.md](Faz-A5-Notlar.md) |
 
 ### Orta
 | Sorun | Nerede |

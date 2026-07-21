@@ -114,6 +114,15 @@ namespace FXEd
                 ImGui::EndMenu();
             }
 
+            if (ImGui::BeginMenu("Duzen"))
+            {
+                if (ImGui::MenuItem("Geri Al", "Ctrl+Z", false, m_Commands.CanUndo()))
+                    UndoEdit();
+                if (ImGui::MenuItem("Yeniden Yap", "Ctrl+Shift+Z", false, m_Commands.CanRedo()))
+                    RedoEdit();
+                ImGui::EndMenu();
+            }
+
             if (ImGui::BeginMenu("Sahne"))
             {
                 if (ImGui::MenuItem(m_ScenePaused ? "Devam Et" : "Duraklat"))
@@ -132,6 +141,7 @@ namespace FXEd
                     SampleScene::Build(*m_Scene, m_Checkerboard, m_Circle);
                     m_HierarchyPanel.SetContext(m_Scene);
                     m_Selection.Clear();
+                    m_Commands.Clear();
                 }
 
                 ImGui::Separator();

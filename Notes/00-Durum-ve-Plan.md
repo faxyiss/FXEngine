@@ -6,6 +6,8 @@
 >
 > Mimarinin tamamı ve alınan yön kararları: **[02-Mimari.md](02-Mimari.md)**
 >
+> Sıradaki somut işler: **[03-Yapilacaklar.md](03-Yapilacaklar.md)**
+>
 > Son güncelleme: 2026-07-21 · Son commit: `0ba9735`
 > **Aşama A + Aşama B + script alanları + yapısal Undo + ABI damgası
 > tamam.** Sıradaki iş ve C# kararı için **§5b**'ye bak.
@@ -257,17 +259,33 @@ derleme adımı yok, script hatası çökertmez. Bedeli yine bağlama katmanı.
 **Karar: önce 16c örnek oyun yaz (C++), sonra dil kararını gerçek veriyle
 ver.**
 
+### 16c yazıldı — çıkan eksikler
+
+`C:\FXProjects\FirstFxGame` (topla-kaç: Player + 5 Star + Enemy, dört
+script + ortak `shared/Game.cpp`). Amacına ulaştı; çıkan eksiklerin
+tamamı **[03-Yapilacaklar.md](03-Yapilacaklar.md)**'da. En kritik üçü:
+
+1. **Script'ten entity silinemiyor/yaratılamıyor** — `ScriptSystem` view
+   gezerken registry değişemez. Yıldız silinemedi, uzağa taşındı.
+2. **Script alanı olarak entity referansı yok** — her karede
+   `FindEntityByName("Player")`, hem `O(n)` hem yeniden adlandırmada
+   sessizce bozuluyor.
+3. **Prefab bağı yok** — `Star`'a script atayınca beş örneği tek tek
+   düzeltmek gerekti.
+
 ### Önerilen sıra
 
-1. **16c — küçük örnek oyun** (topla-kaç). Amaç: eksik API'leri çarparak
-   görmek. K6'nın beklediği ikinci tur eksikler burada çıkacak.
-2. **18c — sıralama katmanı.** Şu an aynı Z'deki sprite'ların sırası
-   **keyfî** (EnTT view sırası + `GL_LESS` eşitlikte ilk çizileni tutuyor).
-   Unity modeli: `SortingLayer` + `OrderInLayer` → çizmeden önce sırala →
-   sprite'larda **derinlik yazmayı kapat** (`glDepthMask(GL_FALSE)`).
-   Not: görünür Z aralığı `-1…+1`, dışı kırpılıyor.
-3. **17 fizik** → **14/15 animasyon** → **19/23 metin+ses**
-4. Sonra Aşama C'yi yeniden değerlendir.
+1. ~~**16c — küçük örnek oyun**~~ ✅ yazıldı
+2. **A-1 script'ten entity sil/yarat** — model deliği, küçük, birim testi
+   yazılabilir. Bu kapanmadan yazılacak her oyun 16c'nin numarasını
+   tekrarlamak zorunda
+3. **A-2 runtime prefab örnekleme** → **A-3 entity referansı alanı**
+4. **B-1 hiyerarşide sıra** · **B-2 kopyala/yapıştır** ·
+   **C prefab bağı + Apply/Revert** (en büyük editör işi, ikiye bölünecek)
+5. **19 metin** → **18c sıralama** → **17 fizik** → **14/15** → **23 ses**
+6. Sonra Aşama C'yi (C#) yeniden değerlendir.
+
+Gerekçeler ve maddelerin tamamı: **[03-Yapilacaklar.md](03-Yapilacaklar.md)**
 
 ### Yarım kalan / bilinen sorunlar
 

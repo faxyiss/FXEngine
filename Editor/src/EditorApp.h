@@ -64,6 +64,12 @@ namespace FXEd
         // calistirir ve script'lerini kaydeder. Proje acilinca cagriliyor.
         void LoadGameLibrary();
 
+        // B-5: oyunu (Game.dll) derler ve basariliysa yeniden yukler.
+        // Play sirasindaysa ONCE Stop eder (yeniden yukleme calisan
+        // script'lerin vtable'larini gecersiz kilardi). Ciktiyi derleme
+        // konsoluna yazar.
+        void BuildGame();
+
         // Ertelenmis proje istekleri; ImGui cercevesi kapandiktan sonra.
         void ProcessProjectRequests();
 
@@ -171,6 +177,13 @@ namespace FXEd
         void RenderGameView();
         void DrawViewportToolbar();
         void DrawStatsPanel();
+
+        // B-5: son derlemenin cmake ciktisini gosteren panel.
+        void DrawBuildConsole();
+        std::string m_BuildLog;
+        bool        m_LastBuildOk    = false;
+        bool        m_ShowBuildConsole = false;
+        bool        m_ScrollBuildLog = false;   // yeni cikti gelince en alta kaydir
 
         // Ayar pencereleri (A3). Ayrilar cunku biri PROJEYE, digeri
         // KULLANICIYA ait - karisirsa yanlis dosyaya yazilir.

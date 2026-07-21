@@ -274,6 +274,7 @@ namespace FXEd
         DrawScenePanel();
         DrawGamePanel();
         DrawStatsPanel();
+        DrawBuildConsole();
         DrawProjectSettingsWindow();
         DrawPreferencesWindow();
         DrawNewScriptModal();

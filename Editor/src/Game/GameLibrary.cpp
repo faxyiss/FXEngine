@@ -43,19 +43,57 @@ namespace FXEd
     {
         Unload();
 
-        if (!std::filesystem::exists(dllPath))
+        namespace fs = std::filesystem;
+
+        if (!fs::exists(dllPath))
         {
             if (error)
                 *error = "Game.dll yok: " + dllPath;
             return false;
         }
 
-        HMODULE handle = ::LoadLibraryA(dllPath.c_str());
+        // GOLGE KOPYA (B-4): Windows yuklu bir DLL'i kilitler; uzerine
+        // yeniden derlenemez. Bir kopyasini yukleyip orijinali serbest
+        // birakiyoruz. Kopya ayni ADLA bir alt klasorde: MSVC .dll icine
+        // gomdugu pdb yolunu "Game.pdb" olarak yazar; ayni adla kopyalarsak
+        // debugger sembolleri bulur (VS'ten editore attach calisir).
+        std::string loadPath = dllPath;
+        {
+            const fs::path original{ dllPath };
+            const fs::path shadowDir = original.parent_path() / "loaded";
+
+            std::error_code ec;
+            fs::create_directories(shadowDir, ec);
+
+            const fs::path shadowDll = shadowDir / original.filename();
+            fs::copy_file(original, shadowDll,
+                          fs::copy_options::overwrite_existing, ec);
+            if (ec)
+            {
+                if (error)
+                    *error = "Golge kopya basarisiz: " + ec.message();
+                return false;
+            }
+
+            // Sembol dosyasi varsa o da: breakpoint'ler icin.
+            const fs::path pdb = fs::path{ original }.replace_extension(".pdb");
+            if (fs::exists(pdb))
+            {
+                std::error_code pec;
+                fs::copy_file(pdb, shadowDir / pdb.filename(),
+                              fs::copy_options::overwrite_existing, pec);
+            }
+
+            m_ShadowPath = shadowDll.string();
+            loadPath = m_ShadowPath;
+        }
+
+        HMODULE handle = ::LoadLibraryA(loadPath.c_str());
         if (!handle)
         {
             if (error)
                 *error = "LoadLibrary basarisiz (kod "
-                       + std::to_string(::GetLastError()) + "): " + dllPath;
+                       + std::to_string(::GetLastError()) + "): " + loadPath;
             return false;
         }
 

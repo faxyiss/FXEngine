@@ -8,6 +8,11 @@
 #include <fstream>
 #include <sstream>
 
+#ifndef WIN32_LEAN_AND_MEAN
+    #define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+
 namespace fs = std::filesystem;
 
 namespace FXEd::GameProject
@@ -225,5 +230,106 @@ extern "C" __declspec(dllexport) int FXEngineSelfTest(FX::Scene* scene,
             && WriteIfChanged(build / "GameRegistrations.h.in",
                               kRegistrationsTemplate, error)
             && WriteIfChanged(build / "GameMain.cpp", kGameMain, error);
+    }
+
+    namespace
+    {
+        // Bir komutu calistirir, stdout+stderr'i output'a toplar, cikis
+        // kodunu dondurur. CREATE_NO_WINDOW: derleme sirasinda konsol
+        // penceresi acilip kapanmasin (editor pencereli bir uygulama).
+        int RunCommand(const std::string& cmdLine, std::string& output)
+        {
+            SECURITY_ATTRIBUTES sa{};
+            sa.nLength = sizeof(sa);
+            sa.bInheritHandle = TRUE;
+
+            HANDLE readPipe = nullptr, writePipe = nullptr;
+            if (!::CreatePipe(&readPipe, &writePipe, &sa, 0))
+            {
+                output += "\n[editor] CreatePipe basarisiz.\n";
+                return -1;
+            }
+            // Okuma ucunu cocuk MIRAS ALMASIN: aksi halde cocuk hic
+            // kapanmadigi icin ReadFile EOF gormez ve kilitleniriz.
+            ::SetHandleInformation(readPipe, HANDLE_FLAG_INHERIT, 0);
+
+            STARTUPINFOA si{};
+            si.cb = sizeof(si);
+            si.dwFlags = STARTF_USESTDHANDLES;
+            si.hStdOutput = writePipe;
+            si.hStdError  = writePipe;
+            si.hStdInput  = ::GetStdHandle(STD_INPUT_HANDLE);
+
+            PROCESS_INFORMATION pi{};
+
+            // CreateProcessA komut satirini DEGISTIREBILIR; kopya veriyoruz.
+            std::string mutableCmd = cmdLine;
+            const BOOL ok = ::CreateProcessA(
+                nullptr, mutableCmd.data(), nullptr, nullptr, TRUE,
+                CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi);
+
+            // Yazma ucunu ebeveyn kapatir: yoksa ReadFile hic EOF gormez.
+            ::CloseHandle(writePipe);
+
+            if (!ok)
+            {
+                ::CloseHandle(readPipe);
+                output += "\n[editor] cmake calistirilamadi (PATH'te mi?).\n";
+                return -1;
+            }
+
+            char buf[4096];
+            DWORD read = 0;
+            while (::ReadFile(readPipe, buf, sizeof(buf) - 1, &read, nullptr) && read > 0)
+                output.append(buf, read);
+            ::CloseHandle(readPipe);
+
+            ::WaitForSingleObject(pi.hProcess, INFINITE);
+            DWORD code = 1;
+            ::GetExitCodeProcess(pi.hProcess, &code);
+            ::CloseHandle(pi.hProcess);
+            ::CloseHandle(pi.hThread);
+            return static_cast<int>(code);
+        }
+    }
+
+    int Build(const std::string& config, std::string& output)
+    {
+        output.clear();
+
+        std::string writeErr;
+        if (!WriteBuildFiles(&writeErr))
+        {
+            output = "Iskele kurulamadi: " + writeErr + "\n";
+            return -1;
+        }
+
+        const std::string src   = BuildDir();
+        const std::string bin   = CMakeBinaryDir();
+        const std::string quotedSrc = "\"" + src + "\"";
+        const std::string quotedBin = "\"" + bin + "\"";
+
+        // Ilk kez ya da cache silinmisse configure gerekiyor.
+        if (!fs::exists(fs::path{ bin } / "CMakeCache.txt"))
+        {
+            output += "> cmake configure...\n";
+            const int cfg = RunCommand(
+                "cmake -S " + quotedSrc + " -B " + quotedBin, output);
+            if (cfg != 0)
+            {
+                output += "\nConfigure basarisiz (kod " + std::to_string(cfg) + ").\n";
+                return cfg;
+            }
+            output += "\n";
+        }
+
+        output += "> cmake --build (" + config + ")...\n";
+        const int rc = RunCommand(
+            "cmake --build " + quotedBin + " --config " + config, output);
+
+        output += (rc == 0)
+            ? "\nDerleme basarili.\n"
+            : "\nDerleme BASARISIZ (kod " + std::to_string(rc) + ").\n";
+        return rc;
     }
 }

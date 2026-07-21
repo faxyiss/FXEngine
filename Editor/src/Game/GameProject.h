@@ -26,4 +26,10 @@ namespace FXEd::GameProject
     // DOKUNMAZ - her yazma CMake'i gereksiz yere yeniden configure
     // etmeye zorlardi.
     bool WriteBuildFiles(std::string* error = nullptr);
+
+    // Game.dll'i derler (B-5). Gerekirse once configure eder, sonra
+    // `cmake --build`. cmake'in tum ciktisi (stdout+stderr) `output`'a
+    // yazilir - editor bunu bir panelde gosterir. Donus cmake'in cikis
+    // kodu: 0 basari. SENKRON: derleme bitene kadar bloklar (~birkac sn).
+    int Build(const std::string& config, std::string& output);
 }

@@ -484,8 +484,17 @@ hızı her gün acıtıyor, Undo ara sıra.
       `<proje>/assets/scripts/` (namespace `FXGame`, proje yoksa engelli).
       Katmanlar net: motor → editör → oyun (DLL). Projesiz modda script yok
       (kabul). (Not: planın "Play koruması" B-6'sı B-4/B-5 ile birleşti.)
-- [ ] **B-4** — gölge kopya + `FreeLibrary`/`LoadLibrary` döngüsü (Yeniden Yükle)
-- [ ] **B-5** — editörden "Derle" düğmesi + konsol paneli + Play koruması
+- [x] **B-4 — Gölge kopya.** `GameLibrary` orijinali değil
+      `out/loaded/Game.dll` kopyasını yüklüyor; orijinal kilitli kalmıyor.
+      PDB de aynı adla kopyalanıyor (debugger attach için). Doğrulandı:
+      editör açıkken orijinal rebuild edildi, `LNK1168` yok.
+- [x] **B-5 — "Derle" düğmesi + konsol + Play koruması.** Oynatma
+      şeridinde/"Oyun" menüsünde Derle → (Play'deyse önce Stop) →
+      `cmake` (CreateProcess, çıktı yakalanıyor) → başarılıysa yeniden
+      yükle. `Derleme Konsolu` paneli cmake çıktısını gösteriyor.
+
+**Aşama B tamamlandı.** Son GUI onayı (script değiştir → Derle → çalışsın)
+kullanıcıda.
 
 ## Aşama C — Script dili
 

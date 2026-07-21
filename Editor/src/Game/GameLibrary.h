@@ -39,6 +39,7 @@ namespace FXEd
         bool RunSelfTest(std::string* detail = nullptr);
 
     private:
-        void* m_Handle = nullptr;  // HMODULE (windows.h'i header'a sizdirmamak icin void*)
+        void*       m_Handle = nullptr;  // HMODULE (windows.h'i header'a sizdirmamak icin void*)
+        std::string m_ShadowPath;        // yuklenen golge kopyanin yolu (B-4)
     };
 }

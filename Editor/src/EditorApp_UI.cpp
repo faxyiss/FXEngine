@@ -150,6 +150,19 @@ namespace FXEd
                 ImGui::EndMenu();
             }
 
+            if (ImGui::BeginMenu("Oyun"))
+            {
+                const bool hasProject = FX::Project::HasActive();
+                if (ImGui::MenuItem("Derle ve Yeniden Yukle", nullptr, false, hasProject))
+                    BuildGame();
+                if (!hasProject)
+                    ImGui::TextDisabled("  (once bir proje ac)");
+
+                ImGui::Separator();
+                ImGui::MenuItem("Derleme Konsolu", nullptr, &m_ShowBuildConsole);
+                ImGui::EndMenu();
+            }
+
             if (ImGui::BeginMenu("Gizmo"))
             {
                 if (ImGui::MenuItem("Kapali",  "Z", m_GizmoOperation == -1))
@@ -307,6 +320,20 @@ namespace FXEd
             ImGui::TextColored(ImVec4(0.95f, 0.85f, 0.35f, 1.0f), "DURAKLATILDI");
         else
             ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.25f, 1.0f), "PLAY (kopya sahne)");
+
+        // Derle (B-5): saga yaslanmis. Script degistir -> Derle -> ~sn ->
+        // editor kapanmadan yeni davranis. Proje yoksa anlamsiz.
+        {
+            const float btnW = 72.0f;
+            ImGui::SameLine(ImGui::GetWindowWidth() - btnW - 8.0f);
+            ImGui::BeginDisabled(!FX::Project::HasActive());
+            if (ImGui::Button("Derle", ImVec2(btnW, 0.0f)))
+                BuildGame();
+            ImGui::EndDisabled();
+            ImGui::SetItemTooltip(
+                "Oyun kodunu (Game.dll) derle ve yeniden yukle.\n"
+                "Play sirasinda once durdurulur.");
+        }
 
         ImGui::End();
     }
@@ -861,6 +888,48 @@ namespace FXEd
             ImGui::CloseCurrentPopup();
 
         ImGui::EndPopup();
+    }
+
+    void EditorApp::DrawBuildConsole()
+    {
+        if (!m_ShowBuildConsole)
+            return;
+
+        ImGui::SetNextWindowSize(ImVec2(640.0f, 320.0f), ImGuiCond_FirstUseEver);
+        if (!ImGui::Begin("Derleme Konsolu", &m_ShowBuildConsole))
+        {
+            ImGui::End();
+            return;
+        }
+
+        // Durum satiri: goz once buraya baksin, hata mi basari mi.
+        if (m_LastBuildOk)
+            ImGui::TextColored(ImVec4(0.45f, 0.85f, 0.45f, 1.0f), "Son derleme: BASARILI");
+        else
+            ImGui::TextColored(ImVec4(0.95f, 0.5f, 0.4f, 1.0f), "Son derleme: BASARISIZ");
+
+        ImGui::SameLine(ImGui::GetWindowWidth() - 80.0f);
+        if (ImGui::SmallButton("Temizle"))
+            m_BuildLog.clear();
+
+        ImGui::Separator();
+
+        // Salt-okunur, tek parca metin: cmake ciktisini oldugu gibi
+        // gosteriyoruz. Kaydirilabilir bir cocuk pencerede.
+        ImGui::BeginChild("##buildlog", ImVec2(0.0f, 0.0f), true,
+                          ImGuiWindowFlags_HorizontalScrollbar);
+        ImGui::TextUnformatted(m_BuildLog.c_str(),
+                               m_BuildLog.c_str() + m_BuildLog.size());
+        // Yeni cikti geldiginde en alta kaydir; kullanici yukari kaydirdiysa
+        // ona dokunma.
+        if (m_ScrollBuildLog)
+        {
+            ImGui::SetScrollHereY(1.0f);
+            m_ScrollBuildLog = false;
+        }
+        ImGui::EndChild();
+
+        ImGui::End();
     }
 
     void EditorApp::DrawStatsPanel()

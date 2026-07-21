@@ -345,10 +345,92 @@ edilmediği için zararsız, temiz derlemede zaten üretilmiyor.
 
 ---
 
-## Kalan: B-4 + B-5 (açıkken yeniden yükleme)
+## B-4 — Gölge kopya (2026-07-21) ✅
 
-- **B-4** — gölge kopya (`Game.dll` → `Game.loaded.dll`) + "Yeniden Yükle":
-  editör açıkken DLL kilidini aşıp yeni derlemeyi almak.
-- **B-5** — editörden "Derle" düğmesi (`cmake --build`), çıktı bir konsol
-  panelinde; **Play sırasında Derle → önce Stop** koruması burada.
-  FXTest2'nin bozuk `Spin.h`'ı bu adımın hata-raporlama testi.
+Windows yüklü bir DLL'i kilitler; üzerine yeniden derlenemez. `GameLibrary::Load`
+artık orijinali doğrudan yüklemiyor: bir **kopyasını** yükleyip orijinali
+serbest bırakıyor.
+
+```
+<proje>/.fxbuild/out/Game.dll         ← cmake bunu yazar (hiç kilitli değil)
+<proje>/.fxbuild/out/loaded/Game.dll  ← editörün LoadLibrary ettiği kopya
+```
+
+Kopya **aynı adla bir alt klasörde** (`loaded/`), `Game.loaded.dll` gibi
+uzantı-oynaması yapılmadı. Sebep: MSVC `.dll` içine gömdüğü PDB yolunu
+`"Game.pdb"` olarak yazıyor; aynı adla kopyalarsak (ve `Game.pdb`'yi de
+yanına koyarsak) debugger sembolleri buluyor — VS'ten editöre attach edip
+script'e breakpoint koymak çalışır (planın "hata ayıklama sınırı" notu).
+
+**Doğrulama (headless):** BTest editörde açık ve gölge kopyadan yüklüyken
+(`loaded/Game.dll` + `Game.pdb` oluştu, self-test geçti), **orijinal
+`Game.dll` editör kapanmadan yeniden derlendi** — `LNK1168` (yazma için
+açılamıyor) yok. Gölge kopyanın tüm amacı buydu.
+
+---
+
+## B-5 — Editörden "Derle" düğmesi + konsol + Play koruması (2026-07-21) ✅
+
+### Akış
+
+Oynatma şeridinde sağda **"Derle"** düğmesi (ve "Oyun" menüsünde "Derle
+ve Yeniden Yükle"). `BuildGame()`:
+
+```
+Play modundaysan → önce Stop (kullanıcıya söylenerek)
+GameProject::Build(config)  → cmake configure (gerekirse) + cmake --build
+  başarılıysa → LoadGameLibrary() (gölge kopyayı tazele + kayıtları oku)
+  başarısızsa → konsolda hata, editör ayakta
+```
+
+**Play koruması** planın kesin sırası: Play sırasında yeniden yükleme
+vtable'ları geçersiz kılar, o yüzden Derle önce Stop ediyor. Gölge kopya
+sayesinde **derlemenin kendisi** için boşaltma gerekmiyor (orijinal zaten
+kilitli değil); yalnızca **yeniden yükleme** Play'i bekleyemez.
+
+### cmake alt süreci
+
+`GameProject::Build` → `RunCommand` (`CreateProcessA` + `CREATE_NO_WINDOW`,
+tek boruya stdout+stderr). Konsol penceresi açılıp kapanmıyor. Boru okuma
+ucu miras alınmıyor (yoksa çocuk kapanmadan `ReadFile` EOF görmez ve
+kilitleniriz), yazma ucunu `CreateProcess`'ten sonra ebeveyn kapatıyor.
+
+**Senkron:** derleme bitene kadar editör bloklanıyor (~birkaç sn). İlk
+sürüm için kabul; async + ilerleme çubuğu sonraya.
+
+### Derleme konsolu
+
+`Derleme Konsolu` paneli: cmake çıktısını olduğu gibi, kaydırılabilir,
+üstte BAŞARILI/BAŞARISIZ renkli durum. Derleme bitince otomatik açılıp
+en alta kayıyor. "Oyun" menüsünden de açılıp kapanabiliyor.
+
+### Doğrulama
+
+| Ne | Sonuç |
+|---|---|
+| Derleme (B-4+B-5) | ✅ temiz |
+| `FXTests` | ✅ 51 / 238 |
+| Gölge kopya yükleniyor + self-test | ✅ (BTest) |
+| Editör açıkken orijinal rebuild | ✅ kilit yok |
+
+**GUI adımları kullanıcıda** (motorun kuralı: GUI testini simüle etmem):
+- BTest aç → `Spin.h`'ta `m_Speed` değerini değiştir → **Derle** → ~sn →
+  Play'de yeni hız (editör kapanmadı).
+- Play'deyken Derle → önce Stop olmalı, sonra derleme.
+- **FXTest2 aç → Derle** → konsolda derleme hatası görünmeli (senin
+  `Spin.h`'ın eksik `;` ve `CameraComponent::Size` — doğrusu
+  `OrthographicSize`). Editör çökmemeli. Bu, B-5'in hata-raporlama testi.
+
+---
+
+## Aşama B tamamlandı
+
+`B-1` (SHARED) · `B-2` (Game.dll hedefi) · `B-3` (DLL yükleme + EnTT
+ölçümü) · `B-6` (builtin temizlik) · `B-4` (gölge kopya) · `B-5` (Derle
+düğmesi). Başarı ölçütü: **editör açıkken script'i değiştir → Derle →
+sahne/seçim kaybolmadan yeni kod çalışsın** — makinede son GUI adımı
+kullanıcının onayını bekliyor.
+
+Bilerek yapılmayanlar (planın "kapsam dışı"ı korunuyor): otomatik derleme
+(dosya izleyiciyle), script alanlarının Inspector'dan ayarlanması,
+script'lerin kendi component'lerini tanımlaması, Linux `dlopen`.

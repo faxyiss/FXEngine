@@ -2,6 +2,7 @@
 #include "Platform/FileDialogs.h"
 #include "SampleScene.h"
 #include "Game/GameProject.h"
+#include "Game/GameLibrary.h"
 
 #include <FXEngine/Core/Log.h>
 #include <FXEngine/Core/FileSystem.h>
@@ -413,6 +414,44 @@ namespace FXGame
 
         const auto& names = FX::ScriptRegistry::GetNames();
         FX_INFO("Game.dll yuklendi, %zu script kayitli.", names.size());
+    }
+
+    void EditorApp::BuildGame()
+    {
+        if (!FX::Project::HasActive())
+        {
+            SetStatus("Derlemek icin once bir proje ac.");
+            return;
+        }
+
+        // Play sirasinda yeniden yukleme YASAK (vtable'lar gecersizlesir):
+        // once Stop. Kullaniciya soyluyoruz, sessizce durdurmuyoruz.
+        if (IsPlaying())
+        {
+            OnSceneStop();
+            SetStatus("Derleme icin Play durduruldu.");
+        }
+
+        SetStatus("Derleniyor...");
+
+        // Golge kopya sayesinde ORIJINAL Game.dll kilitli degil (yuklu
+        // olan out/loaded/Game.dll); dolayisiyla once bosaltmaya gerek
+        // yok, dogrudan derleyebiliyoruz.
+        const int rc = GameProject::Build(FX_BUILD_CONFIG, m_BuildLog);
+        m_LastBuildOk      = (rc == 0);
+        m_ShowBuildConsole = true;
+        m_ScrollBuildLog   = true;
+
+        if (!m_LastBuildOk)
+        {
+            SetStatus("Derleme BASARISIZ - konsola bak.");
+            FX_ERROR("Oyun derlemesi basarisiz (kod %d).", rc);
+            return;
+        }
+
+        // Basariliysa yeni DLL'i yeniden yukle (Load once eskisini birakir).
+        LoadGameLibrary();
+        SetStatus("Derlendi ve yeniden yuklendi.");
     }
 
     void EditorApp::OpenProject()

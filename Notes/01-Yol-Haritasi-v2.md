@@ -508,6 +508,13 @@ hızı her gün acıtıyor, Undo ara sıra.
       `cmake` (CreateProcess, çıktı yakalanıyor) → başarılıysa yeniden
       yükle. `Derleme Konsolu` paneli cmake çıktısını gösteriyor.
 
+- [x] **B-7 — Oyun projesi gerçek bir C++ projesi.** `assets/` altındaki
+      `.cpp` dosyaları da derleniyor; script tespiti dosya adına değil
+      **içeriğe** bakıyor (`: public FX::ScriptableEntity`), kayıtlı ad
+      sınıf adı. Script olmayan header artık derlemeyi kırmıyor (ölçüldü),
+      `assets/` kökü include yolunda.
+      Ayrıntı: [Faz-B7-Notlar.md](Faz-B7-Notlar.md)
+
 **Aşama B tamamlandı.** Son GUI onayı (script değiştir → Derle → çalışsın)
 kullanıcıda.
 

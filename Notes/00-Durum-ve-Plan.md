@@ -81,6 +81,7 @@ MVP (Faz 0–7) ve şu fazlar tamam: **8, 9, 10, 11, 12, 21, 22**,
 |---|---|
 | **Yapısal Undo** | `EntitySnapshot`/`ComponentSnapshot` (motor) + `Structural` komutları (editör). Entity oluştur/sil, component ekle/sil, prefab ve doku bırakma geri alınabiliyor; çoklu seçim tek adım |
 | **ABI damgası** | `FX_ENGINE_ABI_VERSION`; eski `Game.dll` **yüklenmeden önce** yakalanıyor, konsol + durum çubuğunda uyarı |
+| **B-7 oyun projesi** | `.cpp` dosyaları da derleniyor; script tespiti dosya adına değil **içeriğe** bakıyor, script olmayan header'lar artık derlemeyi kırmıyor ([Faz-B7-Notlar.md](Faz-B7-Notlar.md)) |
 
 ### Şu an çalışan özellikler
 
@@ -94,9 +95,11 @@ MVP (Faz 0–7) ve şu fazlar tamam: **8, 9, 10, 11, 12, 21, 22**,
   `RegisterBuiltins`. Serileştirme, `Scene::Copy` ve Inspector üçü de
   oradan besleniyor. Yeni component = **tek yere yazmak**
 - **Scene View / Game View ayrı (A2)** · **Ayarlar ayrı (A3)**
-- **Oyun kodu ayrı DLL (Aşama B):** `<proje>/assets/**/*.h` script'leri
-  `Game.dll`'e derleniyor, **Derle** düğmesiyle editör kapanmadan yeniden
-  yükleniyor (gölge kopya). Derleme hataları konsolda dosya+satır
+- **Oyun kodu ayrı DLL (Aşama B):** `<proje>/assets/` altındaki `.h` ve
+  `.cpp` dosyaları `Game.dll`'e derleniyor, **Derle** düğmesiyle editör
+  kapanmadan yeniden yükleniyor (gölge kopya). Derleme hataları konsolda
+  dosya+satır. Script = `FX::ScriptableEntity`'den türeyen sınıf (B-7);
+  yardımcı header'lar serbest
 - **Script alanları:** `OnReflect` ile bildirilen alanlar Inspector'da,
   değer component'te veri olarak, Play'de instance'a uygulanıyor
 - **Undo/Redo:** Ctrl+Z / Ctrl+Shift+Z — Inspector alanları, gizmo (A5)
@@ -197,7 +200,7 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 ```
 ✅ borç turu 0.1–0.7  ✅ 13a  ✅ 13b  ✅ 16a  ✅ 16b  ✅ A1  ✅ A2  ✅ A3  ✅ A4
 ✅ Aşama B (B-1…B-6)  ✅ A5 Undo/Redo  ✅ Script alanları (OnReflect)
-✅ Yapısal Undo  ✅ Motor/DLL ABI damgası
+✅ Yapısal Undo  ✅ Motor/DLL ABI damgası  ✅ B-7 (oyun projesi .h+.cpp)
 ▶  16c örnek oyun  →  18c sıralama katmanı  →  17 fizik  →  14/15 animasyon
    → sonra C: C# kararı (aşağıdaki değerlendirmeye bak)
    → 16c → 14 → 15 → 18b → 17a-d → 18c → 19 → 23 → 18d

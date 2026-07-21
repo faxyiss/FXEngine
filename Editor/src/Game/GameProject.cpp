@@ -88,33 +88,58 @@ set(FXGAME_OUT_DIR    "@OUT_DIR@")
 # ikinci bir kopya olur ve ayrisirdi.
 include("@ENGINE_CONFIG@")
 
-# GLOB_RECURSE: assets/ AGACININ TAMAMINDAKI her .h bir script. Boylece
-# kullanici script'lerini icerik panelinde istedigi klasorde tutabilir,
-# hepsi tek Game.dll'e derlenir. CONFIGURE_DEPENDS: yeni dosya eklenince
-# derleme sirasinda yeniden taraniyor (GLOB'un "yeni dosyayi fark etmeme"
-# tehlikesi boylece ortadan kalkiyor).
-#
-# Konvansiyon: assets/ altindaki her .h, FXGame::<DosyaAdi> adinda bir
-# FX::ScriptableEntity turevi icermeli - aksi halde derleme hata verir.
-file(GLOB_RECURSE FXGAME_SCRIPT_HEADERS CONFIGURE_DEPENDS "${FXGAME_ASSETS_DIR}/*.h")
+# GLOB_RECURSE: assets/ AGACININ TAMAMI taraniyor - kullanici kodunu
+# icerik panelinde istedigi klasorde tutabilir, hepsi tek Game.dll'e
+# derlenir. CONFIGURE_DEPENDS: yeni dosya eklenince derleme sirasinda
+# yeniden taraniyor (GLOB'un "yeni dosyayi fark etmeme" tehlikesi
+# boylece ortadan kalkiyor).
+file(GLOB_RECURSE FXGAME_HEADERS CONFIGURE_DEPENDS "${FXGAME_ASSETS_DIR}/*.h")
+file(GLOB_RECURSE FXGAME_SOURCES CONFIGURE_DEPENDS "${FXGAME_ASSETS_DIR}/*.cpp")
 
 set(FX_SCRIPT_INCLUDES "")
 set(FX_SCRIPT_REGISTRATIONS "")
 
-foreach(script_header ${FXGAME_SCRIPT_HEADERS})
-    get_filename_component(script_name ${script_header} NAME_WE)
-    string(APPEND FX_SCRIPT_INCLUDES "#include \"${script_header}\"\n")
-    string(APPEND FX_SCRIPT_REGISTRATIONS
-           "        FX::ScriptRegistry::Register<FXGame::${script_name}>(\"${script_name}\");\n")
+# SCRIPT TESPITI DOSYA ADINA DEGIL ICERIGE BAKAR (B-7).
+#
+# Eskiden assets/ altindaki her .h, adiyla ayni isimde bir script
+# icermek ZORUNDAYDI; bir yardimci header (Utils.h) koymak derlemeyi
+# kiriyordu. Yani oyun kodunu duzenlemenin tek yolu "her dosya bir
+# script"ti. Artik yalnizca FX::ScriptableEntity'den turemis siniflar
+# kaydediliyor, gerisi sessizce gecilip yalnizca derlemeye katiliyor.
+#
+# Kayitli AD sinif adidir (dosya adi degil): sahne dosyasina yazilan
+# kimlik de o. Bir header birden fazla script icerebilir.
+# Konvansiyon: script'ler namespace FXGame icinde olmali.
+foreach(header ${FXGAME_HEADERS})
+    file(READ "${header}" fx_content)
+
+    string(REGEX MATCHALL
+           "class[ \t\r\n]+[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*:[ \t\r\n]*public[ \t\r\n]+FX::ScriptableEntity"
+           fx_matches "${fx_content}")
+
+    if(fx_matches)
+        string(APPEND FX_SCRIPT_INCLUDES "#include \"${header}\"\n")
+
+        foreach(fx_match ${fx_matches})
+            string(REGEX MATCH "class[ \t\r\n]+([A-Za-z_][A-Za-z0-9_]*)"
+                   fx_ignored "${fx_match}")
+            string(APPEND FX_SCRIPT_REGISTRATIONS
+                   "        FX::ScriptRegistry::Register<FXGame::${CMAKE_MATCH_1}>(\"${CMAKE_MATCH_1}\");\n")
+        endforeach()
+    endif()
 endforeach()
 
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/GameRegistrations.h.in"
                "${CMAKE_CURRENT_BINARY_DIR}/generated/GameRegistrations.h"
                @ONLY)
 
-add_library(Game SHARED GameMain.cpp ${FXGAME_SCRIPT_HEADERS})
+add_library(Game SHARED GameMain.cpp ${FXGAME_HEADERS} ${FXGAME_SOURCES})
 
-target_include_directories(Game PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+# assets/ kokunun kendisi de include yolunda: kullanici kendi
+# header'larini "scripts/Utils.h" gibi goreli yazabilsin.
+target_include_directories(Game PRIVATE
+    "${CMAKE_CURRENT_BINARY_DIR}/generated"
+    "${FXGAME_ASSETS_DIR}")
 target_link_libraries(Game PRIVATE FXEngine)
 
 # Cikti tek yerde dursun; multi-config generator'lar config alt klasoru
@@ -132,10 +157,11 @@ endforeach()
 
 // URETILEN DOSYA - .fxbuild/CMakeLists.txt tarafindan uretiliyor.
 //
-// KURAL: assets/scripts/ altindaki her `<Ad>.h` icinde `FXGame::<Ad>`
-// adinda bir FX::ScriptableEntity turevi bulunmali. Kayit satirini elle
-// yazmak zorunda kalsaydik unutmanin cezasi SESSIZ olurdu: script
-// Inspector listesinde hic gorunmezdi.
+// KURAL: assets/ altindaki header'lar taranir; `FX::ScriptableEntity`'den
+// turemis her sinif ADIYLA kaydedilir (namespace FXGame). Script olmayan
+// header'lar gormezden gelinir. Kayit satirini elle yazmak zorunda
+// kalsaydik unutmanin cezasi SESSIZ olurdu: script Inspector listesinde
+// hic gorunmezdi.
 
 @FX_SCRIPT_INCLUDES@
 #include <FXEngine/Scene/ScriptRegistry.h>

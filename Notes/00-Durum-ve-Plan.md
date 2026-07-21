@@ -119,7 +119,7 @@ edilmeli.
 |---|---|
 | Prefab bağlantısı yok (örnek kaynağından bağımsız, override sistemi yok) | `PrefabSerializer` |
 | Linux/macOS dosya diyalogları boş gövde, dosya izleyici yok | `FileDialogs.cpp`, `FileWatcher.cpp` |
-| Çoklu seçimde Inspector yalnızca birincili düzenliyor | `SceneHierarchyPanel` |
+| Çoklu seçimde Inspector yalnızca birincili düzenliyor (A1'den sonra ucuz) | `SceneHierarchyPanel` |
 
 ### Düşük
 - `Renderer2D` global durum (`s_Data` statik), batch bölme yolu hacky
@@ -139,8 +139,8 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 ### Güncel sıra
 
 ```
-✅ borç turu 0.1–0.7  ✅ 13a  ✅ 13b  ✅ 16a  ✅ 16b
-▶  A1 component meta → A2 Game View → A3 Settings
+✅ borç turu 0.1–0.7  ✅ 13a  ✅ 13b  ✅ 16a  ✅ 16b  ✅ A1
+▶  A2 Game View → A3 Settings
    → A4 script dosyası → A5 Undo/Redo
    → B: oyun DLL'i + hot reload
    → C: C# kararı
@@ -168,53 +168,29 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 
 ---
 
-## 5b. YENİ OTURUMDA İLK İŞ: A1 — component meta-veri sistemi
+## 5b. YENİ OTURUMDA İLK İŞ: A2 — Game View / Scene View ayrımı
 
-**Sorun:** Bugün yeni bir component eklemek **dört yere** dokunmayı
-gerektiriyor ve biri unutulduğunda hata *sessiz* oluyor:
+**A1 tamamlandı** (2026-07-21) — [Faz-A1-Notlar.md](Faz-A1-Notlar.md).
+Component'ler artık `ComponentMeta.cpp`'deki `RegisterBuiltins`'te
+**tek yerde** tarif ediliyor; serileştirme, `Scene::Copy` ve Inspector
+üçü de oradan besleniyor. Yeni component eklerken tek dokunulacak yer
+orası.
 
-| Yer | Unutulursa |
-|---|---|
-| `Components.h` — struct | — |
-| `AllComponents` listesi | "Play'e geçince component kayboldu" |
-| `EntitySerialization.cpp` | "Kaydedip açınca ayar gitti" |
-| `SceneHierarchyPanel.cpp` — Inspector bloğu | Component görünmez |
+**Sorun (A2):** "Hangi kamera çiziyor?" bugün belirsiz. Gizmo, ızgara ve
+seçim çerçevesi oyun görüntüsünün üstüne de çiziliyor.
 
-**Hedef:** Her component **tek bir yerde** tanımlansın: adı, alan listesi
-(ad / tip / görünen etiket / aralık), serileştirmesi, Inspector çizimi.
-Yöntem: elle yazılan kayıt + alan listesi (makro sihri yok, harici
-reflection kütüphanesi yok — karar K2, `02-Mimari.md`).
+**Hedef:** Ayrı bir Game View penceresi, sahne kamerasından render.
+Scene View düzenleme yardımcılarını gösterir, Game View göstermez.
+Bu ayrım hedef çözünürlük / en-boy oranı kavramını doğurur ve
+A3 Project Settings'in ilk gerçek müşterisi olur.
 
-### Önerilen adımlar
+**Kararlaştırılacak detaylar:** Play'e basınca otomatik Game View'e
+geçiş, "Maximize on Play", sabit aspect mi serbest mi.
 
-1. **Alan tipi kümesini belirle:** `bool`, `int`, `float`, `vec2`, `vec3`,
-   `string`, `color`, `AssetHandle`, `EntityRef`. Bugün kullanılan her
-   component alanı bu kümeye sığmalı.
-2. **`ComponentRegistry`** — `Register<T>("SpriteRenderer", alanlar…)`.
-   Alan tanımı: etiket + üye işaretçisi (`&T::Field`) + isteğe bağlı
-   min/max/adım.
-3. **Serileştirmeyi tablodan üret** — `EntitySerialization`'ın elle
-   yazılmış blokları yerine tablo üzerinden döngü. *Uyum şart:* üretilen
-   JSON mevcut sahne dosyalarıyla birebir aynı olmalı, yoksa sürüm 5
-   gerekir. Önce testle doğrula.
-4. **Inspector'ı tablodan çiz** — tip başına tek çizim fonksiyonu.
-   Özel durumlar (doku slotu, kamera "Primary" mantığı) tabloya
-   "özel çizici" olarak bağlanabilir.
-5. **Script alanlarını aç** — `ScriptableEntity` türevleri de alan
-   bildirebilsin (`m_Speed` artık koda gömülü değil, Inspector'dan
-   ayarlanır ve sahneye kaydedilir).
-6. **Geçiş kademeli olsun:** önce iki basit component (`Velocity`,
-   `Camera`) tabloya taşınıp eski yol yanında dursun; testler yeşilse
-   kalanlar taşınsın, sonra eski kod silinsin.
-
-### Dikkat
-
-- **Sahne dosyası formatı kırılmamalı.** 41 birim testi bunu koruyor;
-  A1 sırasında `SceneSerializer` testleri kırmızı yanarsa dur.
-- **`AllComponents` (Scene::Copy) da tablodan beslenmeli** — yoksa yine
-  iki yerde iki liste olur.
-- **Alan işaretçileri C# köprüsünün dayanacağı yapı** (karar K1); tabloyu
-  tasarlarken "bunu bir gün dil sınırından geçirebilir miyim?" diye sor.
+**Nereye dokunulacak:** `EditorApp_UI.cpp` (yeni panel),
+`EditorApp.cpp` `OnRender` (ikinci framebuffer), `EditorApp_Viewport.cpp`
+(düzenleme çizimleri yalnız Scene View'da). 0.7'de bu dosyalar tam da
+bunun için bölünmüştü.
 
 ### A1'den sonra sırayla
 

@@ -19,6 +19,8 @@ add_executable(FXEditor
     src/ImGuiLayer.h
     src/EditorCamera.cpp
     src/EditorCamera.h
+    src/Panels/ComponentDrawer.cpp
+    src/Panels/ComponentDrawer.h
     src/Panels/SceneHierarchyPanel.cpp
     src/Panels/SceneHierarchyPanel.h
     src/Panels/ContentBrowserPanel.cpp

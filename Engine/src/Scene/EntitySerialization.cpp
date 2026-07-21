@@ -1,7 +1,7 @@
 #include "Scene/EntitySerialization.h"
 
+#include "FXEngine/Scene/ComponentMeta.h"
 #include "FXEngine/Scene/Components.h"
-#include "FXEngine/Asset/AssetManager.h"
 #include "FXEngine/Core/Log.h"
 
 namespace FX::Detail
@@ -14,25 +14,75 @@ namespace FX::Detail
         json ToJson(const glm::vec3& v) { return json::array({ v.x, v.y, v.z }); }
         json ToJson(const glm::vec4& v) { return json::array({ v.x, v.y, v.z, v.w }); }
 
-        // Okurken savunmaci: alan yoksa veya boyutu yanlissa varsayilani
-        // kullan, cokme. Sahne dosyasi elle duzenlenebilir olmali.
-        glm::vec2 ToVec2(const json& j, const glm::vec2& fallback = glm::vec2(0.0f))
+        // Okurken savunmaci: alan yoksa veya boyutu yanlissa mevcut degeri
+        // (component'in varsayilani) koru, cokme. Sahne dosyasi elle
+        // duzenlenebilir olmali.
+        template<int N>
+        void ReadVec(const json& j, float* dst)
         {
-            if (!j.is_array() || j.size() < 2) return fallback;
-            return { j[0].get<float>(), j[1].get<float>() };
+            if (!j.is_array() || j.size() < N)
+                return;
+
+            for (int i = 0; i < N; ++i)
+                dst[i] = j[i].get<float>();
         }
 
-        glm::vec3 ToVec3(const json& j, const glm::vec3& fallback = glm::vec3(0.0f))
+        void WriteField(const FieldInfo& f, const void* component, json& out)
         {
-            if (!j.is_array() || j.size() < 3) return fallback;
-            return { j[0].get<float>(), j[1].get<float>(), j[2].get<float>() };
+            // const_cast: erisimci tek bir imzayla uretiliyor; burada
+            // yalnizca okuyoruz.
+            void* p = f.Get(const_cast<void*>(component));
+
+            switch (f.Type)
+            {
+            case FieldType::Bool:   out[f.Name] = *static_cast<bool*>(p);        break;
+            case FieldType::Int:    out[f.Name] = *static_cast<int*>(p);         break;
+            case FieldType::Float:  out[f.Name] = *static_cast<float*>(p);       break;
+            case FieldType::Vec2:   out[f.Name] = ToJson(*static_cast<glm::vec2*>(p)); break;
+            case FieldType::Vec3:   out[f.Name] = ToJson(*static_cast<glm::vec3*>(p)); break;
+            case FieldType::Vec4:
+            case FieldType::Color:  out[f.Name] = ToJson(*static_cast<glm::vec4*>(p)); break;
+            case FieldType::String: out[f.Name] = *static_cast<std::string*>(p);  break;
+
+            case FieldType::EntityRef:
+                // Isaretci degil KIMLIK yaziliyor (Faz 8).
+                out[f.Name] = static_cast<std::uint64_t>(
+                    static_cast<EntityRef*>(p)->Target);
+                break;
+            }
         }
 
-        glm::vec4 ToVec4(const json& j, const glm::vec4& fallback = glm::vec4(1.0f))
+        void ReadField(const FieldInfo& f, void* component, const json& in)
         {
-            if (!j.is_array() || j.size() < 4) return fallback;
-            return { j[0].get<float>(), j[1].get<float>(),
-                     j[2].get<float>(), j[3].get<float>() };
+            // Alan dosyada yoksa component'in varsayilani gecerli kalir.
+            // Eski sahneler yeni alanlarla sessizce uyumlu oluyor.
+            if (!in.contains(f.Name))
+                return;
+
+            const json& v = in[f.Name];
+            void* p = f.Get(component);
+
+            switch (f.Type)
+            {
+            case FieldType::Bool:   if (v.is_boolean())        *static_cast<bool*>(p)  = v.get<bool>();  break;
+            case FieldType::Int:    if (v.is_number())         *static_cast<int*>(p)   = v.get<int>();   break;
+            case FieldType::Float:  if (v.is_number())         *static_cast<float*>(p) = v.get<float>(); break;
+            case FieldType::Vec2:   ReadVec<2>(v, &static_cast<glm::vec2*>(p)->x); break;
+            case FieldType::Vec3:   ReadVec<3>(v, &static_cast<glm::vec3*>(p)->x); break;
+            case FieldType::Vec4:
+            case FieldType::Color:  ReadVec<4>(v, &static_cast<glm::vec4*>(p)->x); break;
+
+            case FieldType::String:
+                if (v.is_string()) *static_cast<std::string*>(p) = v.get<std::string>();
+                break;
+
+            case FieldType::EntityRef:
+                // Hedef entity henuz olusturulmamis olabilir; sorun degil,
+                // cozumleme her karede tekrarlaniyor.
+                if (v.is_number_unsigned())
+                    static_cast<EntityRef*>(p)->Target = UUID(v.get<std::uint64_t>());
+                break;
+            }
         }
     }
 
@@ -40,6 +90,7 @@ namespace FX::Detail
     {
         json e;
 
+        // --- Yapisal alanlar: entity duzeyinde, component nesnesi degil ----
         if (entity.HasComponent<IDComponent>())
             e["ID"] = static_cast<std::uint64_t>(entity.GetComponent<IDComponent>().ID);
 
@@ -56,89 +107,22 @@ namespace FX::Detail
                 e["Parent"] = static_cast<std::uint64_t>(rc.Parent);
         }
 
-        if (entity.HasComponent<TransformComponent>())
+        // --- Component'ler: tamami meta tablosundan (A1) --------------------
+        for (const ComponentInfo& info : ComponentRegistry::GetAll())
         {
-            const auto& tc = entity.GetComponent<TransformComponent>();
-            e["Transform"] = {
-                // RADYAN: ic temsille ayni. Derece cevrimi sadece arayuz
-                // sinirinda yapilir.
-                { "Translation", ToJson(tc.Translation) },
-                { "Rotation",    tc.Rotation },
-                { "Scale",       ToJson(tc.Scale) }
-            };
-        }
+            if (!info.SerializedByTable || !info.Has(entity))
+                continue;
 
-        if (entity.HasComponent<SpriteRendererComponent>())
-        {
-            const auto& sc = entity.GetComponent<SpriteRendererComponent>();
+            json obj = json::object();
 
-            json sprite;
-            sprite["Color"]        = ToJson(sc.Color);
-            sprite["TilingFactor"] = sc.TilingFactor;
+            for (const FieldInfo& f : info.Fields)
+                WriteField(f, info.GetPtr(entity), obj);
 
-            // Isaretci yerine KIMLIK: shared_ptr bir calisma zamani adresi,
-            // sonraki acilista anlamsiz.
-            //
-            // Artik YOL degil GUID yaziyoruz. Yol yazsaydik dosya
-            // tasindiginda referans kopardi - Faz 12'den beri surunen
-            // sorun tam olarak buydu.
-            //
-            // Yolu da yaziyoruz ama SADECE INSAN OKUSUN diye: dosyayi
-            // elle inceleyen biri "GUID 8412..." yerine ne oldugunu
-            // gorebilsin. Yukleme onu kullanmiyor.
-            if (sc.Texture)
-            {
-                const std::string path = sc.Texture->GetPath();
-                const AssetHandle handle = AssetManager::GetHandle(path);
+            // Alan tablosunun ifade edemedigi veri (doku slotu).
+            if (info.SaveExtra)
+                info.SaveExtra(info.GetPtr(entity), obj);
 
-                sprite["TextureHandle"] = static_cast<std::uint64_t>(handle);
-                sprite["TexturePath"]   = path;   // yorum amacli
-            }
-            else
-            {
-                sprite["TextureHandle"] = std::uint64_t{ 0 };
-            }
-
-            e["SpriteRenderer"] = sprite;
-        }
-
-        if (entity.HasComponent<VelocityComponent>())
-        {
-            const auto& vc = entity.GetComponent<VelocityComponent>();
-            e["Velocity"] = {
-                { "Linear",  ToJson(vc.Linear) },
-                { "Angular", vc.Angular }
-            };
-        }
-
-        if (entity.HasComponent<FollowComponent>())
-        {
-            const auto& fc = entity.GetComponent<FollowComponent>();
-            e["Follow"] = {
-                { "Target",       static_cast<std::uint64_t>(fc.Target.Target) },
-                { "Speed",        fc.Speed },
-                { "StopDistance", fc.StopDistance }
-            };
-        }
-
-        if (entity.HasComponent<CameraComponent>())
-        {
-            const auto& cc = entity.GetComponent<CameraComponent>();
-            e["Camera"] = {
-                { "OrthographicSize", cc.OrthographicSize },
-                { "Primary",          cc.Primary }
-            };
-        }
-
-        if (entity.HasComponent<NativeScriptComponent>())
-        {
-            // Yalnizca AD yaziliyor. Instance calisma zamani durumudur
-            // ve zaten Play disinda yoktur; fonksiyon isaretcisi de
-            // dosyaya yazilamaz. Faz 8'in dersi burada da gecerli:
-            // dosyaya yazilan sey KIMLIK olmali.
-            e["NativeScript"] = {
-                { "Name", entity.GetComponent<NativeScriptComponent>().ScriptName }
-            };
+            e[info.Name] = obj;
         }
 
         return e;
@@ -146,109 +130,25 @@ namespace FX::Detail
 
     void ApplyComponents(Entity entity, const json& j, TextureLibrary* library)
     {
-        if (j.contains("Transform"))
+        for (const ComponentInfo& info : ComponentRegistry::GetAll())
         {
-            const auto& t = j["Transform"];
-            auto& tc = entity.GetComponent<TransformComponent>();
+            if (!info.SerializedByTable || !j.contains(info.Name))
+                continue;
 
-            tc.Translation = ToVec3(t.value("Translation", json::array()));
-            tc.Rotation    = t.value("Rotation", 0.0f);
-            tc.Scale       = ToVec2(t.value("Scale", json::array()), glm::vec2(1.0f));
-        }
+            const json& obj = j[info.Name];
+            if (!obj.is_object())
+                continue;
 
-        if (j.contains("SpriteRenderer"))
-        {
-            const auto& s = j["SpriteRenderer"];
+            // Varsayilanla olusturup uzerine dosyadakini yaziyoruz:
+            // eksik alanlar component'in kendi varsayilanini alir,
+            // fallback degerleri ikinci bir yerde tekrarlanmaz.
+            void* component = info.AddAndGetPtr(entity);
 
-            auto& sc = entity.AddOrReplaceComponent<SpriteRendererComponent>();
-            sc.Color        = ToVec4(s.value("Color", json::array()));
-            sc.TilingFactor = s.value("TilingFactor", 1.0f);
+            for (const FieldInfo& f : info.Fields)
+                ReadField(f, component, obj);
 
-            // Once GUID (surum 4+), yoksa eski "Texture" yolu (surum <=3).
-            //
-            // Eski sahneleri kirmiyoruz: yolu okuyup AssetManager'dan
-            // kimligini soruyoruz. Kaydettiginde dosya yeni bicime
-            // gecmis oluyor - sessiz ve kademeli gecis.
-            std::string texPath;
-
-            if (s.contains("TextureHandle"))
-            {
-                const auto raw = s.value("TextureHandle", std::uint64_t{ 0 });
-                if (raw != 0)
-                {
-                    const AssetHandle handle(raw);
-                    texPath = AssetManager::GetPath(handle);
-
-                    if (texPath.empty())
-                    {
-                        // GUID var ama karsiligi yok: varlik silinmis
-                        // veya proje disindan gelmis olabilir. Dosyadaki
-                        // yol ipucusuna DUSUYORUZ - sessizce duz renk
-                        // gostermektense elimizdeki en iyi bilgiyi
-                        // kullanmak daha faydali.
-                        texPath = s.value("TexturePath", std::string());
-
-                        if (!texPath.empty())
-                            FX_CORE_WARN("Entity '%s': varlik kimligi %llu bulunamadi, "
-                                         "dosyadaki yola donuluyor (%s).",
-                                         entity.GetName().c_str(),
-                                         static_cast<unsigned long long>(raw),
-                                         texPath.c_str());
-                    }
-                }
-            }
-            else
-            {
-                // Surum <= 3: kimlik dosya yoluydu.
-                texPath = s.value("Texture", std::string());
-            }
-
-            if (!texPath.empty() && library)
-            {
-                sc.Texture = library->Load(texPath);
-
-                if (!sc.Texture)
-                    FX_CORE_WARN("Entity '%s': texture bulunamadi (%s), duz renk kullanilacak.",
-                                 entity.GetName().c_str(), texPath.c_str());
-            }
-        }
-
-        if (j.contains("Velocity"))
-        {
-            const auto& v = j["Velocity"];
-            auto& vc = entity.AddOrReplaceComponent<VelocityComponent>();
-            vc.Linear  = ToVec2(v.value("Linear", json::array()));
-            vc.Angular = v.value("Angular", 0.0f);
-        }
-
-        if (j.contains("Follow"))
-        {
-            const auto& f = j["Follow"];
-            auto& fc = entity.AddOrReplaceComponent<FollowComponent>();
-
-            // Hedef entity henuz olusturulmamis olabilir; sorun degil,
-            // FollowSystem cozumlemeyi her karede tekrarliyor.
-            fc.Target       = UUID(f.value("Target", std::uint64_t{ 0 }));
-            fc.Speed        = f.value("Speed", 2.0f);
-            fc.StopDistance = f.value("StopDistance", 1.0f);
-        }
-
-        if (j.contains("Camera"))
-        {
-            const auto& c = j["Camera"];
-            auto& cc = entity.AddOrReplaceComponent<CameraComponent>();
-            cc.OrthographicSize = c.value("OrthographicSize", 8.0f);
-            cc.Primary          = c.value("Primary", true);
-        }
-
-        if (j.contains("NativeScript"))
-        {
-            // Adin kayitli olup olmadigina BAKMIYORUZ: bilgiyi korumak
-            // istiyoruz. Script bu derlemede yoksa uyari ScriptSystem'den
-            // gelir; component'i atsaydik sahneyi kaydeden kisi
-            // baglantisini sessizce kaybederdi.
-            entity.AddOrReplaceComponent<NativeScriptComponent>(
-                j["NativeScript"].value("Name", std::string()));
+            if (info.LoadExtra)
+                info.LoadExtra(component, obj, library);
         }
     }
 }

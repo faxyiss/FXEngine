@@ -1,5 +1,6 @@
 #include "EditorApp.h"
 #include "Platform/FileDialogs.h"
+#include "Panels/ComponentDrawer.h"
 #include "Scripts/SpinScript.h"
 
 #include <FXEngine/Core/Log.h>
@@ -59,8 +60,12 @@ namespace FXEd
         RegisterEditorScripts();
 
         m_HierarchyPanel.SetSelection(&m_Selection);
-        m_HierarchyPanel.SetTextureLibrary(&m_TextureLibrary);
         m_ContentBrowser.SetContext(&m_TextureLibrary);
+
+        // Component meta tablosuna editore ozgu cizicileri bagla (A1):
+        // doku slotu, kamera tekilligi, script listesi. Motor bunlari
+        // bilmez; tablo yalnizca tasiyicidir.
+        ComponentDrawer::RegisterEditorUI(&m_TextureLibrary);
 
         LoadEditorConfig();
 

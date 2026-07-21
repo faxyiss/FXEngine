@@ -46,6 +46,12 @@ namespace FXTest
 
         std::filesystem::path Assets() const { return m_Dir / "assets"; }
 
+        // Proje kokune goreceli yolun tam karsiligi ("assets/scenes/a.fxscene").
+        std::filesystem::path Path(const std::string& relativeToProject) const
+        {
+            return m_Dir / relativeToProject;
+        }
+
         // Verilen goreceli yola (assets/ altina) iceriksiz bir dosya yazar.
         // Varlik olarak taninmasi icin uzantisi anlamli olmali.
         void WriteAsset(const std::string& relativeToAssets,

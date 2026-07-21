@@ -36,7 +36,6 @@ namespace FXEd
 
         // Faz 12: sabit iki doku yerine kutuphanenin tamami. Texture artik
         // Icerik panelinden surukle-birak ile veriliyor.
-        void SetTextureLibrary(FX::TextureLibrary* library) { m_Library = library; }
 
         // Her karede cagrilir; iki ImGui penceresi cizer.
         void OnImGuiRender();
@@ -65,20 +64,6 @@ namespace FXEd
         // Inspector'da secili entity'nin tum component'leri.
         void DrawComponents(FX::Entity entity);
 
-        void DrawTextureSlot(FX::SpriteRendererComponent& sprite);
-
-        // Dokunun .meta'sindaki ice aktarma ayarlari. Ayar SPRITE'A degil
-        // DOSYAYA ait: ayni dokuyu kullanan her entity ayni filtrelemeyi
-        // gorur (Faz 22'nin kararı).
-        void DrawTextureSettings(FX::SpriteRendererComponent& sprite);
-
-        // Yeniden yuklenen dokuyu sahnedeki TUM kullanicilara dagitir.
-        // TextureLibrary::Reload onbellegi tazeliyor ama entity'ler eski
-        // shared_ptr'i tutuyor; dolayli bir katman (handle -> texture)
-        // eklemek butun cagri yerlerini degistirmek demekti.
-        void ReplaceTextureInScene(const std::string& path,
-                                   const std::shared_ptr<FX::Texture2D>& fresh);
-
         // "Component Ekle" acilir menusu.
         void DrawAddComponentMenu(FX::Entity entity);
 
@@ -95,6 +80,10 @@ namespace FXEd
 
         FX::Entity m_PrefabRequest;
 
+        // Inspector'da 'X'e basilan component. Tabloyu gezerken kaldirmak
+        // ayni sebeple guvensiz; istek dongu bitince isleniyor.
+        std::string m_ComponentToRemove;
+
         // Bu karede cizilen entity'ler, GORUNEN sirada (kapali dallarin
         // cocuklari yok). Shift araligi bunun uzerinden hesaplaniyor.
         std::vector<FX::Entity> m_VisibleOrder;
@@ -105,7 +94,5 @@ namespace FXEd
 
         // Shift araliginin baslangici: son kez Shift'siz tiklanan entity.
         FX::Entity m_RangeAnchor;
-
-        FX::TextureLibrary* m_Library = nullptr;
     };
 }

@@ -14,6 +14,7 @@ add_executable(FXTests
     UUID.test.cpp
     Scene.test.cpp
     SceneSerializer.test.cpp
+    ComponentMeta.test.cpp
     AssetManager.test.cpp
     Project.test.cpp
     Input.test.cpp

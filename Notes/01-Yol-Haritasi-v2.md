@@ -418,10 +418,14 @@ Sonra:    16c → 14 → 15 → 18b → 17a-d → 18c → 19 → 23 → 18d
 
 ## Aşama A — Editör temelleri
 
-- [ ] **A1 — Component meta-veri sistemi.** Her component tek yerde:
-      ad, alan listesi, serileştirme, Inspector çizimi. Elle yazılan
-      kayıt (makro/reflection kütüphanesi yok). Script alanlarının
-      Inspector'dan ayarlanmasını ve Undo'yu da bu açar.
+- [x] **A1 — Component meta-veri sistemi.** `ComponentRegistry`: her
+      component `RegisterBuiltins`'te tek yerde tarif ediliyor;
+      serileştirme, `Scene::Copy` ve Inspector üçü de oradan besleniyor.
+      `AllComponents` tip listesi silindi. Dosya formatı korundu ve
+      teste sabitlendi. Alan erişimi `template<auto Member>` ile
+      (offsetof değil — standart-layout garantisi yok).
+      Script alanları ve çoklu düzenleme **yapılmadı**, altyapı hazır.
+      Ayrıntı: [Faz-A1-Notlar.md](Faz-A1-Notlar.md)
 - [ ] **A2 — Game View / Scene View ayrımı.** Sahne kamerasından ayrı
       pencere; gizmo/ızgara yalnızca Scene View'da.
 - [ ] **A3 — Project Settings + Preferences.** Projeye ait ayarlar

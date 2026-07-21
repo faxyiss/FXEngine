@@ -1,10 +1,9 @@
 #include "SceneHierarchyPanel.h"
-#include "Panels/ContentBrowserPanel.h"
-#include <FXEngine/Scene/ScriptRegistry.h>
+#include "Panels/ComponentDrawer.h"
 
-#include <FXEngine/Scene/Components.h>
-#include <FXEngine/Asset/AssetManager.h>
 #include <FXEngine/Core/Log.h>
+#include <FXEngine/Scene/ComponentMeta.h>
+#include <FXEngine/Scene/Components.h>
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -324,150 +323,6 @@ namespace FXEd
         }
     }
 
-    namespace
-    {
-        // Etiketli, surukle-degistir bir vec2 alani.
-        // ImGui'de tekrar eden kaliplari kucuk yardimcilara ayirmak,
-        // panel kodunu okunur tutar.
-        void DrawVec2Control(const char* label, glm::vec2& values, float speed = 0.05f)
-        {
-            ImGui::PushID(label);
-            ImGui::Text("%s", label);
-            ImGui::SameLine(110.0f);
-            ImGui::SetNextItemWidth(-1.0f);
-            ImGui::DragFloat2("##v", glm::value_ptr(values), speed);
-            ImGui::PopID();
-        }
-
-        void DrawVec3Control(const char* label, glm::vec3& values, float speed = 0.05f)
-        {
-            ImGui::PushID(label);
-            ImGui::Text("%s", label);
-            ImGui::SameLine(110.0f);
-            ImGui::SetNextItemWidth(-1.0f);
-            ImGui::DragFloat3("##v", glm::value_ptr(values), speed);
-            ImGui::PopID();
-        }
-
-        void DrawFloatControl(const char* label, float& value, float speed = 0.05f)
-        {
-            ImGui::PushID(label);
-            ImGui::Text("%s", label);
-            ImGui::SameLine(110.0f);
-            ImGui::SetNextItemWidth(-1.0f);
-            ImGui::DragFloat("##f", &value, speed);
-            ImGui::PopID();
-        }
-    }
-
-    void SceneHierarchyPanel::DrawTextureSlot(FX::SpriteRendererComponent& sc)
-    {
-        ImGui::Text("Texture");
-        ImGui::SameLine(110.0f);
-
-        const ImVec2 slotSize(64.0f, 64.0f);
-
-        if (sc.Texture)
-        {
-            // UV'ler ters: OpenGL sol-alt kokenli, ImGui sol-ust bekler.
-            ImGui::Image(static_cast<ImTextureID>(sc.Texture->GetRendererID()),
-                         slotSize, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
-        }
-        else
-        {
-            ImGui::Button("Doku\nyok", slotSize);
-        }
-
-        // BIRAKMA HEDEFI. Icerik panelinden gelen yolu kutuphaneye veriyoruz;
-        // kutuphane ayni yolu ikinci kez gorurse diske gitmiyor.
-        if (ImGui::BeginDragDropTarget())
-        {
-            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(kContentPayload))
-            {
-                const char* path = static_cast<const char*>(payload->Data);
-
-                if (m_Library)
-                {
-                    if (auto texture = m_Library->Load(path))
-                        sc.Texture = texture;
-                    else
-                        FX_WARN("Doku yuklenemedi: %s", path);
-                }
-            }
-            ImGui::EndDragDropTarget();
-        }
-
-        ImGui::SameLine();
-        ImGui::BeginGroup();
-        if (sc.Texture)
-        {
-            ImGui::TextDisabled("%s", sc.Texture->GetPath().c_str());
-            if (ImGui::SmallButton("Dokuyu Kaldir"))
-                sc.Texture = nullptr;
-        }
-        else
-        {
-            ImGui::TextDisabled("Icerik panelinden\nbir resim surukle");
-        }
-        ImGui::EndGroup();
-
-        DrawTextureSettings(sc);
-    }
-
-    void SceneHierarchyPanel::DrawTextureSettings(FX::SpriteRendererComponent& sc)
-    {
-        if (!sc.Texture || !m_Library)
-            return;
-
-        const std::string path = sc.Texture->GetPath();
-
-        const FX::AssetHandle handle = FX::AssetManager::GetHandle(path);
-        if (!handle.IsValid())
-        {
-            // Proje disindan gelen (motor varligi) veya taranmamis bir
-            // doku olabilir; ayari yazacak bir .meta yok.
-            ImGui::TextDisabled("Ayarlar: bu doku varlik tablosunda degil");
-            return;
-        }
-
-        if (!ImGui::TreeNode("Doku Ayarlari"))
-            return;
-
-        FX::TextureImportSettings settings =
-            FX::AssetManager::GetMetadata(handle).TextureSettings;
-
-        bool changed = false;
-        changed |= ImGui::Checkbox("Nearest (pixel-art)", &settings.Nearest);
-        changed |= ImGui::Checkbox("Repeat (tekrarla)",   &settings.Repeat);
-        changed |= ImGui::Checkbox("Mipmap uret",         &settings.GenerateMipmaps);
-
-        ImGui::TextDisabled("Ayar dokunun .meta dosyasinda saklanir,");
-        ImGui::TextDisabled("bu sprite'a degil DOSYAYA aittir.");
-
-        if (changed)
-        {
-            FX::AssetManager::UpdateTextureSettings(handle, settings);
-            ReplaceTextureInScene(path, m_Library->Reload(path));
-        }
-
-        ImGui::TreePop();
-    }
-
-    void SceneHierarchyPanel::ReplaceTextureInScene(
-        const std::string& path, const std::shared_ptr<FX::Texture2D>& fresh)
-    {
-        if (!m_Scene || !fresh)
-            return;
-
-        auto view = m_Scene->GetRegistry().view<FX::SpriteRendererComponent>();
-        for (auto entityID : view)
-        {
-            auto& sprite = view.get<FX::SpriteRendererComponent>(entityID);
-            if (sprite.Texture && sprite.Texture->GetPath() == path)
-                sprite.Texture = fresh;
-        }
-    }
-
     void SceneHierarchyPanel::DrawComponents(FX::Entity entity)
     {
         // --- Kimlik ------------------------------------------------------------
@@ -524,236 +379,42 @@ namespace FXEd
 
         ImGui::Separator();
 
-        // --- Transform ---------------------------------------------------------
-        if (entity.HasComponent<FX::TransformComponent>())
+        // --- Component'ler: tamami meta tablosundan (A1) --------------------
+        // Eskiden burada component basina elle yazilmis bir blok vardi ve
+        // yeni bir component eklerken burayi unutmak onu GORUNMEZ yapiyordu.
+        for (const FX::ComponentInfo& info : FX::ComponentRegistry::GetAll())
         {
-            if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                auto& tc = entity.GetComponent<FX::TransformComponent>();
+            if (!info.ShowInInspector || !info.Has(entity))
+                continue;
 
-                if (entity.GetParent())
+            bool keep = true;
+
+            // Kaldirilamayan component'lerde 'X' dugmesi hic cizilmiyor:
+            // arayuz gecersiz eylemi mumkun kilmamali.
+            const bool open = info.Removable
+                ? ImGui::CollapsingHeader(info.Label, &keep, ImGuiTreeNodeFlags_DefaultOpen)
+                : ImGui::CollapsingHeader(info.Label, ImGuiTreeNodeFlags_DefaultOpen);
+
+            if (open)
+            {
+                if (info.Name == std::string("Transform") && entity.GetParent())
                     ImGui::TextDisabled("(parent'a gore yerel)");
 
-                DrawVec3Control("Konum", tc.Translation);
-
-                // ARAYUZDE DERECE, VERIDE RADYAN.
-                // Component radyan tutuyor (matematik fonksiyonlari oyle
-                // istiyor) ama insan derece ile dusunur. Cevrimi tam
-                // burada, sinirda yapiyoruz - Faz 5 notlarinda planladigimiz gibi.
-                float degrees = glm::degrees(tc.Rotation);
-                DrawFloatControl("Donme (der)", degrees, 1.0f);
-                tc.Rotation = glm::radians(degrees);
-
-                DrawVec2Control("Olcek", tc.Scale);
+                ComponentDrawer::DrawComponentBody(info, entity);
             }
+
+            // Yapiyi degistiren islem DONGU ICINDE guvenli degil:
+            // istek biriktirilip dongu bittikten sonra isleniyor.
+            if (!keep)
+                m_ComponentToRemove = info.Name;
         }
 
-        // --- SpriteRenderer -----------------------------------------------------
-        if (entity.HasComponent<FX::SpriteRendererComponent>())
+        if (!m_ComponentToRemove.empty())
         {
-            bool keep = true;
-            if (ImGui::CollapsingHeader("Sprite Renderer", &keep,
-                                        ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                auto& sc = entity.GetComponent<FX::SpriteRendererComponent>();
+            if (FX::ComponentInfo* info = FX::ComponentRegistry::Find(m_ComponentToRemove))
+                info->Remove(entity);
 
-                ImGui::Text("Renk");
-                ImGui::SameLine(110.0f);
-                ImGui::SetNextItemWidth(-1.0f);
-                ImGui::ColorEdit4("##Color", glm::value_ptr(sc.Color));
-
-                DrawFloatControl("Tiling", sc.TilingFactor, 0.1f);
-
-                DrawTextureSlot(sc);
-            }
-
-            // CollapsingHeader'in 'X' dugmesi -> component'i kaldir.
-            // Faz 5'te H tusuyla yaptigimiz seyin arayuzlu hali.
-            if (!keep)
-                entity.RemoveComponent<FX::SpriteRendererComponent>();
-        }
-
-        // --- Velocity ------------------------------------------------------------
-        if (entity.HasComponent<FX::VelocityComponent>())
-        {
-            bool keep = true;
-            if (ImGui::CollapsingHeader("Velocity", &keep, ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                auto& vc = entity.GetComponent<FX::VelocityComponent>();
-
-                DrawVec2Control("Dogrusal", vc.Linear, 0.1f);
-
-                float angDeg = glm::degrees(vc.Angular);
-                DrawFloatControl("Acisal (der/s)", angDeg, 5.0f);
-                vc.Angular = glm::radians(angDeg);
-            }
-
-            if (!keep)
-                entity.RemoveComponent<FX::VelocityComponent>();
-        }
-
-        // --- Camera ---------------------------------------------------------------
-        if (entity.HasComponent<FX::CameraComponent>())
-        {
-            bool keep = true;
-            if (ImGui::CollapsingHeader("Camera", &keep, ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                auto& cc = entity.GetComponent<FX::CameraComponent>();
-
-                DrawFloatControl("Boyut", cc.OrthographicSize, 0.1f);
-                if (cc.OrthographicSize < 0.1f)
-                    cc.OrthographicSize = 0.1f;
-
-                ImGui::Text("Birincil");
-                ImGui::SameLine(110.0f);
-                if (ImGui::Checkbox("##Primary", &cc.Primary) && cc.Primary)
-                {
-                    // Tek birincil kamera olmali. Isaretlenen kamerayi
-                    // birincil yaparken digerlerinin isaretini kaldiriyoruz;
-                    // aksi halde "hangisi kazanir" sorusunun cevabi
-                    // registry'deki siraya kalirdi - kullanicinin
-                    // goremedigi bir sey.
-                    auto view = m_Scene->GetRegistry().view<FX::CameraComponent>();
-                    for (auto other : view)
-                    {
-                        if (other != entity.GetHandle())
-                            view.get<FX::CameraComponent>(other).Primary = false;
-                    }
-                }
-
-                ImGui::TextDisabled("Konum ve donme Transform'dan gelir.");
-            }
-
-            if (!keep)
-                entity.RemoveComponent<FX::CameraComponent>();
-        }
-
-        // --- Follow ---------------------------------------------------------------
-        if (entity.HasComponent<FX::FollowComponent>())
-        {
-            bool keep = true;
-            if (ImGui::CollapsingHeader("Follow", &keep, ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                auto& fc = entity.GetComponent<FX::FollowComponent>();
-
-                // HEDEF SECICI.
-                // Entity'yi ADIYLA gosteriyoruz ama sakladigimiz sey UUID.
-                // Kullanici arayuzu okunabilir olmali, veri modeli kalici -
-                // ikisi ayni sey olmak zorunda degil.
-                FX::Entity target = m_Scene->FindEntityByUUID(fc.Target.Target);
-
-                std::string preview = "Yok";
-                if (fc.Target.IsSet())
-                {
-                    preview = target
-                        ? target.GetComponent<FX::TagComponent>().Tag
-                        // Hedef UUID dolu ama entity bulunamiyor: silinmis
-                        // olabilir. Bunu SESSIZCE gizlemek yerine acikca
-                        // gosteriyoruz, yoksa kullanici neden calismadigini
-                        // anlayamaz.
-                        : std::string("<kayip: ") +
-                          std::to_string(static_cast<std::uint64_t>(fc.Target.Target)) + ">";
-                }
-
-                ImGui::Text("Hedef");
-                ImGui::SameLine(110.0f);
-                ImGui::SetNextItemWidth(-1.0f);
-                if (ImGui::BeginCombo("##Target", preview.c_str()))
-                {
-                    if (ImGui::Selectable("Yok", !fc.Target.IsSet()))
-                        fc.Target.Clear();
-
-                    // Sahnedeki tum entity'leri listele.
-                    auto view = m_Scene->GetRegistry().view<FX::TagComponent, FX::IDComponent>();
-                    for (auto id : view)
-                    {
-                        FX::Entity candidate{ id, m_Scene };
-
-                        // Kendini takip etmek anlamsiz - secenegi hic sunma.
-                        // (Faz 6'daki ilke: arayuz gecersiz eylemi mumkun kilmamali.)
-                        if (candidate == entity)
-                            continue;
-
-                        const auto& tag = candidate.GetComponent<FX::TagComponent>().Tag;
-                        const auto  uuid = candidate.GetComponent<FX::IDComponent>().ID;
-
-                        // Ayni isimde birden fazla entity olabilir; ImGui'nin
-                        // ID yiginina UUID'yi itiyoruz ki secimler karismasin.
-                        ImGui::PushID(static_cast<int>(static_cast<std::uint64_t>(uuid)));
-                        if (ImGui::Selectable(tag.c_str(), uuid == fc.Target.Target))
-                            fc.Target.Target = uuid;
-                        ImGui::PopID();
-                    }
-                    ImGui::EndCombo();
-                }
-
-                DrawFloatControl("Hiz", fc.Speed, 0.1f);
-                DrawFloatControl("Durma mesafesi", fc.StopDistance, 0.1f);
-
-                // FollowSystem, Velocity'ye YAZIYOR. Velocity yoksa
-                // sistem bu entity'yi hic gormez (view uc component istiyor).
-                // Kullaniciyi bu sessiz basarisizliktan haberdar et.
-                if (!entity.HasComponent<FX::VelocityComponent>())
-                {
-                    ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.3f, 1.0f),
-                                       "Velocity component'i gerekli!");
-                    if (ImGui::Button("Velocity Ekle"))
-                        entity.AddComponent<FX::VelocityComponent>();
-                }
-            }
-
-            if (!keep)
-                entity.RemoveComponent<FX::FollowComponent>();
-        }
-
-        if (entity.HasComponent<FX::NativeScriptComponent>())
-        {
-            bool keep = true;
-            if (ImGui::CollapsingHeader("Native Script", &keep,
-                                        ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                auto& nsc = entity.GetComponent<FX::NativeScriptComponent>();
-
-                ImGui::Text("Script");
-                ImGui::SameLine(110.0f);
-                ImGui::SetNextItemWidth(-1.0f);
-
-                const char* preview = nsc.ScriptName.empty() ? "(secilmedi)"
-                                                             : nsc.ScriptName.c_str();
-
-                // Liste ScriptRegistry'den geliyor: yeni bir script
-                // kaydedildiginde burada kendiliginden goruunur.
-                if (ImGui::BeginCombo("##script", preview))
-                {
-                    if (ImGui::Selectable("(secilmedi)", nsc.ScriptName.empty()))
-                        nsc.ScriptName.clear();
-
-                    for (const std::string& name : FX::ScriptRegistry::GetNames())
-                    {
-                        if (ImGui::Selectable(name.c_str(), nsc.ScriptName == name))
-                            nsc.ScriptName = name;
-                    }
-                    ImGui::EndCombo();
-                }
-
-                // Sahne baska bir derlemeden gelmis olabilir: dosyadaki
-                // ad bu derlemede kayitli olmayabilir. Sessiz kalmak
-                // "script neden calismiyor?" sorusunu doguruyordu.
-                if (!nsc.ScriptName.empty() && !FX::ScriptRegistry::Contains(nsc.ScriptName))
-                {
-                    ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.35f, 1.0f),
-                                       "'%s' bu derlemede kayitli degil!",
-                                       nsc.ScriptName.c_str());
-                }
-
-                // Ornek yalnizca Play'de var; bunu gostermek "script neden
-                // calismiyor?" sorusunu bastan cevapliyor.
-                ImGui::TextDisabled(nsc.Instance ? "Durum: calisiyor"
-                                                 : "Durum: Play'de baslayacak");
-            }
-
-            if (!keep)
-                entity.RemoveComponent<FX::NativeScriptComponent>();
+            m_ComponentToRemove.clear();
         }
 
         ImGui::Separator();
@@ -771,73 +432,33 @@ namespace FXEd
 
         if (ImGui::BeginPopup("AddComponent"))
         {
-            // ZATEN VAR OLANLARI GOSTERMIYORUZ.
-            // Gosterseydik kullanici tiklar, AddComponent'teki assert
-            // tetiklenir ve program debug'da durur. Arayuz, gecersiz
-            // eylemi mumkun kilmamali - hata mesaji gostermekten iyidir.
-            if (!entity.HasComponent<FX::SpriteRendererComponent>())
-            {
-                if (ImGui::MenuItem("Sprite Renderer"))
-                {
-                    entity.AddComponent<FX::SpriteRendererComponent>();
-                    ImGui::CloseCurrentPopup();
-                }
-            }
+            // ZATEN VAR OLANLARI GOSTERMIYORUZ. Gosterseydik kullanici
+            // tiklar, AddComponent'teki assert tetiklenirdi. Arayuz
+            // gecersiz eylemi mumkun kilmamali.
+            int shown = 0;
 
-            if (!entity.HasComponent<FX::VelocityComponent>())
+            for (const FX::ComponentInfo& info : FX::ComponentRegistry::GetAll())
             {
-                if (ImGui::MenuItem("Velocity"))
-                {
-                    entity.AddComponent<FX::VelocityComponent>();
-                    ImGui::CloseCurrentPopup();
-                }
-            }
+                if (!info.AddableFromMenu || info.Has(entity))
+                    continue;
 
-            if (!entity.HasComponent<FX::NativeScriptComponent>())
-            {
-                if (ImGui::MenuItem("Native Script"))
-                {
-                    // Bos ekleniyor; hangi script oldugu Inspector'daki
-                    // listeden secilir. Menuye script listesini de
-                    // koysaydik ayni secim iki yerde yasardi.
-                    entity.AddComponent<FX::NativeScriptComponent>();
-                    ImGui::CloseCurrentPopup();
-                }
-            }
+                ++shown;
 
-            if (!entity.HasComponent<FX::CameraComponent>())
-            {
-                if (ImGui::MenuItem("Camera"))
+                if (ImGui::MenuItem(info.Label))
                 {
-                    entity.AddComponent<FX::CameraComponent>();
-                    ImGui::CloseCurrentPopup();
-                }
-            }
+                    info.Add(entity);
 
-            if (!entity.HasComponent<FX::FollowComponent>())
-            {
-                if (ImGui::MenuItem("Follow"))
-                {
-                    entity.AddComponent<FX::FollowComponent>();
-
-                    // FollowSystem uc component istiyor; Velocity yoksa
-                    // takip sessizce calismaz. Kullaniciyi bu tuzaga
-                    // dusurmek yerine eksigi kendimiz tamamliyoruz.
-                    if (!entity.HasComponent<FX::VelocityComponent>())
-                        entity.AddComponent<FX::VelocityComponent>();
+                    // Bagimliliklari olan component'ler eksigini kendisi
+                    // tamamliyor (Follow -> Velocity).
+                    if (info.OnAdded)
+                        info.OnAdded(entity);
 
                     ImGui::CloseCurrentPopup();
                 }
             }
 
-            // Hicbir sey eklenemiyorsa kullaniciya sebebini soyle.
-            if (entity.HasComponent<FX::SpriteRendererComponent>() &&
-                entity.HasComponent<FX::VelocityComponent>() &&
-                entity.HasComponent<FX::CameraComponent>() &&
-                entity.HasComponent<FX::FollowComponent>())
-            {
+            if (shown == 0)
                 ImGui::TextDisabled("Eklenebilecek component yok");
-            }
 
             ImGui::EndPopup();
         }

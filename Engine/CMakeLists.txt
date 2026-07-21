@@ -30,6 +30,7 @@ set(FXENGINE_SOURCES
     src/Renderer/Framebuffer.cpp
     src/Renderer/TextureLibrary.cpp
     src/Scene/Scene.cpp
+    src/Scene/ComponentMeta.cpp
     src/Scene/Entity.cpp
     src/Scene/Systems.cpp
     src/Scene/ScriptRegistry.cpp
@@ -66,6 +67,7 @@ set(FXENGINE_HEADERS
     include/FXEngine/Renderer/Framebuffer.h
     include/FXEngine/Renderer/TextureLibrary.h
     include/FXEngine/Scene/Components.h
+    include/FXEngine/Scene/ComponentMeta.h
     include/FXEngine/Scene/Entity.h
     include/FXEngine/Scene/Scene.h
     include/FXEngine/Scene/Systems.h

@@ -1,5 +1,6 @@
 #include "FXEngine/Scene/Scene.h"
 #include "FXEngine/Scene/Entity.h"
+#include "FXEngine/Scene/ComponentMeta.h"
 #include "FXEngine/Scene/Components.h"
 #include "FXEngine/Scene/Systems.h"
 
@@ -7,28 +8,6 @@
 
 namespace FX
 {
-    namespace
-    {
-        // Tek bir component tipini kaynaktan hedefe tasir.
-        // Hedefte yoksa hic dokunmaz - "her entity her component'e sahip
-        // degil" durumu normal.
-        template<typename C>
-        void CopyComponentIfExists(Entity dst, Entity src)
-        {
-            if (src.HasComponent<C>())
-                dst.AddOrReplaceComponent<C>(src.GetComponent<C>());
-        }
-
-        // Paket acilimi: AllComponents listesindeki her tip icin
-        // yukaridakini cagirir. Listeye bir tip eklemek burada da
-        // otomatik olarak gecerli olur.
-        template<typename... C>
-        void CopyComponents(ComponentGroup<C...>, Entity dst, Entity src)
-        {
-            (CopyComponentIfExists<C>(dst, src), ...);
-        }
-    }
-
     std::unique_ptr<Scene> Scene::Copy(Scene& source)
     {
         auto target = std::make_unique<Scene>();
@@ -48,7 +27,11 @@ namespace FX
             // asagidaki kopyalama onlarin uzerine yaziyor.
             Entity dst = target->CreateEntityWithUUID(uuid);
 
-            CopyComponents(AllComponents{}, dst, src);
+            // Kopyalanacak component listesi meta tablosundan geliyor
+            // (A1). Ayri bir liste tutsaydik yeni bir component eklendiginde
+            // "Play'e gecince kayboldu" hatasi dogardi.
+            for (const ComponentInfo& info : ComponentRegistry::GetAll())
+                info.CopyTo(dst, src);
         }
 
         // Script ORNEKLERI kopyalanmaz, yalnizca baglantilari.

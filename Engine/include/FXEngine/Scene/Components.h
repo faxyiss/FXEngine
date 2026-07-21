@@ -261,28 +261,14 @@ namespace FX
     };
 
     // -----------------------------------------------------------------------
-    // Component tip listesi
+    // Component listesi burada DEGIL
     // -----------------------------------------------------------------------
-    // Sahne kopyalamanin (Scene::Copy) hangi component'leri tasiyacagi
-    // TEK BIR YERDE yazili olsun diye var.
+    // A1'e kadar burada bir `AllComponents` tip listesi duruyordu; sahne
+    // kopyalama onu kullaniyordu, serilestirme ve Inspector ise kendi
+    // elle yazilmis listelerini. Uc liste er gec ayristi.
     //
-    // Kopyalama listesini elle yazsaydik, yeni bir component eklendiginde
-    // "play moduna gecince Velocity kayboldu" turu bir hata dogardi -
-    // Faz 12'de serilestiriciler icin cozdugumuz problemin aynisi.
-    //
-    // IDComponent listede YOK: kimlik kopyalanmaz, hedef entity
-    // olusturulurken aciktan veriliyor.
-    template<typename... T>
-    struct ComponentGroup {};
-
-    using AllComponents = ComponentGroup<
-        TagComponent,
-        TransformComponent,
-        RelationshipComponent,
-        WorldTransformComponent,
-        SpriteRendererComponent,
-        VelocityComponent,
-        FollowComponent,
-        CameraComponent,
-        NativeScriptComponent>;
+    // Artik tek kaynak `ComponentMeta.h`'daki `ComponentRegistry`:
+    // kopyalama, serilestirme ve Inspector uculu de oradan besleniyor.
+    // Yeni bir component eklerken dokunulacak yer ComponentMeta.cpp'deki
+    // RegisterBuiltins.
 }

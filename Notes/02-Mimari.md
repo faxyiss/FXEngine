@@ -458,7 +458,7 @@ eksikler (çarpışma, animasyon, ses, sahne geçişi) ancak orada görünür.
 | # | İş | Neden bu sırada |
 |---|---|---|
 | ~~**A1**~~ | ✅ Component meta-veri sistemi — [Faz-A1-Notlar.md](Faz-A1-Notlar.md) | Diğer dördünü de ucuzlatıyor |
-| **A2** | Game View / Scene View ayrımı | Kamera ve çözünürlük kavramlarını netleştirir |
+| ~~**A2**~~ | ✅ Game View / Scene View ayrımı — [Faz-A2-Notlar.md](Faz-A2-Notlar.md) | Kamera ve çözünürlük kavramlarını netleştirir |
 | **A3** | Project Settings + Preferences | A2'nin doğurduğu ayarların yeri |
 | **A4** | Script dosyası oluşturma + şablon | İterasyonun ilk adımı |
 | **A5** | Undo/Redo (eski 20a-20b) | A1'den sonra çok ucuzlar |

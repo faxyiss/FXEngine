@@ -12,6 +12,9 @@
 
 #include <SDL3/SDL.h>
 
+#include <fstream>
+#include <string>
+
 namespace FXEd
 {
     void ImGuiLayer::Init(FX::Window& window)
@@ -41,7 +44,12 @@ namespace FXEd
 
         // Ini yoksa ilk acilista varsayilan duzeni kuracagiz. Yoksa tum
         // paneller ust uste, icerige gore kucucuk boyutlarda aciliyor.
-        m_BuildDefaultLayout = !FX::FileSystem::Exists(m_IniPath);
+        //
+        // A2'de "Viewport" paneli "Scene" + "Game" olarak ikiye ayrildi.
+        // Eski bir ini'de "Game" yok; duzeni yeniden kurmazsak yeni
+        // paneller yerlesmemis halde ortada yuzuyor.
+        m_BuildDefaultLayout = !FX::FileSystem::Exists(m_IniPath) ||
+                               !IniHasWindow("Game");
 
         ImGui::StyleColorsDark();
 
@@ -107,6 +115,23 @@ namespace FXEd
         }
     }
 
+    bool ImGuiLayer::IniHasWindow(const char* name) const
+    {
+        std::ifstream in(m_IniPath);
+        if (!in.is_open())
+            return false;
+
+        const std::string needle = std::string("[Window][") + name + "]";
+
+        std::string line;
+        while (std::getline(in, line))
+        {
+            if (line.rfind(needle, 0) == 0)
+                return true;
+        }
+        return false;
+    }
+
     void ImGuiLayer::BuildDefaultLayout(unsigned int dockspaceID)
     {
         ImGui::DockBuilderRemoveNode(dockspaceID);
@@ -123,7 +148,10 @@ namespace FXEd
         ImGui::DockBuilderDockWindow("Istatistikler",  leftBottom);
         ImGui::DockBuilderDockWindow("Inspector",      right);
         ImGui::DockBuilderDockWindow("Icerik",         bottom);
-        ImGui::DockBuilderDockWindow("Viewport",       center);
+        // Scene ve Game AYNI dugume: sekme olarak yan yana gelirler,
+        // Play'e basinca Game one cikar (Unity duzeni).
+        ImGui::DockBuilderDockWindow("Scene",          center);
+        ImGui::DockBuilderDockWindow("Game",           center);
 
         ImGui::DockBuilderFinish(dockspaceID);
     }

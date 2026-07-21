@@ -426,8 +426,13 @@ Sonra:    16c → 14 → 15 → 18b → 17a-d → 18c → 19 → 23 → 18d
       (offsetof değil — standart-layout garantisi yok).
       Script alanları ve çoklu düzenleme **yapılmadı**, altyapı hazır.
       Ayrıntı: [Faz-A1-Notlar.md](Faz-A1-Notlar.md)
-- [ ] **A2 — Game View / Scene View ayrımı.** Sahne kamerasından ayrı
-      pencere; gizmo/ızgara yalnızca Scene View'da.
+- [x] **A2 — Game View / Scene View ayrımı.** İki panel, iki
+      framebuffer. Scene her zaman editör kamerasından ve düzenleme
+      yardımcılarıyla (Play'de de), Game her zaman sahne kamerasından ve
+      yardımcısız. Play'de Game sekmesi öne gelir. Kamera yoksa sessizce
+      editör kamerasına düşmek yerine görünür uyarı. Serbest en-boy
+      oranı; hedef çözünürlük A3'e bırakıldı.
+      Ayrıntı: [Faz-A2-Notlar.md](Faz-A2-Notlar.md)
 - [ ] **A3 — Project Settings + Preferences.** Projeye ait ayarlar
       (`ProjectSettings/`) ile kullanıcıya ait ayarlar (`editor.json`)
       ayrılır.

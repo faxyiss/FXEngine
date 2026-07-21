@@ -120,7 +120,14 @@ namespace FXEd
 
         // ImGui panellerini cizer.
         void DrawMenuBar();
-        void DrawViewportPanel();
+        void DrawScenePanel();
+
+        // Oyun goruntusu: sahne kamerasindan, duzenleme yardimcisi yok.
+        void DrawGamePanel();
+
+        // Sahneyi iki ayri framebuffer'a cizer (A2).
+        void RenderSceneView();
+        void RenderGameView();
         void DrawViewportToolbar();
         void DrawStatsPanel();
         void DrawGizmo();
@@ -169,7 +176,21 @@ namespace FXEd
 
         // Sahne artik dogrudan ekrana degil, BUNA ciziliyor.
         // Sonra texture'i ImGui panelinde gosteriyoruz.
-        std::unique_ptr<FX::Framebuffer> m_Framebuffer;
+        //
+        // IKI FRAMEBUFFER (A2): Scene View editor kamerasindan ve
+        // duzenleme yardimcilariyla, Game View sahne kamerasindan ve
+        // yardimcisiz cizer. Tek framebuffer'i paylassalardi ikisi ayni
+        // kareyi gosterirdi ve "hangi kamera ciziyor?" sorusu belirsiz
+        // kalmaya devam ederdi.
+        std::unique_ptr<FX::Framebuffer> m_Framebuffer;       // Scene View
+        std::unique_ptr<FX::Framebuffer> m_GameFramebuffer;   // Game View
+
+        glm::vec2 m_GameViewportSize{ 0.0f, 0.0f };
+
+        // Play'e basinca Game, Stop'ta Scene one gelsin. ImGui'ye
+        // cerceve icinde soylenmeli; istek bayrakta bekliyor.
+        bool m_FocusGameView  = false;
+        bool m_FocusSceneView = false;
 
         // Viewport panelinin PIKSEL boyutu. Pencere boyutundan farklidir:
         // paneller yer kapladigi icin viewport her zaman daha kucuktur.

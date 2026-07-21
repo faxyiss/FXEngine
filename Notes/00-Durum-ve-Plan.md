@@ -139,8 +139,8 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 ### Güncel sıra
 
 ```
-✅ borç turu 0.1–0.7  ✅ 13a  ✅ 13b  ✅ 16a  ✅ 16b  ✅ A1
-▶  A2 Game View → A3 Settings
+✅ borç turu 0.1–0.7  ✅ 13a  ✅ 13b  ✅ 16a  ✅ 16b  ✅ A1  ✅ A2
+▶  A3 Settings
    → A4 script dosyası → A5 Undo/Redo
    → B: oyun DLL'i + hot reload
    → C: C# kararı
@@ -168,29 +168,36 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 
 ---
 
-## 5b. YENİ OTURUMDA İLK İŞ: A2 — Game View / Scene View ayrımı
+## 5b. YENİ OTURUMDA İLK İŞ: A3 — Project Settings + Preferences
 
-**A1 tamamlandı** (2026-07-21) — [Faz-A1-Notlar.md](Faz-A1-Notlar.md).
-Component'ler artık `ComponentMeta.cpp`'deki `RegisterBuiltins`'te
-**tek yerde** tarif ediliyor; serileştirme, `Scene::Copy` ve Inspector
-üçü de oradan besleniyor. Yeni component eklerken tek dokunulacak yer
-orası.
+**A1 ve A2 tamam** (2026-07-21) — [Faz-A1-Notlar.md](Faz-A1-Notlar.md),
+[Faz-A2-Notlar.md](Faz-A2-Notlar.md).
 
-**Sorun (A2):** "Hangi kamera çiziyor?" bugün belirsiz. Gizmo, ızgara ve
-seçim çerçevesi oyun görüntüsünün üstüne de çiziliyor.
+**Sorun (A3):** Ayarlar üç yere dağılmış: `.fxproject`, `editor.json` ve
+koda gömülü sabitler. Yanlış tarafa konan ayar takım çalışmasında ya
+sürekli çakışır ya kaybolur.
 
-**Hedef:** Ayrı bir Game View penceresi, sahne kamerasından render.
-Scene View düzenleme yardımcılarını gösterir, Game View göstermez.
-Bu ayrım hedef çözünürlük / en-boy oranı kavramını doğurur ve
-A3 Project Settings'in ilk gerçek müşterisi olur.
+| | Project Settings | Preferences |
+|---|---|---|
+| Kime ait | **Projeye** | **Kullanıcıya/makineye** |
+| Sürüm kontrolü | Girer | Girmez |
+| Nerede | `ProjectSettings/*.json` | `editor.json` / `%APPDATA%` |
+| İçerik | Başlangıç sahnesi, hedef çözünürlük, fizik, sıralama katmanları | Tema, kısayollar, kamera hızı, snap varsayılanları |
 
-**Kararlaştırılacak detaylar:** Play'e basınca otomatik Game View'e
-geçiş, "Maximize on Play", sabit aspect mi serbest mi.
+**A2'nin bıraktığı ilk müşteri:** Game View şu an **serbest en-boy
+oranında** çiziyor. Hedef çözünürlük (`1920x1080` gibi) Project
+Settings'e girince Game View sabit orana geçebilir ve kenarlara siyah
+bant koyar.
 
-**Nereye dokunulacak:** `EditorApp_UI.cpp` (yeni panel),
-`EditorApp.cpp` `OnRender` (ikinci framebuffer), `EditorApp_Viewport.cpp`
-(düzenleme çizimleri yalnız Scene View'da). 0.7'de bu dosyalar tam da
-bunun için bölünmüştü.
+**Bugün nerede duruyorlar:**
+- `.fxproject` (sürüm 2): ad, varlık klasörü, `StartScene` GUID
+- `editor.json`: son sahneler, son projeler, içerik paneli görünümü
+- Koda gömülü: snap değerleri (`m_SnapTranslate` vb.), kamera hızı,
+  ızgara varsayılanı — hepsi `EditorApp.h`'de
+
+**Nereye dokunulacak:** yeni `ProjectSettings` sınıfı (`Engine/Core/`),
+`EditorApp_Project.cpp` (yükleme/kaydetme), yeni bir ayarlar penceresi
+(`EditorApp_UI.cpp`).
 
 ### A1'den sonra sırayla
 

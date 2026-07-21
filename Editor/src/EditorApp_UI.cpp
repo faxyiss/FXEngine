@@ -204,12 +204,20 @@ namespace FXEd
         }
     }
 
-    void EditorApp::DrawViewportPanel()
+    void EditorApp::DrawScenePanel()
     {
-        // Viewport panelinde kenar boslugu ISTEMIYORUZ - goruntu
-        // panelin tamamini kaplasin.
+        // Panelde kenar boslugu ISTEMIYORUZ - goruntu tamamini kaplasin.
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-        ImGui::Begin("Viewport");
+
+        // Stop'ta Scene one gelsin. Begin'den ONCE cagriliyor: ImGui
+        // pencere adiyla calisiyor ve pencere henuz acilmadi.
+        if (m_FocusSceneView)
+        {
+            m_FocusSceneView = false;
+            ImGui::SetWindowFocus("Scene");
+        }
+
+        ImGui::Begin("Scene");
 
         m_ViewportFocused = ImGui::IsWindowFocused();
         m_ViewportHovered = ImGui::IsWindowHovered();
@@ -265,6 +273,46 @@ namespace FXEd
         // veya "gizmo kullaniliyor mu" bilmemeli.
         const bool canPan = m_ViewportHovered && !ImGuizmo::IsUsing() && !ImGuizmo::IsOver();
         m_EditorCamera.OnImGuiInteract(canPan, m_ImGuiLayer.WantsKeyboard());
+
+        ImGui::End();
+        ImGui::PopStyleVar();
+    }
+
+    void EditorApp::DrawGamePanel()
+    {
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+
+        if (m_FocusGameView)
+        {
+            m_FocusGameView = false;
+            ImGui::SetWindowFocus("Game");
+        }
+
+        ImGui::Begin("Game");
+
+        const ImVec2 panelSize = ImGui::GetContentRegionAvail();
+
+        // Sadece kaydediyoruz; yeniden boyutlandirma RenderGameView'de,
+        // ImGui cercevesi acilmadan once (bkz. DrawScenePanel).
+        if (panelSize.x > 0.0f && panelSize.y > 0.0f)
+            m_GameViewportSize = { panelSize.x, panelSize.y };
+
+        if (m_Scene->GetPrimaryCameraEntity())
+        {
+            // UV'ler ters: OpenGL sol-alt kokenli, ImGui sol-ust bekler.
+            const auto texID =
+                static_cast<ImTextureID>(m_GameFramebuffer->GetColorAttachmentID(0));
+            ImGui::Image(texID, panelSize, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
+        }
+        else
+        {
+            // Sessizce siyah ekran gostermek "oyun neden gorunmuyor?"
+            // sorusunu doguruyordu. Sebebi soyluyoruz.
+            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.3f, 1.0f),
+                               "Sahnede birincil kamera yok.");
+            ImGui::TextDisabled("Bir entity'ye Camera component'i ekleyip");
+            ImGui::TextDisabled("\"Birincil\" isaretle.");
+        }
 
         ImGui::End();
         ImGui::PopStyleVar();

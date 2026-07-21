@@ -53,6 +53,10 @@ namespace FXEd
     private:
         void BuildDefaultLayout(unsigned int dockspaceID);
 
+        // Kaydedilmis duzende bu pencere var mi? Yeni bir panel
+        // eklendiginde eski duzeni yenilemek icin.
+        bool IniHasWindow(const char* name) const;
+
         bool m_Initialized = false;
 
         // ImGui, IniFilename isaretcisini SAKLAR ve sonra okur - gecici bir

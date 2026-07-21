@@ -49,6 +49,102 @@ namespace FXEd
         }
     }
 
+    // Scene View: EDITOR kamerasindan, duzenleme yardimcilariyla.
+    // Play sirasinda da calisiyor - oyunu disaridan izleyip hata
+    // ayiklamak icin (Unity davranisi).
+    void EditorApp::RenderSceneView()
+    {
+        // Panel boyutu degistiyse framebuffer'i BURADA, ImGui cercevesi
+        // acilmadan once yeniden olustur: cerceve ortasinda texture
+        // silmek ImGui'yi gecersiz kimlige birakiyor.
+        if (m_ViewportSize.x > 0.0f && m_ViewportSize.y > 0.0f)
+        {
+            const auto w = static_cast<std::uint32_t>(m_ViewportSize.x);
+            const auto h = static_cast<std::uint32_t>(m_ViewportSize.y);
+            const auto& spec = m_Framebuffer->GetSpec();
+
+            if (spec.Width != w || spec.Height != h)
+                m_Framebuffer->Resize(w, h);
+        }
+
+        m_Framebuffer->Bind();
+
+        FX::RenderCommand::SetClearColor({ 0.07f, 0.08f, 0.11f, 1.0f });
+        FX::RenderCommand::Clear();
+
+        // ID ekini -1'e doldur. glClear onu 0 yapardi ve 0 gecerli bir
+        // entity kimligi - bos alana tiklayinca ilk entity secilirdi.
+        m_Framebuffer->ClearAttachment(1, -1);
+
+        FX::Renderer2D::ResetStats();
+
+        // Izgara sahneden ONCE: derinlik testi kapali oldugu icin sirayi
+        // cizim belirliyor, yani izgara sprite'larin arkasinda kaliyor.
+        DrawGrid();
+
+        m_Scene->OnRender(m_EditorCamera.GetCamera());
+
+        // Kamera gizmosu PickEntity'den once: cizgileri kendi entity
+        // ID'lerini ID ekine yaziyor, boylece kamera viewport'tan
+        // tiklanarak secilebiliyor.
+        DrawCameraGizmos();
+
+        // Secim cercevesi sahneden SONRA: ayni sebeple her zaman ustte.
+        DrawSelectionOutline();
+        PickEntity();
+
+        m_Framebuffer->Unbind();
+    }
+
+    // Game View: SAHNE kamerasindan, hicbir duzenleme yardimcisi yok.
+    // "Hangi kamera ciziyor?" sorusunun cevabi artik tek: bu panel her
+    // zaman sahnenin birincil kamerasini gosterir.
+    void EditorApp::RenderGameView()
+    {
+        if (m_GameViewportSize.x <= 0.0f || m_GameViewportSize.y <= 0.0f)
+            return;
+
+        const auto w = static_cast<std::uint32_t>(m_GameViewportSize.x);
+        const auto h = static_cast<std::uint32_t>(m_GameViewportSize.y);
+
+        if (const auto& spec = m_GameFramebuffer->GetSpec(); spec.Width != w || spec.Height != h)
+            m_GameFramebuffer->Resize(w, h);
+
+        m_GameFramebuffer->Bind();
+
+        FX::RenderCommand::SetClearColor({ 0.0f, 0.0f, 0.0f, 1.0f });
+        FX::RenderCommand::Clear();
+
+        FX::Entity camEntity = m_Scene->GetPrimaryCameraEntity();
+        if (!camEntity)
+        {
+            // Kamera yoksa siyah kaliyor. Editor kamerasina DUSMUYORUZ:
+            // "kameran yok" gercegini gizlemek, oyunu calistirinca
+            // bos ekran gormenin sebebini de gizlerdi. Panel bunun
+            // yerine gorunur bir uyari yaziyor.
+            m_GameFramebuffer->Unbind();
+            return;
+        }
+
+        const auto& cc = camEntity.GetComponent<FX::CameraComponent>();
+
+        const glm::mat4 world = camEntity.HasComponent<FX::WorldTransformComponent>()
+            ? camEntity.GetComponent<FX::WorldTransformComponent>().Matrix
+            : camEntity.GetComponent<FX::TransformComponent>().GetTransform();
+
+        // En-boy orani PANELDEN geliyor, sahneden degil: ayni sahne
+        // farkli pencere boyutlarinda acilabilir (bkz. CameraComponent).
+        const float aspect = m_GameViewportSize.x / m_GameViewportSize.y;
+
+        FX::OrthographicCamera camera{ -1.0f, 1.0f, -1.0f, 1.0f };
+        camera.SetProjectionFromAspect(aspect, cc.OrthographicSize);
+        camera.SetPosition({ world[3][0], world[3][1], 0.0f });
+
+        m_Scene->OnRender(camera);
+
+        m_GameFramebuffer->Unbind();
+    }
+
     void EditorApp::DrawGrid()
     {
         if (!m_ShowGrid || m_ViewportSize.y <= 0.0f)

@@ -55,6 +55,15 @@ namespace FXEd
         };
         m_Framebuffer = std::make_unique<FX::Framebuffer>(fbSpec);
 
+        // Game View'da secim yok, dolayisiyla entity ID eki de yok:
+        // her karede bos yere bir R32I tampon temizlemeyelim.
+        FX::FramebufferSpec gameSpec = fbSpec;
+        gameSpec.Attachments = {
+            FX::FramebufferTextureFormat::RGBA8,
+            FX::FramebufferTextureFormat::DEPTH24STENCIL8
+        };
+        m_GameFramebuffer = std::make_unique<FX::Framebuffer>(gameSpec);
+
         // Script'ler her seyden once kayitli olmali: sahne yuklemesi
         // (StartScene) adlari cozmeye calisacak.
         RegisterEditorScripts();
@@ -131,6 +140,9 @@ namespace FXEd
             FX_WARN("Play: sahnede isaretli kamera yok, editor kamerasi kullanilacak.");
         }
 
+        // Oyunu gormek icin sekme degistirmek zorunda kalmayalim.
+        m_FocusGameView = true;
+
         SetStatus("Play - oyun kopya sahnede calisiyor");
     }
 
@@ -149,6 +161,8 @@ namespace FXEd
 
         m_HierarchyPanel.SetContext(m_Scene);
         m_Selection.Clear();
+
+        m_FocusSceneView = true;
 
         SetStatus("Stop - duzenleme sahnesine donuldu");
     }
@@ -221,86 +235,8 @@ namespace FXEd
             return;
         }
 
-        // ===================================================================
-        // 1) SAHNEYI FRAMEBUFFER'A CIZ (ekrana degil)
-        // ===================================================================
-        // Viewport paneli buyumus/kucultulmusse framebuffer'i BURADA,
-        // ImGui cercevesi acilmadan once yeniden olustur.
-        if (m_ViewportSize.x > 0.0f && m_ViewportSize.y > 0.0f)
-        {
-            const auto w = static_cast<std::uint32_t>(m_ViewportSize.x);
-            const auto h = static_cast<std::uint32_t>(m_ViewportSize.y);
-            const auto& spec = m_Framebuffer->GetSpec();
-
-            if (spec.Width != w || spec.Height != h)
-            {
-                m_Framebuffer->Resize(w, h);
-            }
-        }
-
-        m_Framebuffer->Bind();
-
-        FX::RenderCommand::SetClearColor({ 0.07f, 0.08f, 0.11f, 1.0f });
-        FX::RenderCommand::Clear();
-
-        // ID ekini -1'e doldur. glClear onu 0 yapardi ve 0 gecerli bir
-        // entity kimligi - bos alana tiklayinca ilk entity secilirdi.
-        m_Framebuffer->ClearAttachment(1, -1);
-
-        FX::Renderer2D::ResetStats();
-
-        // Play modunda SAHNENIN kamerasindan bakiliyor; oyunun gercekte
-        // nasil gorunecegini ancak boyle gorursun. Sahnede isaretli bir
-        // kamera yoksa editor kamerasina dusuyoruz - siyah ekran
-        // gostermektense calismaya devam etmek daha faydali.
-        const FX::OrthographicCamera* renderCamera = &m_EditorCamera.GetCamera();
-        FX::OrthographicCamera sceneCamera{ -1.0f, 1.0f, -1.0f, 1.0f };
-
-        if (IsPlaying())
-        {
-            if (FX::Entity camEntity = m_Scene->GetPrimaryCameraEntity())
-            {
-                const auto& cc = camEntity.GetComponent<FX::CameraComponent>();
-
-                glm::mat4 world{ 1.0f };
-                if (camEntity.HasComponent<FX::WorldTransformComponent>())
-                    world = camEntity.GetComponent<FX::WorldTransformComponent>().Matrix;
-                else
-                    world = camEntity.GetComponent<FX::TransformComponent>().GetTransform();
-
-                const float aspect = (m_ViewportSize.y > 0.0f)
-                                   ? m_ViewportSize.x / m_ViewportSize.y : 1.0f;
-
-                sceneCamera.SetProjectionFromAspect(aspect, cc.OrthographicSize);
-                sceneCamera.SetPosition({ world[3][0], world[3][1], 0.0f });
-
-                renderCamera = &sceneCamera;
-            }
-        }
-        else
-        {
-            // Izgara sahneden ONCE: derinlik testi kapali oldugu icin sirayi
-            // cizim belirliyor, yani izgara sprite'larin arkasinda kaliyor.
-            DrawGrid();
-        }
-
-        m_Scene->OnRender(*renderCamera);
-
-        // Duzenleme yardimcilari Play'de gorunmez: oyunun gercek
-        // goruntusunu kirletirler.
-        if (!IsPlaying())
-        {
-            // Kamera gizmosu PickEntity'den once: cizgileri kendi entity
-            // ID'lerini ID ekine yaziyor, boylece kamera viewport'tan
-            // tiklanarak secilebiliyor.
-            DrawCameraGizmos();
-
-            // Secim cercevesi sahneden SONRA: ayni sebeple her zaman ustte.
-            DrawSelectionOutline();
-            PickEntity();
-        }
-
-        m_Framebuffer->Unbind();
+        RenderSceneView();
+        RenderGameView();
 
         // ===================================================================
         // 2) EKRANI TEMIZLE, ARAYUZU CIZ
@@ -314,7 +250,8 @@ namespace FXEd
         m_ImGuiLayer.Begin();
 
         DrawMenuBar();
-        DrawViewportPanel();
+        DrawScenePanel();
+        DrawGamePanel();
         DrawStatsPanel();
         m_HierarchyPanel.OnImGuiRender();
         m_ContentBrowser.OnImGuiRender();

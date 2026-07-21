@@ -204,9 +204,9 @@ namespace FX
         }
 
         // --- Shader ------------------------------------------------------------
-        s_Data.TextureShader.reset(Shader::FromFiles("Renderer2D",
-                                                     "assets/shaders/Renderer2D.vert",
-                                                     "assets/shaders/Renderer2D.frag"));
+        s_Data.TextureShader = Shader::FromFiles("Renderer2D",
+                                                 "assets/shaders/Renderer2D.vert",
+                                                 "assets/shaders/Renderer2D.frag");
         if (!s_Data.TextureShader || !s_Data.TextureShader->IsValid())
         {
             FX_CORE_ERROR("Renderer2D shader'i yuklenemedi!");
@@ -254,9 +254,9 @@ namespace FX
         s_Data.LineVA->AddVertexBuffer(s_Data.LineVB);
         s_Data.LineVA->Unbind();
 
-        s_Data.LineShader.reset(Shader::FromFiles("Line",
-                                                  "assets/shaders/Line.vert",
-                                                  "assets/shaders/Line.frag"));
+        s_Data.LineShader = Shader::FromFiles("Line",
+                                              "assets/shaders/Line.vert",
+                                              "assets/shaders/Line.frag");
         if (!s_Data.LineShader || !s_Data.LineShader->IsValid())
         {
             FX_CORE_ERROR("Line shader'i yuklenemedi!");

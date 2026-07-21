@@ -160,6 +160,13 @@ Faz 22'nin bıraktığı tutarlılık açığı.
       görünüm tercihi kaydediliyor. Prefab referansları zaten GUID'miş
       (ortak `SerializeEntity`).
       Ayrıntı: [Borc-06-Faz22-Artiklari.md](Borc-06-Faz22-Artiklari.md)
+- [x] **0.7 — A1 öncesi refactor.** `EditorApp.cpp` 2033 satırdan dört
+      dosyaya bölündü, demo sahne `SampleScene`'e çıktı (`m_PlayerUUID`
+      silindi), `OnRender`'daki kopya istek bloğu tekleşti, `.meta` yolu
+      `AssetManager::MetaPathFor`'a toplandı, `Shader::FromFiles` artık
+      `unique_ptr` döndürüyor. Davranış değişikliği yok; A1'in
+      dokunacağı dosyalara bilerek girilmedi.
+      Ayrıntı: [Borc-07-Refactor.md](Borc-07-Refactor.md)
 
 > **Neden 0.2 ve 0.3 Faz 20'den önce?** Undo komutları "hangi entity'ler
 > üzerinde?" sorusunu cevaplar. Tek seçim varsayımıyla yazılan her komut,
@@ -375,7 +382,8 @@ MVP sırasında bilinçli olarak bıraktıklarımız:
 |---|---|---|
 | `Renderer2D` global durum | `s_Data` dosya kapsamlı statik. İkinci bir renderer örneği imkânsız, test etmek zor. | `Renderer2D.cpp` |
 | Batch bölme yolu hacky | Slotlar dolunca `EndScene()` çağırıp elle durum düzeltiliyor. Ayrı bir `FlushAndReset()` olmalı. | `Renderer2D.cpp` |
-| `Shader::FromFiles` ham `new` | `unique_ptr` döndürmeli. | `Shader.cpp` |
+| ~~`Shader::FromFiles` ham `new`~~ | ✅ 0.7'de `unique_ptr` döndürüyor. | — |
+| `ContentBrowserPanel.cpp` 1308 satır | Bölünebilir; 0.7'de `EditorApp` bölündü, bu ertelendi (yaklaşan fazlar oraya dokunmuyor). | `ContentBrowserPanel.cpp` |
 | ~~Editör kamerası `EditorApp` içinde~~ | ✅ Faz 10'da `EditorCamera` sınıfına taşındı. | — |
 | ~~Sahne yolu koda gömülü~~ | ✅ Faz 12'de dosya diyaloğuyla çözüldü. | — |
 | Hata durumunda yedek doku yok | Texture yüklenemezse `nullptr`; mor "eksik doku" dokusu daha iyi olurdu. | `TextureLibrary.cpp` |

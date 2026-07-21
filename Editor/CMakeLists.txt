@@ -6,8 +6,15 @@
 
 add_executable(FXEditor
     src/main.cpp
+    # EditorApp tek sinif, dort dosyaya bolunmus tanimlari:
+    # cekirdek yasam dongusu / proje-dosya islemleri / paneller / viewport
     src/EditorApp.cpp
+    src/EditorApp_Project.cpp
+    src/EditorApp_UI.cpp
+    src/EditorApp_Viewport.cpp
     src/EditorApp.h
+    src/SampleScene.cpp
+    src/SampleScene.h
     src/ImGuiLayer.cpp
     src/ImGuiLayer.h
     src/EditorCamera.cpp

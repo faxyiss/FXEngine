@@ -48,14 +48,14 @@ namespace FXEd
         void OnWindowResize(std::uint32_t width, std::uint32_t height) override;
 
     private:
-        void BuildScene();
-        void SpawnMover();
-
         // --- Proje islemleri (Faz 21) -----------------------------------------
         void NewProject();                              // diyalog acar
         void OpenProject();                             // diyalog acar
         bool OpenProject(const std::string& filepath);  // dogrudan yukler
         void PushRecentProject(const std::string& path);
+
+        // Ertelenmis proje istekleri; ImGui cercevesi kapandiktan sonra.
+        void ProcessProjectRequests();
 
         // Karsilama ekrani: proje secilene kadar editor arayuzu yerine
         // bu ciziliyor. Proje acilmadan varlik yuklemek yanlis kokten
@@ -155,19 +155,6 @@ namespace FXEd
         void OnSceneStop();
 
         bool IsPlaying() const { return m_SceneState == SceneState::Play; }
-
-        // FAZ 8 DEGISIKLIGI: Artik Entity tutamagi degil UUID sakliyoruz.
-        //
-        // Faz 7'de m_PlayerEntity bir tutamakti ve sahne yuklendiginde
-        // gecersiz kaliyordu - elle temizlemek zorundaydik. UUID kalici
-        // oldugu icin yukleme sonrasi da GECERLI: sadece FindEntityByUUID
-        // ile cozmemiz yeterli.
-        //
-        // Bu, Faz 8'in getirdigi degisimin en somut ornegi.
-        FX::UUID m_PlayerUUID{ 0 };
-
-        // Her karede degil, ihtiyac aninda cozulur.
-        FX::Entity GetPlayer();
 
         // --- Editor arayuzu ----------------------------------------------------
         // Secimin SAHIBI burasi (0.2). Viewport, gizmo, inspector ve

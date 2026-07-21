@@ -123,7 +123,7 @@ edilmeli.
 
 ### Düşük
 - `Renderer2D` global durum (`s_Data` statik), batch bölme yolu hacky
-- `Shader::FromFiles` ham `new` döndürüyor
+- `ContentBrowserPanel.cpp` 1308 satır — bölünebilir (acil değil)
 - `GetRegistry()` çok açık — doğrudan `create`/`destroy` UUID haritasını bozar
 - `Renderer2D` ve `TextureLibrary` test dışı (OpenGL bağlamı ister)
 - Sadece Windows'ta denendi
@@ -139,7 +139,7 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 ### Güncel sıra
 
 ```
-✅ borç turu 0.1–0.6  ✅ 13a  ✅ 13b  ✅ 16a  ✅ 16b
+✅ borç turu 0.1–0.7  ✅ 13a  ✅ 13b  ✅ 16a  ✅ 16b
 ▶  A1 component meta → A2 Game View → A3 Settings
    → A4 script dosyası → A5 Undo/Redo
    → B: oyun DLL'i + hot reload
@@ -158,6 +158,7 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 | 0.3 | Entity çoklu seçimi | ✅ Ctrl/Shift, gizmoda delta, toplu silme |
 | 0.5 | Catch2 + `UUID`/`Scene`/`SceneSerializer`/`AssetManager` testleri | ✅ 26 test / 80 assertion |
 | 0.6 | Faz 22 artıkları (Inspector doku ayarları, `StartScene` GUID, `AssetDirectory`) | ✅ `.fxproject` sürüm 2 |
+| 0.7 | A1 öncesi refactor turu — [Borc-07-Refactor.md](Borc-07-Refactor.md) | ✅ `EditorApp.cpp` 2033→4 dosya, demo sahne ayrıldı, `.meta` yolu tek yerde |
 
 **2026-07-21: yön kararı alındı.** Editör temel araçları örnek oyunun
 önüne alındı, C# scripting ertelendi. Gerekçeler ve mimarinin tamamı:

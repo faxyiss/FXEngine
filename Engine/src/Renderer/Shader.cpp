@@ -94,9 +94,9 @@ namespace FX
         FX_CORE_INFO("Shader '%s' hazir (program id=%u).", m_Name.c_str(), m_RendererID);
     }
 
-    Shader* Shader::FromFiles(const std::string& name,
-                              const std::string& vertexPath,
-                              const std::string& fragmentPath)
+    std::unique_ptr<Shader> Shader::FromFiles(const std::string& name,
+                                              const std::string& vertexPath,
+                                              const std::string& fragmentPath)
     {
         // Yollari EXE KLASORUNE gore cozuyoruz, calisma dizinine gore degil.
         // Boylece program nereden baslatilirsa baslatilsin shader'lari bulur.
@@ -113,7 +113,9 @@ namespace FX
             return nullptr;
         }
 
-        return new Shader(name, vSrc, fSrc);
+        // make_unique degil: yapici public ama argumanlarin sirasi
+        // burada dogrulanmis kaynak metinler, yol degil.
+        return std::unique_ptr<Shader>(new Shader(name, vSrc, fSrc));
     }
 
     Shader::~Shader()

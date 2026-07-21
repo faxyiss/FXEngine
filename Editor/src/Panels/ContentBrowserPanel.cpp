@@ -986,11 +986,13 @@ namespace FXEd
         if (std::filesystem::is_directory(newPath, ec))
             return;
 
-        const std::filesystem::path oldMeta = oldPath.string() + ".meta";
+        // Uzanti kurali AssetManager'in: burada elle kursaydik ikisi
+        // ayrisir ve .meta geride kalip GUID kopardi.
+        const std::filesystem::path oldMeta = FX::AssetManager::MetaPathFor(oldPath.string());
         if (!std::filesystem::exists(oldMeta, ec))
             return;
 
-        const std::filesystem::path newMeta = newPath.string() + ".meta";
+        const std::filesystem::path newMeta = FX::AssetManager::MetaPathFor(newPath.string());
         std::filesystem::rename(oldMeta, newMeta, ec);
 
         if (ec)
@@ -1273,7 +1275,8 @@ namespace FXEd
                         // bir .meta kalir ve bir sonraki taramada
                         // "dosyasi olmayan kayit" olusurdu.
                         std::error_code metaEc;
-                        std::filesystem::remove(t.string() + ".meta", metaEc);
+                        std::filesystem::remove(
+                            FX::AssetManager::MetaPathFor(t.string()), metaEc);
 
                         if (!ec)
                             FX::AssetManager::OnAssetDeleted(rel);

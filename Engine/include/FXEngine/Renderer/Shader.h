@@ -14,6 +14,7 @@
 // ===========================================================================
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <unordered_map>
 
@@ -33,9 +34,10 @@ namespace FX
                const std::string& vertexSource,
                const std::string& fragmentSource);
 
-        static Shader* FromFiles(const std::string& name,
-                                 const std::string& vertexPath,
-                                 const std::string& fragmentPath);
+        // Yukleme basarisizsa nullptr doner; sahiplik cagirana gecer.
+        static std::unique_ptr<Shader> FromFiles(const std::string& name,
+                                                 const std::string& vertexPath,
+                                                 const std::string& fragmentPath);
 
         ~Shader();
 

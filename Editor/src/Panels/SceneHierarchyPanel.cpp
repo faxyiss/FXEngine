@@ -422,7 +422,13 @@ namespace FXEd
         if (!m_ComponentToRemove.empty())
         {
             if (FX::ComponentInfo* info = FX::ComponentRegistry::Find(m_ComponentToRemove))
+            {
+                // Coklu secimde silme de hepsine uygulanir (ekleme gibi).
                 info->Remove(entity);
+                for (FX::Entity other : alsoApplyTo)
+                    if (info->Has(other))
+                        info->Remove(other);
+            }
 
             m_ComponentToRemove.clear();
         }
@@ -433,6 +439,14 @@ namespace FXEd
 
     void SceneHierarchyPanel::DrawAddComponentMenu(FX::Entity entity)
     {
+        // Coklu secimde component TUM secili entity'lere ekleniyor.
+        // Hedef listesi: cok secim varsa hepsi, yoksa yalniz birincil.
+        std::vector<FX::Entity> targets;
+        if (m_Selection && m_Selection->Count() > 1)
+            targets = m_Selection->GetAll();
+        else
+            targets.push_back(entity);
+
         // Butonu ortala (kozmetik ama panel derli toplu gorunur).
         const float width = ImGui::GetContentRegionAvail().x;
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + width * 0.15f);
@@ -442,26 +456,40 @@ namespace FXEd
 
         if (ImGui::BeginPopup("AddComponent"))
         {
-            // ZATEN VAR OLANLARI GOSTERMIYORUZ. Gosterseydik kullanici
-            // tiklar, AddComponent'teki assert tetiklenirdi. Arayuz
-            // gecersiz eylemi mumkun kilmamali.
             int shown = 0;
 
             for (const FX::ComponentInfo& info : FX::ComponentRegistry::GetAll())
             {
-                if (!info.AddableFromMenu || info.Has(entity))
+                if (!info.AddableFromMenu)
+                    continue;
+
+                // En az bir hedefte YOKSA goster: o hedeflere eklenebilir.
+                // Hepsinde varsa gizle - gecersiz eylemi sunmayalim.
+                bool anyMissing = false;
+                for (FX::Entity t : targets)
+                    if (!info.Has(t)) { anyMissing = true; break; }
+
+                if (!anyMissing)
                     continue;
 
                 ++shown;
 
                 if (ImGui::MenuItem(info.Label))
                 {
-                    info.Add(entity);
+                    // Zaten sahip olana EKLEME (AddComponent assert eder);
+                    // yalnizca eksik olanlara.
+                    for (FX::Entity t : targets)
+                    {
+                        if (info.Has(t))
+                            continue;
 
-                    // Bagimliliklari olan component'ler eksigini kendisi
-                    // tamamliyor (Follow -> Velocity).
-                    if (info.OnAdded)
-                        info.OnAdded(entity);
+                        info.Add(t);
+
+                        // Bagimliliklari olan component'ler eksigini kendisi
+                        // tamamliyor (Follow -> Velocity).
+                        if (info.OnAdded)
+                            info.OnAdded(t);
+                    }
 
                     ImGui::CloseCurrentPopup();
                 }

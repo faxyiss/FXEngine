@@ -295,6 +295,13 @@ namespace FXEd
         if (const std::string toOpen = m_ContentBrowser.TakeOpenRequest(); !toOpen.empty())
             OpenAsset(toOpen);
 
+        // Icerik panelinden "Yeni Script...": o klasore olustur.
+        if (std::string dir = m_ContentBrowser.TakeNewScriptRequest(); !dir.empty())
+        {
+            m_NewScriptDir       = std::move(dir);
+            m_NewScriptRequested = true;
+        }
+
         ProcessProjectRequests();
 
         if (FX::Entity prefabRoot = m_HierarchyPanel.TakePrefabRequest())
@@ -389,9 +396,10 @@ namespace FXEd
                 Close();
                 return true;
 
-            case FX::Key::Space:
-                m_ScenePaused = !m_ScenePaused;
-                return true;
+            // Space ARTIK duraklatmiyor: oyun script'leri Space'i girdi
+            // olarak kullaniyor (orn. ziplama). Duraklat/durdur yalnizca
+            // oynatma seridindeki dugmelerle. (Space + sol tus hala kamera
+            // kaydirma; o EditorCamera'da, burada degil.)
 
             case FX::Key::N:
                 if (ctrl) { NewScene(); return true; }

@@ -172,6 +172,16 @@ namespace FXEd
         return relative;
     }
 
+    std::string ContentBrowserPanel::TakeNewScriptRequest()
+    {
+        if (m_NewScriptDir.empty())
+            return {};
+
+        const std::string dir = m_NewScriptDir.string();
+        m_NewScriptDir.clear();
+        return dir;
+    }
+
     void ContentBrowserPanel::ProcessFileChanges()
     {
         std::vector<FX::FileChange> changes = m_Watcher.Poll();
@@ -452,6 +462,8 @@ namespace FXEd
                 m_NameBuffer[0] = '\0';
                 m_OpenNewFolderPopup = true;
             }
+            if (ImGui::MenuItem("Yeni Script..."))
+                m_NewScriptDir = m_Current;   // o an gezilen klasore olustur
             if (ImGui::MenuItem("Dosya Ice Aktar..."))
                 m_ImportRequest = true;
             ImGui::Separator();

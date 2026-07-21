@@ -92,7 +92,10 @@ namespace FXEd
 
                 ImGui::Separator();
                 if (ImGui::MenuItem("Yeni Script..."))
+                {
+                    m_NewScriptDir.clear();   // varsayilan: assets/scripts
                     m_NewScriptRequested = true;
+                }
 
                 ImGui::Separator();
                 if (ImGui::MenuItem("Varlik Ice Aktar...", "Ctrl+I"))
@@ -425,69 +428,74 @@ namespace FXEd
         ImGui::Begin("Game");
         ImGui::PopStyleVar();
 
-        DrawGameViewToolbar();
-
+        // Panel icerik alaninin sol ust ekran konumu: hem goruntuyu hem
+        // (yuzen) arac cubugunu buna gore yerlestiriyoruz.
         const ImVec2 origin = ImGui::GetCursorScreenPos();
         const ImVec2 avail  = ImGui::GetContentRegionAvail();
 
-        if (avail.x <= 0.0f || avail.y <= 0.0f)
+        if (avail.x > 0.0f && avail.y > 0.0f)
         {
-            ImGui::End();
-            return;
-        }
+            // --- Cizim yuzeyinin boyutu --------------------------------
+            // Serbest modda panelin tamami. Kilitli modda hedef orani
+            // panele SIGDIRIYORUZ (kirpmiyoruz): artan yer siyah bant.
+            ImVec2 surface = avail;
 
-        // --- Cizim yuzeyinin boyutu ------------------------------------
-        // Serbest modda panelin tamami. Kilitli modda hedef orani panele
-        // SIGDIRIYORUZ (kirpmiyoruz): artan yer siyah bant kaliyor.
-        // Goruntuyu panele yayip kamerayi kilitlemek esneme uretirdi.
-        ImVec2 surface = avail;
+            if (m_GameViewLocked && FX::Project::HasActive())
+            {
+                const float target = FX::Project::GetActive()->GetConfig().TargetAspect();
 
-        if (m_GameViewLocked && FX::Project::HasActive())
-        {
-            const float target = FX::Project::GetActive()->GetConfig().TargetAspect();
+                if (avail.x / avail.y > target)
+                    surface.x = avail.y * target;   // panel genis -> yanlarda bant
+                else
+                    surface.y = avail.x / target;   // panel dar   -> altta/ustte bant
+            }
 
-            if (avail.x / avail.y > target)
-                surface.x = avail.y * target;   // panel genis -> yanlarda bant
+            m_GameViewportSize = { surface.x, surface.y };
+
+            if (!m_Scene->GetPrimaryCameraEntity())
+            {
+                // Sessizce siyah ekran "oyun neden gorunmuyor?" doguruyordu.
+                ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.3f, 1.0f),
+                                   "Sahnede birincil kamera yok.");
+                ImGui::TextDisabled("Bir entity'ye Camera component'i ekleyip");
+                ImGui::TextDisabled("\"Birincil\" isaretle.");
+            }
             else
-                surface.y = avail.x / target;   // panel dar   -> altta/ustte bant
+            {
+                // Bant alani icin once siyaha boya, goruntuyu ORTAYA koy.
+                ImGui::GetWindowDrawList()->AddRectFilled(
+                    origin, ImVec2(origin.x + avail.x, origin.y + avail.y),
+                    IM_COL32(0, 0, 0, 255));
+
+                ImGui::SetCursorScreenPos(ImVec2(origin.x + (avail.x - surface.x) * 0.5f,
+                                                 origin.y + (avail.y - surface.y) * 0.5f));
+
+                // UV'ler ters: OpenGL sol-alt kokenli, ImGui sol-ust bekler.
+                const auto texID =
+                    static_cast<ImTextureID>(m_GameFramebuffer->GetColorAttachmentID(0));
+                ImGui::Image(texID, surface, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
+            }
+
+            // Arac cubugu HER ZAMAN ve goruntunun USTUNDE. Onceki satir-ici
+            // surum panelde gorunmuyordu; Scene'in yuzen overlay desenine
+            // gecirildi.
+            DrawGameViewToolbar(origin.x, origin.y);
         }
-
-        m_GameViewportSize = { surface.x, surface.y };
-
-        if (!m_Scene->GetPrimaryCameraEntity())
-        {
-            // Sessizce siyah ekran gostermek "oyun neden gorunmuyor?"
-            // sorusunu doguruyordu. Sebebi soyluyoruz.
-            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.3f, 1.0f),
-                               "Sahnede birincil kamera yok.");
-            ImGui::TextDisabled("Bir entity'ye Camera component'i ekleyip");
-            ImGui::TextDisabled("\"Birincil\" isaretle.");
-            ImGui::End();
-            return;
-        }
-
-        // Bant alani icin once panelin tamamini siyaha boya, sonra
-        // goruntuyu ORTAYA yerlestir.
-        ImGui::GetWindowDrawList()->AddRectFilled(
-            origin, ImVec2(origin.x + avail.x, origin.y + avail.y),
-            IM_COL32(0, 0, 0, 255));
-
-        ImGui::SetCursorScreenPos(ImVec2(origin.x + (avail.x - surface.x) * 0.5f,
-                                         origin.y + (avail.y - surface.y) * 0.5f));
-
-        // UV'ler ters: OpenGL sol-alt kokenli, ImGui sol-ust bekler.
-        const auto texID =
-            static_cast<ImTextureID>(m_GameFramebuffer->GetColorAttachmentID(0));
-        ImGui::Image(texID, surface, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
 
         ImGui::End();
     }
 
-    void EditorApp::DrawGameViewToolbar()
+    void EditorApp::DrawGameViewToolbar(float anchorX, float anchorY)
     {
-        ImGui::SetCursorPos(ImVec2(6.0f, 4.0f));
+        ImGui::SetCursorScreenPos(ImVec2(anchorX + 8.0f, anchorY + 8.0f));
 
-        ImGui::SetNextItemWidth(150.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6.0f, 6.0f));
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.09f, 0.09f, 0.11f, 0.85f));
+
+        ImGui::BeginChild("##GameViewToolbar", ImVec2(0.0f, 0.0f),
+                          ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY |
+                          ImGuiChildFlags_AlwaysUseWindowPadding,
+                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
         const bool hasProject = FX::Project::HasActive();
         const auto& cfg = hasProject ? FX::Project::GetActive()->GetConfig()
@@ -499,6 +507,7 @@ namespace FXEd
 
         const char* preview = m_GameViewLocked ? locked : "Serbest";
 
+        ImGui::SetNextItemWidth(150.0f);
         if (ImGui::BeginCombo("##AspectMode", preview))
         {
             if (ImGui::Selectable("Serbest", !m_GameViewLocked))
@@ -522,7 +531,9 @@ namespace FXEd
         ImGui::EndDisabled();
         ImGui::SetItemTooltip("Hedef cozunurluk PROJE ayaridir.");
 
-        ImGui::Separator();
+        ImGui::EndChild();
+        ImGui::PopStyleColor();
+        ImGui::PopStyleVar();
     }
 
     void EditorApp::DrawViewportToolbar()
@@ -795,7 +806,11 @@ namespace FXEd
                                     ImGuiWindowFlags_AlwaysAutoResize))
             return;
 
-        ImGui::TextDisabled("<proje>/assets/scripts/ altina bir sablon yazilir.");
+        // Hedef klasor: icerik panelinden gelinmisse o, yoksa varsayilan.
+        if (m_NewScriptDir.empty())
+            ImGui::TextDisabled("Klasor: <proje>/assets/scripts/");
+        else
+            ImGui::TextDisabled("Klasor: %s", m_NewScriptDir.c_str());
         ImGui::Separator();
 
         // Script'ler artik projeye ait (B-6). Proje yoksa yazacak yer yok.

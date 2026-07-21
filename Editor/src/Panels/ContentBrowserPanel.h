@@ -56,6 +56,11 @@ namespace FXEd
         // acilacagina EditorApp karar veriyor.
         std::string TakeOpenRequest();
 
+        // Kullanici bos alana sag tik -> "Yeni Script..." dediyse, script'in
+        // olusturulacagi KLASORUN mutlak yolunu doner (o an gezilen klasor)
+        // ve istegi temizler; yoksa bos string. Modal EditorApp'te aciliyor.
+        std::string TakeNewScriptRequest();
+
         // Klasor icerigi degistiginde (disaridan kopyalama vb.) cagrilir.
         void Refresh() { m_NeedsRefresh = true; }
 
@@ -177,6 +182,10 @@ namespace FXEd
         float       m_MessageTimer = 0.0f;
         bool m_OpenNewFolderPopup = false;
         bool m_ImportRequest      = false;
+
+        // "Yeni Script..." istendiginde o an gezilen klasor buraya yaziliyor;
+        // EditorApp TakeNewScriptRequest ile aliyor.
+        std::filesystem::path m_NewScriptDir;
 
         // Cift tiklanan dosya. Istek biriktiriliyor cunku acma islemi
         // sahneyi degistirebilir ya da modal bir sey acabilir.

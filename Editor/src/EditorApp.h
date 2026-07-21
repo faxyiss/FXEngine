@@ -127,11 +127,15 @@ namespace FXEd
         void SetStatus(const std::string& message);
 
         // --- Script dosyasi olusturma (A4) ------------------------------------
-        // Sablonu Editor/src/Scripts/ altina yazar ve sistem editorunde
-        // acar. Derlenmesi icin yeniden derleme gerekiyor - bu sinir
-        // bilincli, cozumu Asama B (oyun DLL'i).
+        // Sablonu <proje>/assets/scripts/ altina (ya da icerik panelinde
+        // gezilen klasore) yazar ve sistem editorunde acar. Derlenmesi
+        // icin oyunu (Game.dll) Derle'ye basmak gerekiyor.
         void DrawNewScriptModal();
         bool CreateScriptFile(const std::string& name, std::string& outPath);
+
+        // Yeni script'in yazilacagi KLASOR. Bos = varsayilan (assets/scripts).
+        // Icerik panelinden "Yeni Script..." denince o klasore ayarlaniyor.
+        std::string m_NewScriptDir;
 
         // ISTEK bayragi: bir kez tuketilip ImGui::OpenPopup cagriliyor.
         // "Acik mi?" durumunu ImGui'nin kendisi tutuyor - biz de tutup
@@ -187,7 +191,9 @@ namespace FXEd
 
         // Ayar pencereleri (A3). Ayrilar cunku biri PROJEYE, digeri
         // KULLANICIYA ait - karisirsa yanlis dosyaya yazilir.
-        void DrawGameViewToolbar();
+        // Yuzen overlay: Game panelinin sol ustune, goruntunun uzerine
+        // ciziliyor (anchor = panel icerik alaninin sol ust ekran konumu).
+        void DrawGameViewToolbar(float anchorX, float anchorY);
 
         void DrawProjectSettingsWindow();
         void DrawPreferencesWindow();

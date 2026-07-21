@@ -80,18 +80,23 @@ if(MSVC)
     add_compile_options(/utf-8 /MP)
 endif()
 
-set(FXGAME_SCRIPTS_DIR "@SCRIPTS_DIR@")
-set(FXGAME_OUT_DIR     "@OUT_DIR@")
+set(FXGAME_ASSETS_DIR "@ASSETS_DIR@")
+set(FXGAME_OUT_DIR    "@OUT_DIR@")
 
 # Motorun include yollari ve import kutuphanesi. Bu dosyayi motor kendi
 # hedefinden URETIYOR (Engine/CMakeLists.txt) - burada elle yazilsaydi
 # ikinci bir kopya olur ve ayrisirdi.
 include("@ENGINE_CONFIG@")
 
-# CONFIGURE_DEPENDS: yeni bir script dosyasi eklendiginde derleme
-# sirasinda klasor yeniden taraniyor. GLOB'un normalde tehlikeli olma
-# sebebi (yeni dosyayi fark etmemesi) boylece ortadan kalkiyor.
-file(GLOB FXGAME_SCRIPT_HEADERS CONFIGURE_DEPENDS "${FXGAME_SCRIPTS_DIR}/*.h")
+# GLOB_RECURSE: assets/ AGACININ TAMAMINDAKI her .h bir script. Boylece
+# kullanici script'lerini icerik panelinde istedigi klasorde tutabilir,
+# hepsi tek Game.dll'e derlenir. CONFIGURE_DEPENDS: yeni dosya eklenince
+# derleme sirasinda yeniden taraniyor (GLOB'un "yeni dosyayi fark etmeme"
+# tehlikesi boylece ortadan kalkiyor).
+#
+# Konvansiyon: assets/ altindaki her .h, FXGame::<DosyaAdi> adinda bir
+# FX::ScriptableEntity turevi icermeli - aksi halde derleme hata verir.
+file(GLOB_RECURSE FXGAME_SCRIPT_HEADERS CONFIGURE_DEPENDS "${FXGAME_ASSETS_DIR}/*.h")
 
 set(FX_SCRIPT_INCLUDES "")
 set(FX_SCRIPT_REGISTRATIONS "")
@@ -195,6 +200,15 @@ extern "C" __declspec(dllexport) int FXEngineSelfTest(FX::Scene* scene,
     std::string CMakeBinaryDir() { return Join(Root(), ".fxbuild/cmake"); }
     std::string DllPath()        { return Join(Root(), ".fxbuild/out/Game.dll"); }
 
+    // Projenin varlik klasoru (script taramasi bunun ALTINI ozyinelemeli
+    // gezerek yapiliyor - script'ler herhangi bir alt klasorde olabilir).
+    static std::string AssetsDir()
+    {
+        if (!FX::Project::HasActive())
+            return {};
+        return Join(Root(), FX::Project::GetActive()->GetConfig().AssetDirectory.c_str());
+    }
+
     bool WriteBuildFiles(std::string* error)
     {
         const std::string root = Root();
@@ -220,7 +234,7 @@ extern "C" __declspec(dllexport) int FXEngineSelfTest(FX::Scene* scene,
         }
 
         std::string cmakeLists = kCMakeLists;
-        cmakeLists = Substitute(cmakeLists, "@SCRIPTS_DIR@", ScriptsDir());
+        cmakeLists = Substitute(cmakeLists, "@ASSETS_DIR@", AssetsDir());
         cmakeLists = Substitute(cmakeLists, "@OUT_DIR@", Join(root, ".fxbuild/out"));
         cmakeLists = Substitute(cmakeLists, "@ENGINE_CONFIG@", engineConfig);
 

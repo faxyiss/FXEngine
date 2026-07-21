@@ -68,7 +68,10 @@ namespace FXEd
     // ayirmak, uctan birini degistirince digerlerini bozmak demekti.
     bool EditorApp::CreateScriptFile(const std::string& name, std::string& outPath)
     {
-        const std::string scriptsDir = GameProject::ScriptsDir();
+        // Icerik panelinden gelen hedef klasor varsa oraya, yoksa
+        // varsayilan assets/scripts'e.
+        const std::string scriptsDir =
+            !m_NewScriptDir.empty() ? m_NewScriptDir : GameProject::ScriptsDir();
         if (scriptsDir.empty())
             return false;   // acik proje yok
 

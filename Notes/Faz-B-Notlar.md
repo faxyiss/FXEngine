@@ -434,3 +434,37 @@ kullanıcının onayını bekliyor.
 Bilerek yapılmayanlar (planın "kapsam dışı"ı korunuyor): otomatik derleme
 (dosya izleyiciyle), script alanlarının Inspector'dan ayarlanması,
 script'lerin kendi component'lerini tanımlaması, Linux `dlopen`.
+
+---
+
+## B sonrası kullanım düzeltmeleri (2026-07-21)
+
+Kullanıcı ilk gerçek script'i yazıp test ederken üç düzeltme istedi:
+
+1. **Space artık oyunu duraklatmıyor.** `OnKeyPressed`'te Space →
+   `m_ScenePaused` kısayolu kaldırıldı; script'ler Space'i girdi olarak
+   kullanıyor (zıplama vb.). Duraklat/Stop yalnızca oynatma şeridindeki
+   düğmelerle. (Space + sol tuş kamera kaydırma `EditorCamera`'da, durdu.)
+
+2. **Game panelinin araç çubuğu görünmüyordu.** Eski satır-içi sürüm
+   (`SetCursorPos` + inline widget'lar) panelde hiç çizilmiyordu. Scene'in
+   çalışan **yüzen overlay** desenine geçirildi: `DrawGameViewToolbar(anchorX,
+   anchorY)` artık yarı saydam bir child pencere, görüntünün üstünde, panel
+   sol üstünde. En/boy oranı combo'su + "Ayarlar..." artık görünüyor.
+
+3. **İçerik panelinde istediğin klasörde script.** Boş alana sağ tık →
+   "Yeni Script..." → o an gezilen klasöre oluşturuyor
+   (`ContentBrowserPanel::TakeNewScriptRequest` → `m_NewScriptDir`). Modal
+   hedef klasörü gösteriyor. Menüdeki "Dosya → Yeni Script" varsayılan
+   `assets/scripts`'e yazmaya devam ediyor.
+
+   **Bunu mümkün kılan asıl değişiklik:** `Game.dll` derlemesindeki script
+   taraması artık **özyinelemeli** (`GLOB_RECURSE`, `assets/` ağacının
+   tamamı). Önceden yalnız `assets/scripts/*.h` taranıyordu; alt klasördeki
+   bir script sessizce derlenmezdi. Konvansiyon: `assets/` altındaki her
+   `.h`, `FXGame::<DosyaAdi>` adında bir `ScriptableEntity` türevi içermeli.
+
+**Doğrulama:** temiz derleme; `assets/dusmanlar/Takipci.h` (alt klasör)
++ `assets/scripts/` script'leri birlikte tarandı, **3 script** kayıtlı,
+Game.dll temiz derlendi, self-test geçti, `FXTests` 51/238. Space/Game
+toolbar/sağ-tık davranışının görsel onayı kullanıcıda.

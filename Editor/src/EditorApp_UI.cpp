@@ -7,6 +7,7 @@
 #include <FXEngine/Scene/Components.h>
 
 #include <imgui.h>
+#include <imgui_internal.h>   // BeginViewportSideBar
 #include <ImGuizmo.h>
 
 #include <memory>
@@ -194,14 +195,82 @@ namespace FXEd
                                    m_StatusMessage.c_str());
             }
 
-            // Sagda durum bilgisi
+            // Sagda yalnizca FPS. Play/Edit durumu oynatma seridinde:
+            // burada "calisiyor" yaziyordu ama Edit modunda sahne
+            // duragan - yanlis bilgiydi.
             ImGui::SameLine(ImGui::GetWindowWidth() - 220.0f);
-            ImGui::TextDisabled("%s | %.0f FPS",
-                                m_ScenePaused ? "DURAKLATILDI" : "calisiyor",
-                                m_CurrentFps);
+            ImGui::TextDisabled("%.0f FPS", m_CurrentFps);
 
             ImGui::EndMainMenuBar();
         }
+    }
+
+    // Play/Stop editordeki en onemli dugme ve bir GORUNUME degil
+    // editorun durumuna ait. Scene panelinin icinde durdugu surece
+    // Game sekmesine gecince kayboluyordu; artik menu cubugunun
+    // altinda, her zaman gorunur bir seritte.
+    void EditorApp::DrawPlayBar()
+    {
+        const float height = ImGui::GetFrameHeight() + 10.0f;
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 5.0f));
+
+        // Dockspace'ten ONCE cagriliyor (bkz. ImGuiLayer::BeginDockspace):
+        // calisma alanindan kendi payini ayirmasi gerekiyor.
+        const bool open = ImGui::BeginViewportSideBar(
+            "##PlayBar", ImGui::GetMainViewport(), ImGuiDir_Up, height,
+            ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_NoScrollbar);
+
+        ImGui::PopStyleVar();
+
+        if (!open)
+        {
+            ImGui::End();
+            return;
+        }
+
+        const bool playing = IsPlaying();
+
+        // Dugmeleri ortala: goz once oraya gidiyor ve pencere
+        // genisligi degistikce yeri kaymiyor.
+        const float groupWidth = 52.0f + 8.0f + 64.0f;
+        ImGui::SetCursorPosX((ImGui::GetWindowWidth() - groupWidth) * 0.5f);
+
+        ImGui::PushStyleColor(ImGuiCol_Button,
+            playing ? ImVec4(0.65f, 0.22f, 0.22f, 1.0f)
+                    : ImVec4(0.20f, 0.55f, 0.25f, 1.0f));
+
+        if (ImGui::Button(playing ? "Stop" : "Play", ImVec2(52.0f, 0.0f)))
+        {
+            if (playing) OnSceneStop();
+            else         OnScenePlay();
+        }
+
+        ImGui::PopStyleColor();
+        ImGui::SetItemTooltip(playing
+            ? "Duzenleme sahnesine don (kopyadaki degisiklikler atilir)"
+            : "Sahnenin bir kopyasini calistir");
+
+        ImGui::SameLine();
+
+        // Duraklatma sadece Play'de anlamli.
+        ImGui::BeginDisabled(!playing);
+        if (ImGui::Button(m_ScenePaused ? "Devam" : "Duraklat", ImVec2(64.0f, 0.0f)))
+            m_ScenePaused = !m_ScenePaused;
+        ImGui::EndDisabled();
+
+        // Play'de hangi sahnede oldugun solda yaziyor: kopya mi orijinal mi
+        // sorusu Play sirasinda en sik sorulan sey.
+        ImGui::SameLine(12.0f);
+        if (!playing)
+            ImGui::TextDisabled("Edit");
+        else if (m_ScenePaused)
+            ImGui::TextColored(ImVec4(0.95f, 0.85f, 0.35f, 1.0f), "DURAKLATILDI");
+        else
+            ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.25f, 1.0f), "PLAY (kopya sahne)");
+
+        ImGui::End();
     }
 
     void EditorApp::DrawScenePanel()
@@ -332,37 +401,6 @@ namespace FXEd
                           ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY |
                           ImGuiChildFlags_AlwaysUseWindowPadding,
                           ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-
-        // --- Play / Stop ---------------------------------------------------
-        // Arac cubugunun EN BASINDA: editordeki en onemli tek dugme.
-        {
-            const bool playing = IsPlaying();
-
-            ImGui::PushStyleColor(ImGuiCol_Button,
-                playing ? ImVec4(0.65f, 0.22f, 0.22f, 1.0f)
-                        : ImVec4(0.20f, 0.55f, 0.25f, 1.0f));
-
-            if (ImGui::Button(playing ? "Stop" : "Play", ImVec2(52.0f, 0.0f)))
-            {
-                if (playing) OnSceneStop();
-                else         OnScenePlay();
-            }
-
-            ImGui::PopStyleColor();
-            ImGui::SetItemTooltip(playing
-                ? "Duzenleme sahnesine don (kopyadaki degisiklikler atilir)"
-                : "Sahnenin bir kopyasini calistir");
-
-            ImGui::SameLine();
-
-            // Duraklatma sadece Play'de anlamli.
-            ImGui::BeginDisabled(!playing);
-            if (ImGui::Button(m_ScenePaused ? "Devam" : "Duraklat", ImVec2(64.0f, 0.0f)))
-                m_ScenePaused = !m_ScenePaused;
-            ImGui::EndDisabled();
-
-            ImGui::SameLine(0.0f, 14.0f);
-        }
 
         // Play modunda duzenleme araclari kapali: kopyada yapilan
         // duzenleme Stop'ta zaten kaybolurdu, kullaniciya bunu

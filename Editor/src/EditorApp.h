@@ -120,6 +120,11 @@ namespace FXEd
 
         // ImGui panellerini cizer.
         void DrawMenuBar();
+
+        // Play/Stop/Duraklat - bir gorunume degil editorun durumuna ait,
+        // bu yuzden menu cubugunun altinda genel bir serit.
+        void DrawPlayBar();
+
         void DrawScenePanel();
 
         // Oyun goruntusu: sahne kamerasindan, duzenleme yardimcisi yok.

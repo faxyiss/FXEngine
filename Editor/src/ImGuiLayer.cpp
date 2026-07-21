@@ -97,13 +97,15 @@ namespace FXEd
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
         ImGuizmo::BeginFrame();
+    }
 
-        // --- Dockspace ---------------------------------------------------------
-        // Tum ekrani kaplayan gorunmez bir "kenetlenme alani" olusturur.
-        // Panellerin nereye yapisabilecegini bu belirler.
+    void ImGuiLayer::BeginDockspace()
+    {
+        // Tum calisma alanini kaplayan gorunmez bir "kenetlenme alani".
+        // PassthruCentralNode: ortadaki bos alan seffaf kalir.
         //
-        // PassthruCentralNode: ortadaki bos alan SEFFAF kalir. Bunu
-        // istiyoruz cunku viewport paneli oraya yerlesecek.
+        // Menu cubugu ve ust arac cubugu BUNDAN ONCE cizilmis olmali;
+        // ikisi de calisma alanini kucultuyor ve dockspace kalani aliyor.
         const ImGuiID dockspaceID =
             ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(),
                                          ImGuiDockNodeFlags_PassthruCentralNode);

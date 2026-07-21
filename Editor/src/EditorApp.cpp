@@ -250,6 +250,12 @@ namespace FXEd
         m_ImGuiLayer.Begin();
 
         DrawMenuBar();
+        DrawPlayBar();
+
+        // Dockspace menu cubugundan ve oynatma seridinden SONRA: ikisi de
+        // calisma alanini kucultuyor, dockspace kalani aliyor.
+        m_ImGuiLayer.BeginDockspace();
+
         DrawScenePanel();
         DrawGamePanel();
         DrawStatsPanel();

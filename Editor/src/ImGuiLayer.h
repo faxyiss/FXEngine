@@ -30,7 +30,14 @@ namespace FXEd
 
         // Yeni bir ImGui cercevesi baslatir. Tum ImGui:: cagrilari
         // Begin ile End arasinda olmali.
+        // Yeni ImGui cercevesi. Dockspace AYRI (bkz. BeginDockspace):
+        // ust arac cubugu ikisinin ARASINDA cizilmeli, yoksa dockspace
+        // ona yer ayirmaz ve paneller altina girer.
         void Begin();
+
+        // Kenetlenme alanini acar; bundan sonra cizilen paneller
+        // yapisabilir. Karsilama ekrani bunu hic cagirmiyor.
+        void BeginDockspace();
 
         // Cerceveyi kapatir ve ImGui'nin cizim verisini GPU'ya gonderir.
         void End(std::uint32_t displayWidth, std::uint32_t displayHeight);

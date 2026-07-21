@@ -49,6 +49,30 @@ fikirlerinden biri — *sessiz yanlışlık yerine görünür uyarı*. Sahne
 kamerasının varlığı oyunun çalışması için şart; onu gizlemek "oyun neden
 boş?" sorusunu doğuruyordu.
 
+### Play/Stop artık genel bir şeritte
+
+**İlk denemenin hatası:** Play/Stop düğmeleri viewport araç çubuğunun
+içindeydi ve o araç çubuğu Scene panelinin üstüne çiziliyordu. Game
+sekmesine geçince **düğmeler kayboluyordu**.
+
+Sebep kavramsal: Play/Stop bir *görünüme* ait değil, **editörün
+durumuna** ait. Izgara/gizmo/kademe Scene View'ın araçları ve orada
+kalmalı; Play/Stop her yerden erişilebilir olmalı.
+
+Çözüm: menü çubuğunun altında tam genişlikte bir şerit
+(`BeginViewportSideBar`). Ortalanmış Play/Duraklat düğmeleri + solda
+Edit / PLAY / DURAKLATILDI göstergesi.
+
+Bunun bir yan etkisi vardı: şerit çalışma alanından pay ayırmak zorunda
+ve bunu **dockspace'ten önce** yapmalı, yoksa paneller şeridin altına
+girer. `ImGuiLayer::Begin()` ikiye ayrıldı — `Begin()` yalnızca
+çerçeveyi açıyor, `BeginDockspace()` kenetlenme alanını. Sıra artık:
+menü çubuğu → oynatma şeridi → dockspace → paneller.
+
+Ayrıca menü çubuğundaki durum metni kaldırıldı: Edit modunda bile
+"calisiyor" yazıyordu, yani **yanlış bilgiydi**. Durum artık tek yerde,
+oynatma şeridinde.
+
 ### Game View'ın framebuffer'ı daha ince
 
 Scene View'ın framebuffer'ında entity ID eki (`R32I`) var — seçim onu
@@ -83,17 +107,21 @@ gösterip göstermediği elle test edilmeli.
 2. Scene sekmesi: ızgara, seçim çerçevesi, gizmo çalışıyor mu?
 3. Game sekmesi: **ızgara ve gizmo görünmemeli**; sahne kamerasının
    gördüğü kadarı görünmeli.
-4. **Play'e bas** → Game sekmesi kendiliğinden öne gelmeli.
-5. Play sırasında Scene sekmesine geç → oyun canlı akmalı, gizmo ve
+4. **Play/Stop düğmeleri menü çubuğunun altında, ortada** olmalı ve
+   Scene ↔ Game sekmesi değiştirince **kaybolmamalı**.
+5. **Play'e bas** → Game sekmesi kendiliğinden öne gelmeli; şeritte
+   turuncu "PLAY (kopya sahne)" yazmalı, Duraklat'ta sarı
+   "DURAKLATILDI".
+6. Play sırasında Scene sekmesine geç → oyun canlı akmalı, gizmo ve
    ızgara **hâlâ görünür** olmalı, entity seçebilmelisin.
-6. **Stop** → Scene sekmesi öne gelmeli.
-7. Ana Kamera'yı sil (veya "Birincil" işaretini kaldır) → Game View
+7. **Stop** → Scene sekmesi öne gelmeli.
+8. Ana Kamera'yı sil (veya "Birincil" işaretini kaldır) → Game View
    turuncu "Sahnede birincil kamera yok" uyarısı göstermeli.
-8. Kamerayı hareket ettir → Game View'daki görüntü kaymalı.
-9. Game panelini yeniden boyutlandır → görüntü bozulmadan uymalı.
-10. Scene panelini yeniden boyutlandır → gizmo ve seçim hâlâ doğru
+9. Kamerayı hareket ettir → Game View'daki görüntü kaymalı.
+10. Game panelini yeniden boyutlandır → görüntü bozulmadan uymalı.
+11. Scene panelini yeniden boyutlandır → gizmo ve seçim hâlâ doğru
     yerde olmalı (fare koordinat dönüşümü).
-11. İçerik panelinden **Scene**'e resim sürükle → sprite oluşmalı
+12. İçerik panelinden **Scene**'e resim sürükle → sprite oluşmalı
     (bırakma hedefi Game'de yok, orada bir şey olmamalı).
 
 ## Yapılmadı

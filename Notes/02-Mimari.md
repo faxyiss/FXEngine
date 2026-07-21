@@ -324,7 +324,7 @@ Kurallar:
 ## 10. Script sistemi
 
 ```
-ScriptRegistry     ad → sınıf tablosu     (kayıt uygulamanın işi)
+ScriptRegistry     ad → sınıf tablosu     (kayıt CMake tarafından üretilir, A4)
 ScriptableEntity   OnCreate/OnUpdate/OnDestroy  (protected — motor çağırır)
 NativeScriptComponent   { ScriptName, Instance* }
 ScriptSystem       Start/Update/Stop — örneklerin yaşam döngüsü
@@ -460,7 +460,7 @@ eksikler (çarpışma, animasyon, ses, sahne geçişi) ancak orada görünür.
 | ~~**A1**~~ | ✅ Component meta-veri sistemi — [Faz-A1-Notlar.md](Faz-A1-Notlar.md) | Diğer dördünü de ucuzlatıyor |
 | ~~**A2**~~ | ✅ Game View / Scene View ayrımı — [Faz-A2-Notlar.md](Faz-A2-Notlar.md) | Kamera ve çözünürlük kavramlarını netleştirir |
 | ~~**A3**~~ | ✅ Project Settings + Preferences — [Faz-A3-Notlar.md](Faz-A3-Notlar.md) | A2'nin doğurduğu ayarların yeri |
-| **A4** | Script dosyası oluşturma + şablon | İterasyonun ilk adımı |
+| ~~**A4**~~ | ✅ Script dosyası + şablon + otomatik kayıt — [Faz-A4-Notlar.md](Faz-A4-Notlar.md) | İterasyonun ilk adımı |
 | **A5** | Undo/Redo (eski 20a-20b) | A1'den sonra çok ucuzlar |
 
 ## Aşama B — İterasyon hızı

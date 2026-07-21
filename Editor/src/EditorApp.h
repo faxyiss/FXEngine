@@ -103,6 +103,16 @@ namespace FXEd
 
         void SetStatus(const std::string& message);
 
+        // --- Script dosyasi olusturma (A4) ------------------------------------
+        // Sablonu Editor/src/Scripts/ altina yazar ve sistem editorunde
+        // acar. Derlenmesi icin yeniden derleme gerekiyor - bu sinir
+        // bilincli, cozumu Asama B (oyun DLL'i).
+        void DrawNewScriptModal();
+        bool CreateScriptFile(const std::string& name, std::string& outPath);
+
+        bool m_ShowNewScript = false;
+        char m_NewScriptName[64] = "";
+
         // Sonsuz izgara. Aralik zoom'a gore 1-2-5-10 serisinde secilir.
         void DrawGrid();
 

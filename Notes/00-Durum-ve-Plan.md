@@ -139,9 +139,8 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 ### Güncel sıra
 
 ```
-✅ borç turu 0.1–0.7  ✅ 13a  ✅ 13b  ✅ 16a  ✅ 16b  ✅ A1  ✅ A2  ✅ A3
-▶  A4 script dosyası
-   → A4 script dosyası → A5 Undo/Redo
+✅ borç turu 0.1–0.7  ✅ 13a  ✅ 13b  ✅ 16a  ✅ 16b  ✅ A1  ✅ A2  ✅ A3  ✅ A4
+▶  A5 Undo/Redo
    → B: oyun DLL'i + hot reload
    → C: C# kararı
    → 16c → 14 → 15 → 18b → 17a-d → 18c → 19 → 23 → 18d
@@ -168,27 +167,36 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 
 ---
 
-## 5b. YENİ OTURUMDA İLK İŞ: A4 — script dosyası oluşturma + şablon
+## 5b. YENİ OTURUMDA İLK İŞ: A5 — Undo/Redo
 
-**A1, A2, A3 tamam** (2026-07-21) — [Faz-A1-Notlar.md](Faz-A1-Notlar.md),
-[Faz-A2-Notlar.md](Faz-A2-Notlar.md), [Faz-A3-Notlar.md](Faz-A3-Notlar.md).
+**Aşama A'nın son işi.** A1–A4 tamam (2026-07-21):
+[A1](Faz-A1-Notlar.md) · [A2](Faz-A2-Notlar.md) · [A3](Faz-A3-Notlar.md) ·
+[A4](Faz-A4-Notlar.md).
 
-**Hedef (A4):** İçerik panelinde sağ tık → "Yeni Script" → şablon üret →
-sistem editöründe aç.
+**Sorun:** Gizmo ile yanlış sürüklediğin bir nesneyi geri alamıyorsun.
+Teknik borç listesindeki tek **yüksek** öncelikli madde bu.
 
-**Dürüst sınır (karar K5):** C++'ta yeni bir script'in derlenmesi motorun
-yeniden derlenmesini gerektiriyor ve `RegisterEditorScripts()`'e elle
-eklenmesi lazım ([SpinScript.h](../Editor/src/Scripts/SpinScript.h)).
-A4 dosyayı ve şablonu üretir; iterasyon hızı sorununu **Aşama B** (oyun
-DLL'i + hot reload) çözer.
+**A1 ve 0.3 bunu ucuzlattı — sebebini kaybetme:**
+- `ComponentRegistry`'nin alan tablosu sayesinde tek bir **generic
+  "alanı değiştir" komutu** yeter; component başına komut yazmak gerekmez
+  (alan erişimcisi + tip zaten tabloda).
+- `SelectionContext` çoklu seçim taşıyor, yani komutlar baştan "hangi
+  entity'ler üzerinde?" sorusunu çoğul cevaplayabilir. Tek-seçim
+  varsayımıyla yazılan her komut sonradan yeniden yazılırdı — 0.2/0.3
+  zinciri tam bu yüzden Undo'dan önce yapılmıştı.
 
-**Kararlaştırılacak:** Script'ler nereye yazılsın — `Editor/src/Scripts/`
-(bugünkü yer, motorla birlikte derlenir) yoksa projenin içine
-(`<proje>/scripts/`, Aşama B'nin DLL'ine hazırlık)? İkincisi A4'ü Aşama
-B'ye bağlar ama doğru yer orası.
+**Kapsam kararı gerekecek:** hangi işlemler geri alınabilir olmalı?
+En az: gizmo dönüşümü, Inspector alan değişikliği, entity oluştur/sil,
+parent değiştir, component ekle/kaldır. Sahne açma/kaydetme geri
+alınamaz olmalı (sınır net olsun).
 
-**Nereye dokunulacak:** `ContentBrowserPanel` (sağ tık menüsü + şablon
-yazma), `FileDialogs` veya `ShellExecute` (sistem editöründe açma).
+**Dikkat:** Çoklu seçimde tek bir gizmo sürüklemesi **tek** undo girişi
+olmalı, N değil. Aynı şekilde bir DragFloat sürüklemesi bırakılana kadar
+tek giriş (ImGui `IsItemDeactivatedAfterEdit`).
+
+**Nereye dokunulacak:** yeni `CommandHistory` (Editor/), `EditorApp`
+(Ctrl+Z/Ctrl+Y), `ComponentDrawer` (alan değişikliklerini komuta
+çevirme), `SceneHierarchyPanel` (oluştur/sil/parent).
 
 ### A1'den sonra sırayla
 

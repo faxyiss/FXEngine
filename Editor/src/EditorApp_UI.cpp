@@ -5,11 +5,15 @@
 #include <FXEngine/Core/Project.h>
 #include <FXEngine/Renderer/Renderer2D.h>
 #include <FXEngine/Scene/Components.h>
+#include <FXEngine/Scene/ScriptRegistry.h>
+
+#include "Platform/FileDialogs.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>   // BeginViewportSideBar
 #include <ImGuizmo.h>
 
+#include <cctype>
 #include <memory>
 #include <string>
 
@@ -84,6 +88,13 @@ namespace FXEd
 
                     if (!toOpen.empty())
                         OpenScene(toOpen);
+                }
+
+                ImGui::Separator();
+                if (ImGui::MenuItem("Yeni Script..."))
+                {
+                    m_NewScriptName[0] = '\0';
+                    m_ShowNewScript = true;
                 }
 
                 ImGui::Separator();
@@ -738,6 +749,99 @@ namespace FXEd
         ImGui::TextDisabled("(cikista otomatik de kaydedilir)");
 
         ImGui::End();
+    }
+
+    void EditorApp::DrawNewScriptModal()
+    {
+        if (!m_ShowNewScript)
+            return;
+
+        ImGui::OpenPopup("Yeni Script");
+
+        ImGui::SetNextWindowSize(ImVec2(460.0f, 0.0f), ImGuiCond_Appearing);
+        if (!ImGui::BeginPopupModal("Yeni Script", nullptr,
+                                    ImGuiWindowFlags_AlwaysAutoResize))
+            return;
+
+        ImGui::TextDisabled("Editor/src/Scripts/ altina bir sablon yazilir.");
+        ImGui::Separator();
+
+        ImGui::Text("Ad");
+        ImGui::SameLine(60.0f);
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::SetKeyboardFocusHere();
+        ImGui::InputText("##scriptname", m_NewScriptName, sizeof(m_NewScriptName));
+
+        const std::string name = m_NewScriptName;
+
+        // Ad hem SINIF adi hem DOSYA adi hem de sahne dosyasina yazilan
+        // kimlik olacak; ucunde de gecerli olmali.
+        std::string problem;
+        if (name.empty())
+        {
+            problem = "Bir ad yaz.";
+        }
+        else if (!(std::isalpha(static_cast<unsigned char>(name[0])) || name[0] == '_'))
+        {
+            problem = "Harf veya _ ile baslamali (C++ sinif adi olacak).";
+        }
+        else
+        {
+            for (char c : name)
+            {
+                if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_')
+                {
+                    problem = "Yalnizca harf, rakam ve _ kullan.";
+                    break;
+                }
+            }
+        }
+
+        if (problem.empty() && FX::ScriptRegistry::Contains(name))
+            problem = "Bu adda bir script zaten var.";
+
+        if (!problem.empty())
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "%s", problem.c_str());
+        else
+            ImGui::TextDisabled("Olusacak: %s.h  ->  class %s", name.c_str(), name.c_str());
+
+        ImGui::Separator();
+
+        // Dogru bilgi, sonradan sikayet degil: derleme sarti bastan yazili.
+        ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.35f, 1.0f),
+                           "Script'in calismasi icin editoru YENIDEN DERLE.");
+        ImGui::TextDisabled("Kayit otomatik; CMake klasoru tariyor.");
+
+        ImGui::Separator();
+
+        ImGui::BeginDisabled(!problem.empty());
+        if (ImGui::Button("Olustur", ImVec2(120.0f, 0.0f)))
+        {
+            std::string path;
+            if (CreateScriptFile(name, path))
+            {
+                SetStatus("Script olusturuldu: " + name + ".h (yeniden derle)");
+                FX_INFO("Script olusturuldu: %s", path.c_str());
+                FileDialogs::OpenExternally(path);
+            }
+            else
+            {
+                SetStatus("Script OLUSTURULAMADI: " + name + ".h");
+            }
+
+            m_ShowNewScript = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndDisabled();
+
+        ImGui::SameLine();
+        if (ImGui::Button("Vazgec", ImVec2(120.0f, 0.0f)))
+        {
+            m_ShowNewScript = false;
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
     }
 
     void EditorApp::DrawStatsPanel()

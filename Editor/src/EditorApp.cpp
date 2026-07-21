@@ -1,7 +1,7 @@
 #include "EditorApp.h"
 #include "Platform/FileDialogs.h"
 #include "Panels/ComponentDrawer.h"
-#include "Scripts/SpinScript.h"
+#include <ScriptRegistrations.h>   // uretiliyor - bkz. Editor/CMakeLists.txt
 
 #include <FXEngine/Core/Log.h>
 #include <FXEngine/Core/FileSystem.h>
@@ -272,6 +272,7 @@ namespace FXEd
         DrawStatsPanel();
         DrawProjectSettingsWindow();
         DrawPreferencesWindow();
+        DrawNewScriptModal();
         m_HierarchyPanel.OnImGuiRender();
         m_ContentBrowser.OnImGuiRender();
 

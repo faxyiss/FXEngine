@@ -1,0 +1,28 @@
+#pragma once
+
+// ===========================================================================
+// URETILEN DOSYA - ELLE DUZENLEME (A4)
+//
+// Kaynak sablon: Editor/src/Scripts/ScriptRegistrations.h.in
+// Ureten: Editor/CMakeLists.txt
+//
+// KURAL: Editor/src/Scripts/ altindaki her `<Ad>.h` dosyasinin icinde
+// `FXEd::<Ad>` adinda bir ScriptableEntity turevi bulunmali. CMake
+// klasoru tarayip include'u ve kaydi kendisi yaziyor.
+//
+// Neden uretiliyor? A4'ten once yeni bir script yazmak IKI yere
+// dokunmayi gerektiriyordu: dosyayi olusturmak ve RegisterEditorScripts
+// icine bir satir eklemek. Ikincisi unutuldugunda hata SESSIZDI -
+// script Inspector listesinde hic gorunmuyordu. A1'de component'ler
+// icin cozulen problemin aynisi.
+// ===========================================================================
+
+@FX_SCRIPT_INCLUDES@
+#include <FXEngine/Scene/ScriptRegistry.h>
+
+namespace FXEd
+{
+    inline void RegisterEditorScripts()
+    {
+@FX_SCRIPT_REGISTRATIONS@    }
+}

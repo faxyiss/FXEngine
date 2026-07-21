@@ -441,8 +441,15 @@ Sonra:    16c → 14 → 15 → 18b → 17a-d → 18c → 19 → 23 → 18d
       **açılmadı** — `.fxproject` zaten o rolde ve tek ayar için yeni
       dosya şeması gereksizdi; Faz 17/18c'de yeniden bakılacak.
       Ayrıntı: [Faz-A3-Notlar.md](Faz-A3-Notlar.md)
-- [ ] **A4 — Script dosyası oluşturma + şablon.** İçerik panelinden
-      "Yeni Script" → şablon → sistem editöründe aç.
+- [x] **A4 — Script dosyası oluşturma + şablon.** Dosya → "Yeni Script"
+      → `Editor/src/Scripts/<Ad>.h` + sistem editöründe aç. **Kayıt artık
+      otomatik:** CMake klasörü tarayıp (`CONFIGURE_DEPENDS`)
+      `ScriptRegistrations.h` üretiyor — "Register satırını unut" sessiz
+      hatası kalktı. Konvansiyon: dosya adı = sınıf adı = kayıt adı.
+      `SpinScript.h` → `Spin.h` + `Move.h` (kayıt adları korundu).
+      İçerik panelinde sağ tık **yapılmadı**: script'ler projede değil,
+      Aşama B'de oraya taşınınca anlamlı olacak.
+      Ayrıntı: [Faz-A4-Notlar.md](Faz-A4-Notlar.md)
 - [ ] **A5 — Undo/Redo** (eski 20a + 20b). A1'den sonra çok ucuzlar.
 
 ## Aşama B — İterasyon hızı

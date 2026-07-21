@@ -54,6 +54,87 @@ namespace FXEd
     }
 
     // -----------------------------------------------------------------------
+    // Script dosyasi olusturma (A4)
+    // -----------------------------------------------------------------------
+    // Script'ler PROJENIN icine degil Editor/src/Scripts/ altina yaziliyor:
+    // exe'ye derlenen tek yer orasi. Projenin assets/ klasorune bir sablon
+    // koysaydik hicbir zaman calismayacak bir dosya uretmis olurduk -
+    // tam olarak bu projenin yasakladigi sessiz yanlislik.
+    //
+    // Dosya adi = sinif adi = sahne dosyasina yazilan ad. Uc kimligi
+    // ayirmak, uctan birini degistirince digerlerini bozmak demekti.
+    bool EditorApp::CreateScriptFile(const std::string& name, std::string& outPath)
+    {
+        const std::filesystem::path dir{ FX_EDITOR_SCRIPTS_DIR };
+
+        std::error_code ec;
+        std::filesystem::create_directories(dir, ec);
+
+        const std::filesystem::path file = dir / (name + ".h");
+        outPath = file.string();
+
+        // Var olani EZMIYORUZ: yazilmis bir script'i sessizce silmek
+        // geri alinamaz bir kayip olurdu.
+        if (std::filesystem::exists(file))
+            return false;
+
+        std::ofstream out(file);
+        if (!out)
+            return false;
+
+        // Ham dize: sablonun kendisi C++ kodu, kacis dizileriyle
+        // yazmak okunmaz hale getirirdi. %s yerine gecen tek sey ad.
+        static constexpr const char* kTemplate = R"TPL(#pragma once
+
+#include <FXEngine/Scene/ScriptableEntity.h>
+#include <FXEngine/Scene/Components.h>
+#include <FXEngine/Core/Input.h>
+#include <FXEngine/Core/Log.h>
+
+namespace FXEd
+{
+    // SINIF ADI DOSYA ADIYLA AYNI OLMALI: kayit CMake tarafindan buna
+    // gore uretiliyor (bkz. Scripts/ScriptRegistrations.h.in).
+    class %NAME% : public FX::ScriptableEntity
+    {
+    protected:
+        // Play basladiginda bir kez.
+        void OnCreate() override
+        {
+            FX_INFO("%NAME%: OnCreate (%s)", GetEntity().GetName().c_str());
+        }
+
+        // Her sabit adimda; dt her zaman ayni deger (1/60).
+        void OnUpdate(float dt) override
+        {
+            auto& tf = GetComponent<FX::TransformComponent>();
+
+            // Ornek: saniyede 1 birim saga.
+            tf.Translation.x += 1.0f * dt;
+        }
+
+        // Stop'ta veya entity silindiginde bir kez.
+        void OnDestroy() override
+        {
+        }
+    };
+}
+)TPL";
+
+        std::string content = kTemplate;
+
+        for (std::size_t pos = content.find("%NAME%");
+             pos != std::string::npos;
+             pos = content.find("%NAME%", pos + name.size()))
+        {
+            content.replace(pos, 6, name);
+        }
+
+        out << content;
+        return out.good();
+    }
+
+    // -----------------------------------------------------------------------
     // Karsilama ekrani (Faz 21)
     // -----------------------------------------------------------------------
     void EditorApp::DrawLauncher()

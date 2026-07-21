@@ -6,7 +6,9 @@
 >
 > Mimarinin tamamı ve alınan yön kararları: **[02-Mimari.md](02-Mimari.md)**
 >
-> Son güncelleme: 2026-07-21 · Aşama B **B-1 tamam**
+> Son güncelleme: 2026-07-21 · Son commit: `2469052`
+> **Aşama A + Aşama B + script alanları tamam.** Sıradaki iş ve C# kararı
+> için **§5b**'ye bak.
 
 ---
 
@@ -39,24 +41,61 @@ build/      CMake çıktısı
 
 MVP (Faz 0–7) ve şu fazlar tamam: **8, 9, 10, 11, 12, 21, 22**,
 **borç turu 0.1–0.7**, **13a + 13b**, **16a + 16b**, Faz 18'in
-çizgi/ızgara kısmı, ve **Aşama A'nın A1–A4'ü**.
+çizgi/ızgara kısmı, **Aşama A (A1–A5)**, **Aşama B (B-1…B-6)** ve
+**script alanları**.
 
-### Son oturumda yapılanlar (2026-07-21)
+### Aşama A + B oturumları (2026-07-21)
 
 | Commit | İş |
 |---|---|
 | `4caa520` | **0.7** Refactor turu: `EditorApp.cpp` 2033→4 dosya, demo sahne ayrıldı |
 | `e8d9d5c` | **A1** Component meta-veri sistemi (`ComponentRegistry`) |
 | `ee41e55` · `50473d0` | **A2** Game View / Scene View ayrımı + genel oynatma şeridi |
-| `e7e036d` | `EngineLogo` uygulama logosu (pencere ikonu + karşılama ekranı) |
-| `34d59da` · `c62dabe` | **A3** Project Settings + Preferences, ayrı "Ayarlar" menüsü |
+| `e7e036d` | `EngineLogo` uygulama logosu |
+| `34d59da` · `c62dabe` | **A3** Project Settings + Preferences |
 | `136d8bc` · `671915d` | **A4** Script dosyası oluşturma + otomatik kayıt |
 | `34f27db` · `46da685` | **Aşama B planı** yazıldı ve onaylandı |
 | `cdabcde` | **B-1** `FXEngine` → `SHARED`; `Project::GetActive/HasActive` `.cpp`'ye taşındı |
 | `5673bd0` | **B-2** `<proje>/.fxbuild/` iskelesi + `Game.dll` + `FXEngineConfig-<Config>.cmake` |
 | `867b414` | **B-3** `GameLibrary` DLL yükleme + `FXEngineSelfTest` (EnTT sınır ölçümü GEÇTİ) |
 | `0f00b4f` | **B-6** `Editor/src/Scripts/` kaldırıldı, "Yeni Script" projeye yazıyor |
-| _bu oturum_ | **B-4** gölge kopya (`out/loaded/`) · **B-5** Derle düğmesi + konsol + Play koruması |
+| `3f72180` | **B-4** gölge kopya (`out/loaded/`) · **B-5** Derle düğmesi + konsol + Play koruması |
+
+### Son oturumda yapılanlar (2026-07-21, ikinci tur)
+
+| Commit | İş |
+|---|---|
+| `b4ffffd` | Space artık duraklatmıyor · Game paneli araç çubuğu yüzen overlay'e geçti (görünmüyordu) · "Yeni Script" içerik panelinde **istenen klasöre** yazıyor + script taraması **özyinelemeli** (`GLOB_RECURSE`) |
+| `6e49cec` | Derleme konsolu: hataları **en üste kırmızı, satır kaydırmalı özet** olarak gösteriyor (dosya+satır görünür) |
+| `d576ca0` | İçerik paneli: **kopyala / kes / yapıştır** (Ctrl+C/X/V) |
+| `604d24d` | **Teknik borç:** çoklu seçimde Inspector artık hepsini düzenliyor · yüklenemeyen doku için **mor "eksik doku"** |
+| `5beb62d` | Çoklu seçim: **component ekleme/silme** de tüm seçili entity'lere uygulanıyor |
+| `496b5ba` | **A5 Undo/Redo** — `CommandStack` + Inspector alan düzenleme + gizmo dönüşümü |
+| `2469052` | **Script alanları** — `OnReflect` reflection + `NativeScriptComponent::Fields` |
+
+### Şu an çalışan özellikler
+
+- **Proje sistemi:** karşılama ekranı, `.fxproject` **sürüm 3**
+  (ad, varlık klasörü, `StartScene` GUID, hedef çözünürlük), son projeler.
+  `FXEditor.exe <yol.fxproject>` ile doğrudan açılabiliyor
+- **Varlık sistemi:** GUID kimlik, `.meta`, taşıma referansları kırmıyor,
+  doku ayarları dosya başına, dosya izleyici
+- **Sahne:** entity UUID'leri, hiyerarşi, prefab, sürüm 4 dosya formatı
+- **Component'ler tek yerde tanımlı (A1):** `ComponentMeta.cpp` →
+  `RegisterBuiltins`. Serileştirme, `Scene::Copy` ve Inspector üçü de
+  oradan besleniyor. Yeni component = **tek yere yazmak**
+- **Scene View / Game View ayrı (A2)** · **Ayarlar ayrı (A3)**
+- **Oyun kodu ayrı DLL (Aşama B):** `<proje>/assets/**/*.h` script'leri
+  `Game.dll`'e derleniyor, **Derle** düğmesiyle editör kapanmadan yeniden
+  yükleniyor (gölge kopya). Derleme hataları konsolda dosya+satır
+- **Script alanları:** `OnReflect` ile bildirilen alanlar Inspector'da,
+  değer component'te veri olarak, Play'de instance'a uygulanıyor
+- **Undo/Redo (A5):** Ctrl+Z / Ctrl+Shift+Z — Inspector alanları + gizmo
+- **Çoklu seçim:** alan düzenleme + component ekle/sil hepsine uygulanıyor
+- **İçerik paneli:** kopyala/kes/yapıştır, yeniden adlandır, sil, sürükle-bırak
+- **Play/Stop:** kopya sahnede, Edit modu durağan
+- **Girdi:** `FX::Input` (sorgu) + `FX::Event` (olay)
+- **Testler:** `FXTests` **51 test / 238 assertion**
 
 ### Şu an çalışan özellikler
 
@@ -139,6 +178,12 @@ edilmeli.
 | ~~Çoklu seçimde Inspector yalnızca birincili düzenliyor~~ | ✅ kapatıldı: değişen alan + component ekleme/silme tüm seçili entity'lere uygulanıyor (`ComponentDrawer`, `SceneHierarchyPanel`) |
 
 ### Düşük
+- **Türkçe/ASCII-dışı karakterli proje yolu açılmıyor** (2026-07-21'de
+  ölçüldü). `C:\...\Benim Oyunum\` (boşluklu ASCII) **çalışıyor**;
+  `C:\...\Benim Oyunum çğü\` **açılmıyor**, `.fxbuild` bile üretilmiyor.
+  Sebep büyük olasılıkla `main(int, char**)` ANSI `argv` + dar string
+  `std::filesystem::path` (Win32 A-API'leri). Çözüm: `wmain`/UTF-16 ya da
+  `SetConsoleCP`/manifest ile UTF-8. **Türkçe klasör adı kullanma.**
 - `Renderer2D` global durum (`s_Data` statik), batch bölme yolu hacky
 - `ContentBrowserPanel.cpp` ~1400 satır — bölünebilir (acil değil)
 - `GetRegistry()` çok açık — doğrudan `create`/`destroy` UUID haritasını bozar
@@ -158,10 +203,9 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 
 ```
 ✅ borç turu 0.1–0.7  ✅ 13a  ✅ 13b  ✅ 16a  ✅ 16b  ✅ A1  ✅ A2  ✅ A3  ✅ A4
-✅ B-1 (SHARED)  ✅ B-2 (Game.dll)  ✅ B-3 (DLL yükleme + EnTT)
-✅ B-6 (builtin temizlik)  ✅ B-4 (gölge kopya)  ✅ B-5 (Derle düğmesi)
-▶  A5 Undo/Redo
-   → C: C# kararı
+✅ Aşama B (B-1…B-6)  ✅ A5 Undo/Redo  ✅ Script alanları (OnReflect)
+▶  16c örnek oyun  →  18c sıralama katmanı  →  17 fizik  →  14/15 animasyon
+   → sonra C: C# kararı (aşağıdaki değerlendirmeye bak)
    → 16c → 14 → 15 → 18b → 17a-d → 18c → 19 → 23 → 18d
    → 13c → 13d → 20c → 20d
 ```
@@ -186,7 +230,62 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 
 ---
 
-## 5b. Aşama B TAMAMLANDI — sıradaki iş A5 (Undo/Redo)
+## 5b. YENİ OTURUMDA İLK İŞ
+
+Aşama A, Aşama B ve script alanları **bitti**. Sıradaki karar noktası
+aşağıda; önce bunu oku.
+
+### Aşama C (C#) değerlendirmesi — 2026-07-21
+
+K1'in ön koşulları (A + B) tamamlandı, yani karar noktası geldi.
+**Değerlendirme sonucu: şimdi C# yapılmamalı.** Gerekçeler:
+
+1. **C#'ın asıl gerekçesi ortadan kalktı.** K1 "asıl acı nokta dil değil
+   iterasyon hızı" diyordu; Aşama B onu çözdü (Derle → ~saniyeler).
+2. **Hangi API'lerin gerektiği henüz bilinmiyor.** K6'nın dediği gibi
+   örnek oyun (16c) yazılmadan eksikler görünmez. Doğrulanmamış bir API
+   yüzeyi için interop bağlaması yazmak, oyun yazılınca **iki kez**
+   yazmak demek.
+3. **Oyun yapmayı engelleyen şey dil değil:** fizik (17), animasyon
+   (14/15), ses (23), metin (19), sıralama katmanı (18c) yok. C# bunları
+   1–2 ay dondurur.
+
+C#'ın gerçek kazancı **crash güvenliği** (C++ script hatası editörü
+düşürür, C# sadece exception verir) ve reflection'ın bedava gelmesi.
+Bunlar gerçek ama şu an 1–2 ayı hak etmiyor.
+
+**Ara yol olarak Lua** düşünülebilir: entegrasyon gün mertebesinde,
+derleme adımı yok, script hatası çökertmez. Bedeli yine bağlama katmanı.
+
+**Karar: önce 16c örnek oyun yaz (C++), sonra dil kararını gerçek veriyle
+ver.**
+
+### Önerilen sıra
+
+1. **16c — küçük örnek oyun** (topla-kaç). Amaç: eksik API'leri çarparak
+   görmek. K6'nın beklediği ikinci tur eksikler burada çıkacak.
+2. **18c — sıralama katmanı.** Şu an aynı Z'deki sprite'ların sırası
+   **keyfî** (EnTT view sırası + `GL_LESS` eşitlikte ilk çizileni tutuyor).
+   Unity modeli: `SortingLayer` + `OrderInLayer` → çizmeden önce sırala →
+   sprite'larda **derinlik yazmayı kapat** (`glDepthMask(GL_FALSE)`).
+   Not: görünür Z aralığı `-1…+1`, dışı kırpılıyor.
+3. **17 fizik** → **14/15 animasyon** → **19/23 metin+ses**
+4. Sonra Aşama C'yi yeniden değerlendir.
+
+### Yarım kalan / bilinen sorunlar
+
+- **Türkçe karakterli proje yolu açılmıyor** (§4'te ayrıntı). Boşluk
+  sorun değil, ASCII-dışı karakter sorun.
+- **Undo yapısal işlemleri kapsamıyor:** entity sil/oluştur, component
+  ekle/sil. Alan düzenleme + gizmo kapsanıyor.
+- **Undo script alanlarını kapsamıyor** (A1 tablosunda değiller).
+- **`ScriptableEntity`'ye yeni sanal eklendi (vtable değişti):** eski
+  motorla derlenmiş `Game.dll` uyumsuz. Proje açtıktan sonra **bir kez
+  Derle** gerekiyor. Sürüm damgasıyla otomatik tespit yok.
+
+---
+
+## 5c. (Arşiv) Aşama B tamamlandı
 
 **Plan:** [Asama-B-Plan.md](Asama-B-Plan.md) · **yapılanlar:**
 [Faz-B-Notlar.md](Faz-B-Notlar.md).

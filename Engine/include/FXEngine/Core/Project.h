@@ -75,8 +75,11 @@ namespace FX
         // Aktif projeyi diske yazar.
         bool Save() const;
 
-        static const std::shared_ptr<Project>& GetActive() { return s_Active; }
-        static bool HasActive() { return s_Active != nullptr; }
+        // Govdeleri .cpp'de: s_Active bir VERI sembolu ve DLL sinirinda
+        // disa aktarilmiyor. Inline kalsalarsa Editor s_Active'i dogrudan
+        // okumaya calisir ve link kirilir.
+        static const std::shared_ptr<Project>& GetActive();
+        static bool HasActive();
 
         // Aktif projeyi kapatir ve FileSystem'i exe klasorune dondurur.
         static void CloseActive();

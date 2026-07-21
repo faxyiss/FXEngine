@@ -78,9 +78,20 @@ set(FXENGINE_HEADERS
     src/Scene/EntitySerialization.h
 )
 
-add_library(FXEngine STATIC
+add_library(FXEngine SHARED
     ${FXENGINE_SOURCES}
     ${FXENGINE_HEADERS})
+
+# SHARED olmasinin sebebi Asama B: oyun kodu ayri bir DLL'e tasinacak ve
+# motorun ScriptRegistry / ComponentMeta / FileSystem / Project / Renderer2D
+# durumlari surec genelinde TEK olmak zorunda. Statik kutuphanede exe ve
+# Game.dll bu durumlarin ayri kopyalarini tasirdi.
+#
+# WINDOWS_EXPORT_ALL_SYMBOLS: __declspec(dllexport) yazmadan tum fonksiyon
+# sembollerini disa aktarir. VERI sembollerini kapsamaz; motorun paylasilan
+# durumu zaten dosya kapsamli ve yalnizca fonksiyonlar uzerinden erisiliyor.
+set_target_properties(FXEngine PROPERTIES
+    WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 # Editor'un IDE'de duzgun agac gormesi icin (kozmetik ama isi kolaylastirir)
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES

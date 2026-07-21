@@ -33,6 +33,9 @@ namespace FX
         }
     }
 
+    const std::shared_ptr<Project>& Project::GetActive() { return s_Active; }
+    bool Project::HasActive() { return s_Active != nullptr; }
+
     void Project::SetActive(const std::shared_ptr<Project>& project)
     {
         s_Active = project;

@@ -6,7 +6,7 @@
 >
 > Mimarinin tamamı ve alınan yön kararları: **[02-Mimari.md](02-Mimari.md)**
 >
-> Son güncelleme: 2026-07-21 · Son commit: `34f27db`
+> Son güncelleme: 2026-07-21 · Aşama B **B-1 tamam**
 
 ---
 
@@ -26,8 +26,12 @@ build/      CMake çıktısı
 
 **Tek yönlü bağımlılık:** Engine → hiçbir şey, Editor → Engine.
 
-> Aşama B bu tabloyu değiştirecek: `FXEngine` **paylaşımlı** kütüphane
-> olacak (gerekçe: [Asama-B-Plan.md](Asama-B-Plan.md) §1).
+> **B-1 sonrası:** `FXEngine` artık **paylaşımlı** (`FXEngine.dll`).
+> Gerekçe [Asama-B-Plan.md](Asama-B-Plan.md) §1, uygulaması
+> [Faz-B-Notlar.md](Faz-B-Notlar.md). Pratik sonuç: motorun `static`
+> **veri**'sine header'daki bir gövdeden dokunma —
+> `WINDOWS_EXPORT_ALL_SYMBOLS` veri sembolü aktarmaz, link kırılır.
+> Erişimci `.cpp`'de tanımlanmalı.
 
 ---
 
@@ -47,7 +51,8 @@ MVP (Faz 0–7) ve şu fazlar tamam: **8, 9, 10, 11, 12, 21, 22**,
 | `e7e036d` | `EngineLogo` uygulama logosu (pencere ikonu + karşılama ekranı) |
 | `34d59da` · `c62dabe` | **A3** Project Settings + Preferences, ayrı "Ayarlar" menüsü |
 | `136d8bc` · `671915d` | **A4** Script dosyası oluşturma + otomatik kayıt |
-| `34f27db` | **Aşama B planı** yazıldı (henüz uygulanmadı) |
+| `34f27db` · `46da685` | **Aşama B planı** yazıldı ve onaylandı |
+| _bu oturum_ | **B-1** `FXEngine` → `SHARED`; `Project::GetActive/HasActive` `.cpp`'ye taşındı |
 
 ### Şu an çalışan özellikler
 
@@ -147,8 +152,9 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 
 ```
 ✅ borç turu 0.1–0.7  ✅ 13a  ✅ 13b  ✅ 16a  ✅ 16b  ✅ A1  ✅ A2  ✅ A3  ✅ A4
-▶  A5 Undo/Redo
-   → B: oyun DLL'i + hot reload
+✅ B-1 (FXEngine → SHARED)
+▶  B-2 → B-3 → B-4 → B-5 → B-6
+   → A5 Undo/Redo
    → C: C# kararı
    → 16c → 14 → 15 → 18b → 17a-d → 18c → 19 → 23 → 18d
    → 13c → 13d → 20c → 20d
@@ -174,10 +180,12 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 
 ---
 
-## 5b. YENİ OTURUMDA İLK İŞ: Aşama B — oyun DLL'i + hot reload
+## 5b. YENİ OTURUMDA İLK İŞ: Aşama B — **B-2'den devam**
 
-**Plan hazır ve onaylandı:** [Asama-B-Plan.md](Asama-B-Plan.md).
-Yeni oturumda önce onu oku, sonra B-1'den başla.
+**Plan:** [Asama-B-Plan.md](Asama-B-Plan.md) · **yapılanlar:**
+[Faz-B-Notlar.md](Faz-B-Notlar.md). B-1 bitti (motor artık DLL, 51 test
+yeşil). Sıradaki: **B-2** — boş bir `Game.dll` hedefi + `<proje>/assets/
+scripts/` tarama.
 
 **Neden A5'ten önce:** kullanıcı her script değişikliğinde editörü
 yeniden derleyip yeniden başlatmak zorunda; bu her gün acıtıyor.

@@ -454,12 +454,23 @@ Sonra:    16c → 14 → 15 → 18b → 17a-d → 18c → 19 → 23 → 18d
 
 ## Aşama B — İterasyon hızı
 
-- [ ] Oyun kodunu ayrı DLL'e alma + hot reload (C++ kalır, script
-      değişimi ~5 sn). **Planı yazıldı ve onaylandı:**
-      [Asama-B-Plan.md](Asama-B-Plan.md). A5'ten ÖNCE yapılacak —
-      iterasyon hızı her gün acıtıyor, Undo ara sıra.
-      İlk ve en riskli adım: `FXEngine` statikten `SHARED`'e geçmeli,
-      yoksa exe ve DLL motor durumunun ayrı kopyalarını taşır.
+Oyun kodunu ayrı DLL'e alma + hot reload (C++ kalır, script değişimi
+~5 sn). Plan: [Asama-B-Plan.md](Asama-B-Plan.md) · uygulama notları:
+[Faz-B-Notlar.md](Faz-B-Notlar.md). A5'ten ÖNCE yapılıyor — iterasyon
+hızı her gün acıtıyor, Undo ara sıra.
+
+- [x] **B-1 — `FXEngine` → `SHARED`.** En riskli adım geçildi.
+      `WINDOWS_EXPORT_ALL_SYMBOLS` veri sembolü aktarmadığı için tek yer
+      kırıldı: `Project::GetActive/HasActive` header'da inline'dı ve
+      `s_Active`'e doğrudan başvuruyordu → gövdeleri `.cpp`'ye taşındı.
+      Diğer paylaşılan durumlar zaten `.cpp` kapsamlıydı. **51 test yeşil,
+      davranış değişikliği sıfır.**
+- [ ] **B-2** — boş `Game.dll` hedefi + `<proje>/assets/scripts/` tarama
+- [ ] **B-3** — `FXRegisterScripts()` dışa aktarımı; ilk iş EnTT tip
+      kimliğini DLL sınırında ölçmek
+- [ ] **B-4** — gölge kopya + `FreeLibrary`/`LoadLibrary` döngüsü
+- [ ] **B-5** — editörden "Derle" düğmesi, çıktı bir konsol panelinde
+- [ ] **B-6** — Play koruması + otomatik Stop
 
 ## Aşama C — Script dili
 

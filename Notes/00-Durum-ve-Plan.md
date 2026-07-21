@@ -139,9 +139,13 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 ### Güncel sıra
 
 ```
-0.1 ✅ → 0.4 → 0.2 → 0.3 → 0.5
-      → 13a-d → 16a-c → 0.6
-      → 14 → 15 → 17a-d → 18b-d → 19 → 23 → 20a-d
+✅ borç turu 0.1–0.6  ✅ 13a  ✅ 13b  ✅ 16a  ✅ 16b
+▶  A1 component meta → A2 Game View → A3 Settings
+   → A4 script dosyası → A5 Undo/Redo
+   → B: oyun DLL'i + hot reload
+   → C: C# kararı
+   → 16c → 14 → 15 → 18b → 17a-d → 18c → 19 → 23 → 18d
+   → 13c → 13d → 20c → 20d
 ```
 
 ### Borç turu (0.x)
@@ -159,11 +163,64 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 önüne alındı, C# scripting ertelendi. Gerekçeler ve mimarinin tamamı:
 **[02-Mimari.md](02-Mimari.md)** — yeni bir şey eklemeden önce oku.
 
-**Sıradaki: A1 — component meta-veri sistemi.** Her component tek yerde
-tanımlanacak (ad, alan listesi, serileştirme, Inspector çizimi). Bu tek
-iş, Inspector'ı, script alanlarını, çok hedefli düzenlemeyi ve Undo'yu
-birden ucuzlatıyor; ileride C# köprüsünün dayanacağı yapı da bu.
 13c/13d ertelendi, gerekçesi [Faz-13-Notlar.md](Faz-13-Notlar.md)'de.
+
+---
+
+## 5b. YENİ OTURUMDA İLK İŞ: A1 — component meta-veri sistemi
+
+**Sorun:** Bugün yeni bir component eklemek **dört yere** dokunmayı
+gerektiriyor ve biri unutulduğunda hata *sessiz* oluyor:
+
+| Yer | Unutulursa |
+|---|---|
+| `Components.h` — struct | — |
+| `AllComponents` listesi | "Play'e geçince component kayboldu" |
+| `EntitySerialization.cpp` | "Kaydedip açınca ayar gitti" |
+| `SceneHierarchyPanel.cpp` — Inspector bloğu | Component görünmez |
+
+**Hedef:** Her component **tek bir yerde** tanımlansın: adı, alan listesi
+(ad / tip / görünen etiket / aralık), serileştirmesi, Inspector çizimi.
+Yöntem: elle yazılan kayıt + alan listesi (makro sihri yok, harici
+reflection kütüphanesi yok — karar K2, `02-Mimari.md`).
+
+### Önerilen adımlar
+
+1. **Alan tipi kümesini belirle:** `bool`, `int`, `float`, `vec2`, `vec3`,
+   `string`, `color`, `AssetHandle`, `EntityRef`. Bugün kullanılan her
+   component alanı bu kümeye sığmalı.
+2. **`ComponentRegistry`** — `Register<T>("SpriteRenderer", alanlar…)`.
+   Alan tanımı: etiket + üye işaretçisi (`&T::Field`) + isteğe bağlı
+   min/max/adım.
+3. **Serileştirmeyi tablodan üret** — `EntitySerialization`'ın elle
+   yazılmış blokları yerine tablo üzerinden döngü. *Uyum şart:* üretilen
+   JSON mevcut sahne dosyalarıyla birebir aynı olmalı, yoksa sürüm 5
+   gerekir. Önce testle doğrula.
+4. **Inspector'ı tablodan çiz** — tip başına tek çizim fonksiyonu.
+   Özel durumlar (doku slotu, kamera "Primary" mantığı) tabloya
+   "özel çizici" olarak bağlanabilir.
+5. **Script alanlarını aç** — `ScriptableEntity` türevleri de alan
+   bildirebilsin (`m_Speed` artık koda gömülü değil, Inspector'dan
+   ayarlanır ve sahneye kaydedilir).
+6. **Geçiş kademeli olsun:** önce iki basit component (`Velocity`,
+   `Camera`) tabloya taşınıp eski yol yanında dursun; testler yeşilse
+   kalanlar taşınsın, sonra eski kod silinsin.
+
+### Dikkat
+
+- **Sahne dosyası formatı kırılmamalı.** 41 birim testi bunu koruyor;
+  A1 sırasında `SceneSerializer` testleri kırmızı yanarsa dur.
+- **`AllComponents` (Scene::Copy) da tablodan beslenmeli** — yoksa yine
+  iki yerde iki liste olur.
+- **Alan işaretçileri C# köprüsünün dayanacağı yapı** (karar K1); tabloyu
+  tasarlarken "bunu bir gün dil sınırından geçirebilir miyim?" diye sor.
+
+### A1'den sonra sırayla
+
+**A2 Game View** (ayrı pencere, sahne kamerası, gizmo/ızgara yalnız Scene
+View'da) → **A3 Settings** (`ProjectSettings/` vs `editor.json` ayrımı) →
+**A4 script dosyası + şablon** → **A5 Undo/Redo** (A1'in alan tablosu
+sayesinde generic "alanı değiştir" komutu).
 
 ### Bölünmüş fazlar
 

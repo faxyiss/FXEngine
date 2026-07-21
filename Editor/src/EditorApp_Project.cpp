@@ -56,18 +56,22 @@ namespace FXEd
     }
 
     // -----------------------------------------------------------------------
-    // Script dosyasi olusturma (A4)
+    // Script dosyasi olusturma (A4, B-6'da projeye tasindi)
     // -----------------------------------------------------------------------
-    // Script'ler PROJENIN icine degil Editor/src/Scripts/ altina yaziliyor:
-    // exe'ye derlenen tek yer orasi. Projenin assets/ klasorune bir sablon
-    // koysaydik hicbir zaman calismayacak bir dosya uretmis olurduk -
-    // tam olarak bu projenin yasakladigi sessiz yanlislik.
+    // Script'ler artik PROJENIN icine yaziliyor: <proje>/assets/scripts/.
+    // B-6'ya kadar Editor/src/Scripts/ altindaydilar (editore derleniyordu);
+    // artik oyun kodu Game.dll'e ait, editore degil. Namespace de bu yuzden
+    // FXEd degil FXGame - kod editore degil oyuna ait.
     //
     // Dosya adi = sinif adi = sahne dosyasina yazilan ad. Uc kimligi
     // ayirmak, uctan birini degistirince digerlerini bozmak demekti.
     bool EditorApp::CreateScriptFile(const std::string& name, std::string& outPath)
     {
-        const std::filesystem::path dir{ FX_EDITOR_SCRIPTS_DIR };
+        const std::string scriptsDir = GameProject::ScriptsDir();
+        if (scriptsDir.empty())
+            return false;   // acik proje yok
+
+        const std::filesystem::path dir{ scriptsDir };
 
         std::error_code ec;
         std::filesystem::create_directories(dir, ec);
@@ -93,10 +97,10 @@ namespace FXEd
 #include <FXEngine/Core/Input.h>
 #include <FXEngine/Core/Log.h>
 
-namespace FXEd
+namespace FXGame
 {
     // SINIF ADI DOSYA ADIYLA AYNI OLMALI: kayit CMake tarafindan buna
-    // gore uretiliyor (bkz. Scripts/ScriptRegistrations.h.in).
+    // gore uretiliyor (bkz. .fxbuild/GameRegistrations.h.in).
     class %NAME% : public FX::ScriptableEntity
     {
     protected:

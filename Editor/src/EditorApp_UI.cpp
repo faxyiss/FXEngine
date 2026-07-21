@@ -768,8 +768,20 @@ namespace FXEd
                                     ImGuiWindowFlags_AlwaysAutoResize))
             return;
 
-        ImGui::TextDisabled("Editor/src/Scripts/ altina bir sablon yazilir.");
+        ImGui::TextDisabled("<proje>/assets/scripts/ altina bir sablon yazilir.");
         ImGui::Separator();
+
+        // Script'ler artik projeye ait (B-6). Proje yoksa yazacak yer yok.
+        if (!FX::Project::HasActive())
+        {
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f),
+                               "Once bir proje ac: script'ler projeye yazilir.");
+            ImGui::Separator();
+            if (ImGui::Button("Kapat", ImVec2(120.0f, 0.0f)))
+                ImGui::CloseCurrentPopup();
+            ImGui::EndPopup();
+            return;
+        }
 
         ImGui::Text("Ad");
         ImGui::SameLine(60.0f);
@@ -820,8 +832,8 @@ namespace FXEd
 
         // Dogru bilgi, sonradan sikayet degil: derleme sarti bastan yazili.
         ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.35f, 1.0f),
-                           "Script'in calismasi icin editoru YENIDEN DERLE.");
-        ImGui::TextDisabled("Kayit otomatik; CMake klasoru tariyor.");
+                           "Script'in calismasi icin oyunu (Game.dll) DERLE.");
+        ImGui::TextDisabled("Kayit otomatik; CMake assets/scripts/ tariyor.");
 
         ImGui::Separator();
 
@@ -831,7 +843,7 @@ namespace FXEd
             std::string path;
             if (CreateScriptFile(name, path))
             {
-                SetStatus("Script olusturuldu: " + name + ".h (yeniden derle)");
+                SetStatus("Script olusturuldu: " + name + ".h (oyunu derle)");
                 FX_INFO("Script olusturuldu: %s", path.c_str());
                 FileDialogs::OpenExternally(path);
             }

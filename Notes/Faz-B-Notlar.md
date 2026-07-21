@@ -295,7 +295,60 @@ Temiz bir geçici proje (scratchpad/BTest, tek `Spin.h`) üzerinde:
 
 ---
 
-## B-6 — (sırada) Editör builtin script'leri projeye taşınır
+## B-6 — Editör builtin script'leri kaldırıldı (2026-07-21) ✅
 
-`Editor/src/Scripts/` boşaltılacak, `RegisterEditorScripts` kaldırılacak,
-A4'ün "Yeni Script"i `<proje>/assets/scripts/`'e yazacak.
+> Not: plan B-6'yı "Play koruması + otomatik Stop" olarak numaralandırıyor;
+> o iş **B-4 (gölge kopya) ile birlikte** yapılacak, çünkü ikisi de
+> "açıkken yeniden yükleme" senaryosuna ait. Bu adım planın §B6
+> "yerleşik script'ler örnek projeye taşınır" kararı.
+
+### Yapılan
+
+`Editor/src/Scripts/` **tamamen kaldırıldı** (Spin, Move, Jump ve A4
+testinden kalan asd/asddsa). Onunla birlikte:
+
+- `RegisterEditorScripts()` çağrısı ve `<ScriptRegistrations.h>` include'u
+  `EditorApp.cpp`'den çıktı.
+- A4'ün CMake kayıt üreteci ve `FX_EDITOR_SCRIPTS_DIR` `Editor/CMakeLists.txt`'ten
+  çıktı. (Bu mekanizmanın kendisi silinmedi — B-2'de `.fxbuild/`'e taşınmıştı.)
+- "Yeni Script" artık `<proje>/assets/scripts/<Ad>.h` yazıyor, namespace
+  `FXGame`, ve **açık proje yoksa engelliyor** (script'in yazılacağı yer yok).
+  Modal metni "editörü yeniden derle" yerine "oyunu (Game.dll) derle" diyor.
+
+### Sonuç: editör artık hiç oyun kodu taşımıyor
+
+Motor editörü bilmez (§7), editör de artık oyun kodunu bilmez. Üç katman
+net ayrıldı: **motor → editör → oyun (DLL)**. Kavramsal olarak §B6'nın
+savunduğu şey buydu.
+
+### Kabul edilen sonuç: projesiz modda script yok
+
+Karşılama ekranındaki "projesiz devam et" ile açılan örnek sahnede
+`NativeScriptComponent` seçenekleri boş. Doğrulandı: projesiz açılışta
+hiç script kaydı yok. Plan bunu bilerek kabul etmişti — o mod geçici bir
+kolaylık.
+
+### Doğrulama
+
+| Ne | Sonuç |
+|---|---|
+| Derleme (Scripts/ ve üreteç olmadan) | ✅ temiz |
+| `FXTests` | ✅ 51 / 238 |
+| Projesiz açılış | ✅ açılıyor, **0 script** |
+| BTest projesi | ✅ Game.dll yüklendi, self-test geçti, `Spin` kayıtlı |
+
+### Not
+
+`build/Editor/generated/ScriptRegistrations.h` eski bir üretim artığı
+olarak build ağacında kalmış olabilir; artık hiçbir yerden include
+edilmediği için zararsız, temiz derlemede zaten üretilmiyor.
+
+---
+
+## Kalan: B-4 + B-5 (açıkken yeniden yükleme)
+
+- **B-4** — gölge kopya (`Game.dll` → `Game.loaded.dll`) + "Yeniden Yükle":
+  editör açıkken DLL kilidini aşıp yeni derlemeyi almak.
+- **B-5** — editörden "Derle" düğmesi (`cmake --build`), çıktı bir konsol
+  panelinde; **Play sırasında Derle → önce Stop** koruması burada.
+  FXTest2'nin bozuk `Spin.h`'ı bu adımın hata-raporlama testi.

@@ -479,9 +479,13 @@ hızı her gün acıtıyor, Undo ara sıra.
       (`LoadLibrary`/`FreeLibrary`) proje açılışında `Game.dll`'i yüklüyor,
       script'leri kaydediyor. Boşaltma sahnelerden sonra (sarkan vtable
       koruması). DLL doğrudan yükleniyor (gölge kopya B-4).
-- [ ] **B-4** — gölge kopya + `FreeLibrary`/`LoadLibrary` döngüsü
-- [ ] **B-5** — editörden "Derle" düğmesi, çıktı bir konsol panelinde
-- [ ] **B-6** — Play koruması + otomatik Stop
+- [x] **B-6 — Editör builtin script'leri kaldırıldı.** `Editor/src/Scripts/`
+      tamamen silindi, `RegisterEditorScripts` gitti, "Yeni Script" artık
+      `<proje>/assets/scripts/` (namespace `FXGame`, proje yoksa engelli).
+      Katmanlar net: motor → editör → oyun (DLL). Projesiz modda script yok
+      (kabul). (Not: planın "Play koruması" B-6'sı B-4/B-5 ile birleşti.)
+- [ ] **B-4** — gölge kopya + `FreeLibrary`/`LoadLibrary` döngüsü (Yeniden Yükle)
+- [ ] **B-5** — editörden "Derle" düğmesi + konsol paneli + Play koruması
 
 ## Aşama C — Script dili
 

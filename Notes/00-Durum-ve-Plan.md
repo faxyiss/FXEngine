@@ -54,7 +54,8 @@ MVP (Faz 0–7) ve şu fazlar tamam: **8, 9, 10, 11, 12, 21, 22**,
 | `34f27db` · `46da685` | **Aşama B planı** yazıldı ve onaylandı |
 | `cdabcde` | **B-1** `FXEngine` → `SHARED`; `Project::GetActive/HasActive` `.cpp`'ye taşındı |
 | `5673bd0` | **B-2** `<proje>/.fxbuild/` iskelesi + `Game.dll` + `FXEngineConfig-<Config>.cmake` |
-| _bu oturum_ | **B-3** `GameLibrary` DLL yükleme + `FXEngineSelfTest` (EnTT sınır ölçümü GEÇTİ) |
+| `867b414` | **B-3** `GameLibrary` DLL yükleme + `FXEngineSelfTest` (EnTT sınır ölçümü GEÇTİ) |
+| _bu oturum_ | **B-6** `Editor/src/Scripts/` kaldırıldı, "Yeni Script" projeye yazıyor |
 
 ### Şu an çalışan özellikler
 
@@ -154,8 +155,8 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 
 ```
 ✅ borç turu 0.1–0.7  ✅ 13a  ✅ 13b  ✅ 16a  ✅ 16b  ✅ A1  ✅ A2  ✅ A3  ✅ A4
-✅ B-1 (SHARED)  ✅ B-2 (Game.dll hedefi)  ✅ B-3 (DLL yükleme + EnTT ölçümü)
-▶  B-6 (builtin script'leri taşı) → B-4 (gölge kopya) → B-5 (Derle düğmesi)
+✅ B-1 (SHARED)  ✅ B-2 (Game.dll)  ✅ B-3 (DLL yükleme + EnTT)  ✅ B-6 (builtin temizlik)
+▶  B-4 (gölge kopya + Yeniden Yükle) → B-5 (Derle düğmesi + Play koruması)
    → A5 Undo/Redo
    → C: C# kararı
    → 16c → 14 → 15 → 18b → 17a-d → 18c → 19 → 23 → 18d
@@ -191,14 +192,16 @@ B-1 ✅ motor artık `FXEngine.dll` · B-2 ✅ her proje kendi `Game.dll`'ini
 derliyor (`<proje>/.fxbuild/` iskelesi editör tarafından üretiliyor,
 `assets/scripts/*.h` taranıyor, `FXRegisterScripts` dışa aktarılıyor).
 
-B-3 ✅ editör `Game.dll`'i yüklüyor, `FXEngineSelfTest` gidiş-dönüşü ile
-EnTT tip kimliğinin DLL sınırında tuttuğu ÖLÇÜLDÜ ve geçti — Aşama B'nin
-en ciddi riski kalktı.
+B-3 ✅ EnTT tip kimliği DLL sınırında ölçüldü ve geçti — en ciddi risk
+kalktı. B-6 ✅ editör artık hiç oyun kodu taşımıyor (motor → editör → oyun
+DLL). "Yeni Script" projeye yazıyor.
 
-**Sıradaki B-6:** editörün builtin `Spin`/`Move` script'leri kaldırılacak
-(`Editor/src/Scripts/` boşalacak, `RegisterEditorScripts` gidecek), A4'ün
-"Yeni Script"i `<proje>/assets/scripts/`'e yazacak. Sonra B-4 (gölge kopya
-ile açıkken yeniden yükleme) → B-5 (editörden Derle düğmesi).
+**Sıradaki B-4 + B-5 (açıkken yeniden yükleme):**
+- **B-4** — gölge kopya (`Game.dll` → `Game.loaded.dll`) + "Yeniden Yükle":
+  editör açıkken DLL kilidini aşıp yeni derlemeyi almak.
+- **B-5** — editörden "Derle" düğmesi (`cmake --build`), çıktı konsol
+  panelinde; **Play sırasında Derle → önce Stop** koruması. FXTest2'nin
+  bozuk `Spin.h`'ı bu adımın hata-raporlama testi.
 
 **Neden A5'ten önce:** kullanıcı her script değişikliğinde editörü
 yeniden derleyip yeniden başlatmak zorunda; bu her gün acıtıyor.

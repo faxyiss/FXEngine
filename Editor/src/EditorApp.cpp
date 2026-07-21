@@ -1,7 +1,6 @@
 #include "EditorApp.h"
 #include "Platform/FileDialogs.h"
 #include "Panels/ComponentDrawer.h"
-#include <ScriptRegistrations.h>   // uretiliyor - bkz. Editor/CMakeLists.txt
 
 #include <FXEngine/Core/Log.h>
 #include <FXEngine/Core/FileSystem.h>
@@ -65,9 +64,9 @@ namespace FXEd
         };
         m_GameFramebuffer = std::make_unique<FX::Framebuffer>(gameSpec);
 
-        // Script'ler her seyden once kayitli olmali: sahne yuklemesi
-        // (StartScene) adlari cozmeye calisacak.
-        RegisterEditorScripts();
+        // Script'ler artik editore degil projeye ait (B-6): açılışta
+        // yerlesik kayit YOK. Bir proje acilinca Game.dll yuklenip
+        // script'lerini kaydediyor (LoadGameLibrary).
 
         m_HierarchyPanel.SetSelection(&m_Selection);
         m_ContentBrowser.SetContext(&m_TextureLibrary);

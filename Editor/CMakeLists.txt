@@ -33,43 +33,14 @@ add_executable(FXEditor
     src/Platform/FileDialogs.h)
 
 # ---------------------------------------------------------------------------
-# Script kayitlari (A4)
+# Oyun kodu artik editore derlenMIYOR (B-6)
 # ---------------------------------------------------------------------------
-# Scripts/ altindaki her <Ad>.h icin bir include ve bir Register satiri
-# uretiliyor. Elle yazsaydik yeni bir script yazan kisi kayit satirini
-# unutabilirdi ve hata SESSIZ olurdu: script Inspector listesinde hic
-# gorunmezdi.
-#
-# CONFIGURE_DEPENDS: yeni bir dosya eklendiginde derleme sirasinda
-# yeniden taraniyor. GLOB'un normalde tehlikeli olmasinin sebebi
-# (yeni dosyayi fark etmemesi) boylece ortadan kalkiyor.
-file(GLOB FXEDITOR_SCRIPT_HEADERS CONFIGURE_DEPENDS
-     "${CMAKE_CURRENT_SOURCE_DIR}/src/Scripts/*.h")
-
-set(FX_SCRIPT_INCLUDES "")
-set(FX_SCRIPT_REGISTRATIONS "")
-
-foreach(script_header ${FXEDITOR_SCRIPT_HEADERS})
-    get_filename_component(script_name ${script_header} NAME_WE)
-    string(APPEND FX_SCRIPT_INCLUDES "#include \"Scripts/${script_name}.h\"
-")
-    string(APPEND FX_SCRIPT_REGISTRATIONS
-           "        FX::ScriptRegistry::Register<FXEd::${script_name}>(\"${script_name}\");
-")
-endforeach()
-
-configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/Scripts/ScriptRegistrations.h.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/generated/ScriptRegistrations.h"
-    @ONLY)
-
-target_sources(FXEditor PRIVATE ${FXEDITOR_SCRIPT_HEADERS})
-
-# "Yeni Script" bu klasore yaziyor. KAYNAK agacindaki yol - uretilen
-# dosyanin derlenebilmesi icin kaynakta durmasi gerekiyor.
+# A4'te script'ler Editor/src/Scripts/ altina yazilip editore derleniyordu.
+# B'de oyun kodu ayri bir Game.dll'e tasindi; kayit ureteci de projedeki
+# .fxbuild/ iskelesine gecti (bkz. GameProject.cpp). Editor artik hic
+# yerlesik script tasimaz.
 target_compile_definitions(FXEditor PRIVATE
-    FX_EDITOR_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/src/Scripts"
-    # B-2: oyun projesi motoru buradan buluyor. Editor gelistirme
+    # Oyun projesi motoru buradan buluyor (B-2). Editor gelistirme
     # zamaninda calisiyor ve zaten derleyici sart kosuyor; kurulu bir
     # dagitimda bunun yerine install agaci gecer.
     FX_ENGINE_BUILD_DIR="${CMAKE_BINARY_DIR}"

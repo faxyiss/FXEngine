@@ -18,6 +18,7 @@
 
 #include "FXEngine/Asset/Asset.h"
 
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -37,6 +38,22 @@ namespace FX
         // degistirmek projeyi bozmasin. Yol tabanliyken .fxproject'i elle
         // duzeltmek gerekiyordu.
         AssetHandle StartScene{ 0 };
+
+        // Oyunun tasarlandigi cozunurluk (surum 3). Game View bunun
+        // EN-BOY ORANINI kullanir; piksel sayisi degil oran onemli -
+        // gercek pencere her boyutta olabilir.
+        //
+        // Projeye ait cunku "bu oyun 16:9 tasarlandi" projenin bir
+        // karari; kullanicinin makinesine gore degismez.
+        std::uint32_t TargetWidth  = 1920;
+        std::uint32_t TargetHeight = 1080;
+
+        float TargetAspect() const
+        {
+            return (TargetHeight > 0)
+                 ? static_cast<float>(TargetWidth) / static_cast<float>(TargetHeight)
+                 : 1.0f;
+        }
     };
 
     class Project

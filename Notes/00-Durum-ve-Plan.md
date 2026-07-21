@@ -139,8 +139,8 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 ### Güncel sıra
 
 ```
-✅ borç turu 0.1–0.7  ✅ 13a  ✅ 13b  ✅ 16a  ✅ 16b  ✅ A1  ✅ A2
-▶  A3 Settings
+✅ borç turu 0.1–0.7  ✅ 13a  ✅ 13b  ✅ 16a  ✅ 16b  ✅ A1  ✅ A2  ✅ A3
+▶  A4 script dosyası
    → A4 script dosyası → A5 Undo/Redo
    → B: oyun DLL'i + hot reload
    → C: C# kararı
@@ -168,36 +168,27 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 
 ---
 
-## 5b. YENİ OTURUMDA İLK İŞ: A3 — Project Settings + Preferences
+## 5b. YENİ OTURUMDA İLK İŞ: A4 — script dosyası oluşturma + şablon
 
-**A1 ve A2 tamam** (2026-07-21) — [Faz-A1-Notlar.md](Faz-A1-Notlar.md),
-[Faz-A2-Notlar.md](Faz-A2-Notlar.md).
+**A1, A2, A3 tamam** (2026-07-21) — [Faz-A1-Notlar.md](Faz-A1-Notlar.md),
+[Faz-A2-Notlar.md](Faz-A2-Notlar.md), [Faz-A3-Notlar.md](Faz-A3-Notlar.md).
 
-**Sorun (A3):** Ayarlar üç yere dağılmış: `.fxproject`, `editor.json` ve
-koda gömülü sabitler. Yanlış tarafa konan ayar takım çalışmasında ya
-sürekli çakışır ya kaybolur.
+**Hedef (A4):** İçerik panelinde sağ tık → "Yeni Script" → şablon üret →
+sistem editöründe aç.
 
-| | Project Settings | Preferences |
-|---|---|---|
-| Kime ait | **Projeye** | **Kullanıcıya/makineye** |
-| Sürüm kontrolü | Girer | Girmez |
-| Nerede | `ProjectSettings/*.json` | `editor.json` / `%APPDATA%` |
-| İçerik | Başlangıç sahnesi, hedef çözünürlük, fizik, sıralama katmanları | Tema, kısayollar, kamera hızı, snap varsayılanları |
+**Dürüst sınır (karar K5):** C++'ta yeni bir script'in derlenmesi motorun
+yeniden derlenmesini gerektiriyor ve `RegisterEditorScripts()`'e elle
+eklenmesi lazım ([SpinScript.h](../Editor/src/Scripts/SpinScript.h)).
+A4 dosyayı ve şablonu üretir; iterasyon hızı sorununu **Aşama B** (oyun
+DLL'i + hot reload) çözer.
 
-**A2'nin bıraktığı ilk müşteri:** Game View şu an **serbest en-boy
-oranında** çiziyor. Hedef çözünürlük (`1920x1080` gibi) Project
-Settings'e girince Game View sabit orana geçebilir ve kenarlara siyah
-bant koyar.
+**Kararlaştırılacak:** Script'ler nereye yazılsın — `Editor/src/Scripts/`
+(bugünkü yer, motorla birlikte derlenir) yoksa projenin içine
+(`<proje>/scripts/`, Aşama B'nin DLL'ine hazırlık)? İkincisi A4'ü Aşama
+B'ye bağlar ama doğru yer orası.
 
-**Bugün nerede duruyorlar:**
-- `.fxproject` (sürüm 2): ad, varlık klasörü, `StartScene` GUID
-- `editor.json`: son sahneler, son projeler, içerik paneli görünümü
-- Koda gömülü: snap değerleri (`m_SnapTranslate` vb.), kamera hızı,
-  ızgara varsayılanı — hepsi `EditorApp.h`'de
-
-**Nereye dokunulacak:** yeni `ProjectSettings` sınıfı (`Engine/Core/`),
-`EditorApp_Project.cpp` (yükleme/kaydetme), yeni bir ayarlar penceresi
-(`EditorApp_UI.cpp`).
+**Nereye dokunulacak:** `ContentBrowserPanel` (sağ tık menüsü + şablon
+yazma), `FileDialogs` veya `ShellExecute` (sistem editöründe açma).
 
 ### A1'den sonra sırayla
 

@@ -270,6 +270,8 @@ namespace FXEd
         DrawScenePanel();
         DrawGamePanel();
         DrawStatsPanel();
+        DrawProjectSettingsWindow();
+        DrawPreferencesWindow();
         m_HierarchyPanel.OnImGuiRender();
         m_ContentBrowser.OnImGuiRender();
 

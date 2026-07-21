@@ -433,9 +433,14 @@ Sonra:    16c → 14 → 15 → 18b → 17a-d → 18c → 19 → 23 → 18d
       editör kamerasına düşmek yerine görünür uyarı. Serbest en-boy
       oranı; hedef çözünürlük A3'e bırakıldı.
       Ayrıntı: [Faz-A2-Notlar.md](Faz-A2-Notlar.md)
-- [ ] **A3 — Project Settings + Preferences.** Projeye ait ayarlar
-      (`ProjectSettings/`) ile kullanıcıya ait ayarlar (`editor.json`)
-      ayrılır.
+- [x] **A3 — Project Settings + Preferences.** Koda gömülü 8 tercih
+      (snap ×4, ızgara, kamera çerçeveleri, gizmo modu, kamera hızı)
+      artık `editor.json`'a kaydediliyor. `.fxproject` sürüm 3:
+      `TargetResolution`. İki ayrı ayar penceresi. Game View serbest ↔
+      hedef orana kilitli (siyah bant). Ayrı `ProjectSettings/` klasörü
+      **açılmadı** — `.fxproject` zaten o rolde ve tek ayar için yeni
+      dosya şeması gereksizdi; Faz 17/18c'de yeniden bakılacak.
+      Ayrıntı: [Faz-A3-Notlar.md](Faz-A3-Notlar.md)
 - [ ] **A4 — Script dosyası oluşturma + şablon.** İçerik panelinden
       "Yeni Script" → şablon → sistem editöründe aç.
 - [ ] **A5 — Undo/Redo** (eski 20a + 20b). A1'den sonra çok ucuzlar.

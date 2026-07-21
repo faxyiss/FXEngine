@@ -132,8 +132,11 @@ namespace FXEd
             ? camEntity.GetComponent<FX::WorldTransformComponent>().Matrix
             : camEntity.GetComponent<FX::TransformComponent>().GetTransform();
 
-        // En-boy orani PANELDEN geliyor, sahneden degil: ayni sahne
-        // farkli pencere boyutlarinda acilabilir (bkz. CameraComponent).
+        // En-boy orani CIZIM YUZEYINDEN geliyor, sahneden degil: ayni
+        // sahne farkli pencere boyutlarinda acilabilir (bkz.
+        // CameraComponent). Yuzeyin boyutuna DrawGamePanel karar veriyor;
+        // oran kilitliyken panele degil hedef orana gore hesapliyor,
+        // artan yer siyah bant olarak kaliyor.
         const float aspect = m_GameViewportSize.x / m_GameViewportSize.y;
 
         FX::OrthographicCamera camera{ -1.0f, 1.0f, -1.0f, 1.0f };

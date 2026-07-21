@@ -59,6 +59,11 @@ namespace FXEd
         const glm::vec3& GetPosition() const { return m_Position; }
 
         float GetZoom() const { return m_ZoomLevel; }
+
+        // Klavye ile kaydirma hizi. Kullanici tercihi - editor.json'a yazilir.
+        float GetMoveSpeed() const { return m_MoveSpeed; }
+        void  SetMoveSpeed(float speed) { m_MoveSpeed = speed; }
+
         void  SetZoom(float zoom);
 
         // Kaydirma su an suruyor mu? EditorApp secim yaparken buna bakiyor.

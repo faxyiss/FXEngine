@@ -181,6 +181,12 @@ namespace FXEd
                 }
                 if (ImGui::MenuItem("Panel Duzenini Sifirla"))
                     m_ImGuiLayer.ResetLayout();
+
+                ImGui::Separator();
+                ImGui::MenuItem("Proje Ayarlari", nullptr, &m_ShowProjectSettings,
+                                FX::Project::HasActive());
+                ImGui::MenuItem("Tercihler", nullptr, &m_ShowPreferences);
+                ImGui::Separator();
                 ImGui::MenuItem("ImGui Demo", nullptr, &m_ShowDemoWindow);
                 ImGui::EndMenu();
             }
@@ -358,22 +364,38 @@ namespace FXEd
         }
 
         ImGui::Begin("Game");
+        ImGui::PopStyleVar();
 
-        const ImVec2 panelSize = ImGui::GetContentRegionAvail();
+        DrawGameViewToolbar();
 
-        // Sadece kaydediyoruz; yeniden boyutlandirma RenderGameView'de,
-        // ImGui cercevesi acilmadan once (bkz. DrawScenePanel).
-        if (panelSize.x > 0.0f && panelSize.y > 0.0f)
-            m_GameViewportSize = { panelSize.x, panelSize.y };
+        const ImVec2 origin = ImGui::GetCursorScreenPos();
+        const ImVec2 avail  = ImGui::GetContentRegionAvail();
 
-        if (m_Scene->GetPrimaryCameraEntity())
+        if (avail.x <= 0.0f || avail.y <= 0.0f)
         {
-            // UV'ler ters: OpenGL sol-alt kokenli, ImGui sol-ust bekler.
-            const auto texID =
-                static_cast<ImTextureID>(m_GameFramebuffer->GetColorAttachmentID(0));
-            ImGui::Image(texID, panelSize, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
+            ImGui::End();
+            return;
         }
-        else
+
+        // --- Cizim yuzeyinin boyutu ------------------------------------
+        // Serbest modda panelin tamami. Kilitli modda hedef orani panele
+        // SIGDIRIYORUZ (kirpmiyoruz): artan yer siyah bant kaliyor.
+        // Goruntuyu panele yayip kamerayi kilitlemek esneme uretirdi.
+        ImVec2 surface = avail;
+
+        if (m_GameViewLocked && FX::Project::HasActive())
+        {
+            const float target = FX::Project::GetActive()->GetConfig().TargetAspect();
+
+            if (avail.x / avail.y > target)
+                surface.x = avail.y * target;   // panel genis -> yanlarda bant
+            else
+                surface.y = avail.x / target;   // panel dar   -> altta/ustte bant
+        }
+
+        m_GameViewportSize = { surface.x, surface.y };
+
+        if (!m_Scene->GetPrimaryCameraEntity())
         {
             // Sessizce siyah ekran gostermek "oyun neden gorunmuyor?"
             // sorusunu doguruyordu. Sebebi soyluyoruz.
@@ -381,10 +403,67 @@ namespace FXEd
                                "Sahnede birincil kamera yok.");
             ImGui::TextDisabled("Bir entity'ye Camera component'i ekleyip");
             ImGui::TextDisabled("\"Birincil\" isaretle.");
+            ImGui::End();
+            return;
         }
 
+        // Bant alani icin once panelin tamamini siyaha boya, sonra
+        // goruntuyu ORTAYA yerlestir.
+        ImGui::GetWindowDrawList()->AddRectFilled(
+            origin, ImVec2(origin.x + avail.x, origin.y + avail.y),
+            IM_COL32(0, 0, 0, 255));
+
+        ImGui::SetCursorScreenPos(ImVec2(origin.x + (avail.x - surface.x) * 0.5f,
+                                         origin.y + (avail.y - surface.y) * 0.5f));
+
+        // UV'ler ters: OpenGL sol-alt kokenli, ImGui sol-ust bekler.
+        const auto texID =
+            static_cast<ImTextureID>(m_GameFramebuffer->GetColorAttachmentID(0));
+        ImGui::Image(texID, surface, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
+
         ImGui::End();
-        ImGui::PopStyleVar();
+    }
+
+    void EditorApp::DrawGameViewToolbar()
+    {
+        ImGui::SetCursorPos(ImVec2(6.0f, 4.0f));
+
+        ImGui::SetNextItemWidth(150.0f);
+
+        const bool hasProject = FX::Project::HasActive();
+        const auto& cfg = hasProject ? FX::Project::GetActive()->GetConfig()
+                                     : FX::ProjectConfig{};
+
+        char locked[64];
+        std::snprintf(locked, sizeof(locked), "%ux%u (%.2f:1)",
+                      cfg.TargetWidth, cfg.TargetHeight, cfg.TargetAspect());
+
+        const char* preview = m_GameViewLocked ? locked : "Serbest";
+
+        if (ImGui::BeginCombo("##AspectMode", preview))
+        {
+            if (ImGui::Selectable("Serbest", !m_GameViewLocked))
+                m_GameViewLocked = false;
+            ImGui::SetItemTooltip("Panel ne kadarsa o oranda cizer.");
+
+            ImGui::BeginDisabled(!hasProject);
+            if (ImGui::Selectable(locked, m_GameViewLocked))
+                m_GameViewLocked = true;
+            ImGui::EndDisabled();
+            ImGui::SetItemTooltip("Projenin hedef oranina kilitler, "
+                                  "artan yere siyah bant koyar.");
+
+            ImGui::EndCombo();
+        }
+
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!hasProject);
+        if (ImGui::SmallButton("Ayarlar..."))
+            m_ShowProjectSettings = true;
+        ImGui::EndDisabled();
+        ImGui::SetItemTooltip("Hedef cozunurluk PROJE ayaridir.");
+
+        ImGui::Separator();
     }
 
     void EditorApp::DrawViewportToolbar()
@@ -476,6 +555,165 @@ namespace FXEd
         ImGui::EndChild();
         ImGui::PopStyleColor();
         ImGui::PopStyleVar();
+    }
+
+    // PROJEYE ait ayarlar: .fxproject'e yazilir, surum kontrolune girer.
+    // "Bu oyun 16:9 tasarlandi" projenin karari, kullanicinin degil.
+    void EditorApp::DrawProjectSettingsWindow()
+    {
+        if (!m_ShowProjectSettings)
+            return;
+
+        ImGui::SetNextWindowSize(ImVec2(420.0f, 0.0f), ImGuiCond_FirstUseEver);
+        if (!ImGui::Begin("Proje Ayarlari", &m_ShowProjectSettings))
+        {
+            ImGui::End();
+            return;
+        }
+
+        if (!FX::Project::HasActive())
+        {
+            ImGui::TextDisabled("Acik proje yok.");
+            ImGui::End();
+            return;
+        }
+
+        auto& cfg = FX::Project::GetActive()->GetConfig();
+
+        ImGui::TextDisabled("Bu ayarlar .fxproject'e yazilir ve surum");
+        ImGui::TextDisabled("kontrolune girer - takimin tamamini ilgilendirir.");
+        ImGui::Separator();
+
+        ImGui::Text("Proje adi");
+        ImGui::SameLine(150.0f);
+        ImGui::TextDisabled("%s", cfg.Name.c_str());
+
+        ImGui::Text("Varlik klasoru");
+        ImGui::SameLine(150.0f);
+        ImGui::TextDisabled("%s", cfg.AssetDirectory.c_str());
+
+        ImGui::Separator();
+
+        int res[2] = { static_cast<int>(cfg.TargetWidth),
+                       static_cast<int>(cfg.TargetHeight) };
+
+        ImGui::Text("Hedef cozunurluk");
+        ImGui::SameLine(150.0f);
+        ImGui::SetNextItemWidth(-1.0f);
+        if (ImGui::DragInt2("##res", res, 1.0f, 1, 16384))
+        {
+            // 0 ve negatif sifira bolme uretir; alt sinir 1.
+            cfg.TargetWidth  = static_cast<std::uint32_t>(res[0] > 0 ? res[0] : 1);
+            cfg.TargetHeight = static_cast<std::uint32_t>(res[1] > 0 ? res[1] : 1);
+        }
+
+        ImGui::TextDisabled("Game View bunun ORANINI kullanir; piksel");
+        ImGui::TextDisabled("sayisi degil oran onemli. Su anki oran: %.3f",
+                            cfg.TargetAspect());
+
+        // Sik kullanilan oranlar: elle 1920x1080 yazmak zorunda kalma.
+        const struct { const char* label; std::uint32_t w, h; } presets[] = {
+            { "16:9",  1920, 1080 },
+            { "16:10", 1920, 1200 },
+            { "4:3",   1024,  768 },
+            { "1:1",   1024, 1024 },
+        };
+
+        for (const auto& p : presets)
+        {
+            if (ImGui::SmallButton(p.label))
+            {
+                cfg.TargetWidth  = p.w;
+                cfg.TargetHeight = p.h;
+            }
+            ImGui::SameLine();
+        }
+        ImGui::NewLine();
+
+        ImGui::Separator();
+
+        if (ImGui::Button("Kaydet", ImVec2(120.0f, 0.0f)))
+        {
+            SetStatus(FX::Project::GetActive()->Save()
+                          ? "Proje ayarlari kaydedildi"
+                          : "Proje ayarlari KAYDEDILEMEDI");
+        }
+
+        ImGui::SameLine();
+        ImGui::TextDisabled("(kaydetmeden kapatirsan degisiklik diske gitmez)");
+
+        ImGui::End();
+    }
+
+    // KULLANICIYA ait ayarlar: editor.json'a yazilir, surum kontrolune
+    // GIRMEZ. Makineden makineye degisir ve takim arkadasini ilgilendirmez.
+    void EditorApp::DrawPreferencesWindow()
+    {
+        if (!m_ShowPreferences)
+            return;
+
+        ImGui::SetNextWindowSize(ImVec2(420.0f, 0.0f), ImGuiCond_FirstUseEver);
+        if (!ImGui::Begin("Tercihler", &m_ShowPreferences))
+        {
+            ImGui::End();
+            return;
+        }
+
+        ImGui::TextDisabled("Bu ayarlar editor.json'a yazilir ve surum");
+        ImGui::TextDisabled("kontrolune GIRMEZ - yalnizca bu makineye ait.");
+        ImGui::Separator();
+
+        ImGui::SeparatorText("Kamera");
+        float speed = m_EditorCamera.GetMoveSpeed();
+        ImGui::Text("Kaydirma hizi");
+        ImGui::SameLine(150.0f);
+        ImGui::SetNextItemWidth(-1.0f);
+        if (ImGui::DragFloat("##camspeed", &speed, 0.1f, 0.5f, 50.0f, "%.1f br/s"))
+            m_EditorCamera.SetMoveSpeed(speed);
+
+        ImGui::SeparatorText("Kademeli hareket");
+        ImGui::Checkbox("Varsayilan olarak acik", &m_SnapEnabled);
+        ImGui::SetItemTooltip("Kapaliyken de Ctrl basili tutarak kademeli hareket edilir.");
+
+        ImGui::Text("Tasima");
+        ImGui::SameLine(150.0f);
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::DragFloat("##snapt", &m_SnapTranslate, 0.05f, 0.01f, 100.0f, "%.2f br");
+
+        ImGui::Text("Donme");
+        ImGui::SameLine(150.0f);
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::DragFloat("##snapr", &m_SnapRotate, 1.0f, 1.0f, 90.0f, "%.0f derece");
+
+        ImGui::Text("Olcek");
+        ImGui::SameLine(150.0f);
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::DragFloat("##snaps", &m_SnapScale, 0.05f, 0.01f, 10.0f, "%.2fx");
+
+        ImGui::SeparatorText("Gorunum");
+        ImGui::Checkbox("Izgara", &m_ShowGrid);
+        ImGui::Checkbox("Kamera cerceveleri", &m_ShowCameraGizmos);
+
+        bool listView = m_ContentBrowser.IsListView();
+        if (ImGui::Checkbox("Icerik paneli liste gorunumu", &listView))
+            m_ContentBrowser.SetListView(listView);
+
+        ImGui::Checkbox("Game View hedef orana kilitli", &m_GameViewLocked);
+
+        ImGui::Separator();
+
+        // Kapanista da kaydediliyor ama kullanici "gitti mi?" diye
+        // merak etmesin diye acik bir dugme var.
+        if (ImGui::Button("Simdi Kaydet", ImVec2(120.0f, 0.0f)))
+        {
+            SaveEditorConfig();
+            SetStatus("Tercihler kaydedildi");
+        }
+
+        ImGui::SameLine();
+        ImGui::TextDisabled("(cikista otomatik de kaydedilir)");
+
+        ImGui::End();
     }
 
     void EditorApp::DrawStatsPanel()

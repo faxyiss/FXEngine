@@ -111,3 +111,77 @@ TEST_CASE("Baslangic sahnesi tasinsa da bulunuyor", "[project]")
     CHECK(FX::AssetManager::GetPath(project->GetConfig().StartScene) ==
           "assets/levels/ilk.fxscene");
 }
+
+TEST_CASE("Hedef cozunurluk kaydedilip geri okunuyor", "[project]")
+{
+    TempProject temp("ResProje");
+
+    auto active = FX::Project::GetActive();
+    REQUIRE(active);
+
+    // Yeni proje varsayilani 16:9.
+    CHECK(active->GetConfig().TargetWidth  == 1920);
+    CHECK(active->GetConfig().TargetHeight == 1080);
+
+    active->GetConfig().TargetWidth  = 640;
+    active->GetConfig().TargetHeight = 480;
+    REQUIRE(active->Save());
+
+    const std::string file = active->GetFilePath();
+    FX::Project::CloseActive();
+
+    auto reopened = FX::Project::Load(file);
+    REQUIRE(reopened);
+    CHECK(reopened->GetConfig().TargetWidth  == 640);
+    CHECK(reopened->GetConfig().TargetHeight == 480);
+    CHECK(reopened->GetConfig().TargetAspect() == 640.0f / 480.0f);
+}
+
+TEST_CASE("Surum 2 projesi acilinca varsayilan cozunurluk aliyor", "[project]")
+{
+    // Yeni bir alan eski dosyalari KIRMAMALI: surum 2 dosyalarinda
+    // TargetResolution yok, varsayilan gecerli olmali.
+    const auto dir = std::filesystem::temp_directory_path() /
+                     ("fxv2_" + std::to_string(std::random_device{}()));
+    std::filesystem::create_directories(dir);
+
+    {
+        std::ofstream out(dir / "V2.fxproject");
+        out << R"({"Version":2,"Name":"V2","AssetDirectory":"assets","StartScene":0})";
+    }
+
+    auto project = FX::Project::Load((dir / "V2.fxproject").string());
+    REQUIRE(project);
+    CHECK(project->GetConfig().TargetWidth  == 1920);
+    CHECK(project->GetConfig().TargetHeight == 1080);
+
+    FX::Project::CloseActive();
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+TEST_CASE("Bozuk cozunurluk degeri varsayilana duser", "[project]")
+{
+    // Elle duzenlenmis dosyada 0 yazabilir; sifira bolme uretmemeli.
+    const auto dir = std::filesystem::temp_directory_path() /
+                     ("fxzero_" + std::to_string(std::random_device{}()));
+    std::filesystem::create_directories(dir);
+
+    {
+        std::ofstream out(dir / "Z.fxproject");
+        out << R"({"Version":3,"Name":"Z","AssetDirectory":"assets",
+                   "StartScene":0,"TargetResolution":[0,0]})";
+    }
+
+    auto project = FX::Project::Load((dir / "Z.fxproject").string());
+    REQUIRE(project);
+    CHECK(project->GetConfig().TargetWidth  == 1920);
+    CHECK(project->GetConfig().TargetHeight == 1080);
+    CHECK(project->GetConfig().TargetAspect() > 0.0f);
+
+    FX::Project::CloseActive();
+
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}

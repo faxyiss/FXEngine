@@ -495,6 +495,20 @@ namespace FXEd
 
         m_ContentBrowser.SetListView(doc.value("ContentListView", false));
 
+        // Viewport tercihleri (A3). A3'e kadar bunlar koda gomuluydu ve
+        // her acilista sifirlaniyordu: kademe degerini ayarliyordun,
+        // editoru kapatip acinca varsayilana donuyordu.
+        m_ShowGrid          = doc.value("ShowGrid", true);
+        m_ShowCameraGizmos  = doc.value("ShowCameraGizmos", true);
+        m_GizmoMode         = doc.value("GizmoMode", 0);
+        m_SnapEnabled       = doc.value("SnapEnabled", false);
+        m_SnapTranslate     = doc.value("SnapTranslate", 0.5f);
+        m_SnapRotate        = doc.value("SnapRotate", 15.0f);
+        m_SnapScale         = doc.value("SnapScale", 0.25f);
+        m_GameViewLocked    = doc.value("GameViewLockAspect", false);
+
+        m_EditorCamera.SetMoveSpeed(doc.value("CameraMoveSpeed", 8.0f));
+
         FX_INFO("editor.json okundu (%zu son sahne, %zu son proje).",
                 m_RecentScenes.size(), m_RecentProjects.size());
     }
@@ -508,6 +522,16 @@ namespace FXEd
         // Gorunum tercihi de kullanicinin verisi: her proje acilisinda
         // Izgara'ya donmesi kucuk ama surekli bir rahatsizlikti.
         doc["ContentListView"] = m_ContentBrowser.IsListView();
+
+        doc["ShowGrid"]           = m_ShowGrid;
+        doc["ShowCameraGizmos"]   = m_ShowCameraGizmos;
+        doc["GizmoMode"]          = m_GizmoMode;
+        doc["SnapEnabled"]        = m_SnapEnabled;
+        doc["SnapTranslate"]      = m_SnapTranslate;
+        doc["SnapRotate"]         = m_SnapRotate;
+        doc["SnapScale"]          = m_SnapScale;
+        doc["GameViewLockAspect"] = m_GameViewLocked;
+        doc["CameraMoveSpeed"]    = m_EditorCamera.GetMoveSpeed();
 
         std::ofstream out(FX::FileSystem::GetBaseDirectory() + "editor.json");
         if (out)

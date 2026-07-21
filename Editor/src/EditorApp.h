@@ -135,6 +135,16 @@ namespace FXEd
         void RenderGameView();
         void DrawViewportToolbar();
         void DrawStatsPanel();
+
+        // Ayar pencereleri (A3). Ayrilar cunku biri PROJEYE, digeri
+        // KULLANICIYA ait - karisirsa yanlis dosyaya yazilir.
+        void DrawGameViewToolbar();
+
+        void DrawProjectSettingsWindow();
+        void DrawPreferencesWindow();
+
+        bool m_ShowProjectSettings = false;
+        bool m_ShowPreferences     = false;
         void DrawGizmo();
 
         // Fare altindaki entity'yi framebuffer'in ID ekinden okur.
@@ -191,6 +201,11 @@ namespace FXEd
         std::unique_ptr<FX::Framebuffer> m_GameFramebuffer;   // Game View
 
         glm::vec2 m_GameViewportSize{ 0.0f, 0.0f };
+
+        // Game View projenin hedef en-boy oranina kilitlensin mi?
+        // Kapaliyken panel ne kadarsa o oranda cizer (A2'nin davranisi).
+        // Kullanici tercihi: editor.json'a yaziliyor.
+        bool m_GameViewLocked = false;
 
         // Play'e basinca Game, Stop'ta Scene one gelsin. ImGui'ye
         // cerceve icinde soylenmeli; istek bayrakta bekliyor.

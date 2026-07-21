@@ -306,7 +306,7 @@ ikisi de silmeye çalışırdı.
 |---|---|---|
 | `.fxscene` | 4 | Entity listesi, UUID'ler, component'ler, hiyerarşi |
 | `.fxprefab` | 1 | Entity ağacı (örneklemede kimlikler yeniden üretilir) |
-| `.fxproject` | 2 | Ad, varlık klasörü, `StartScene` (GUID) |
+| `.fxproject` | 3 | Ad, varlık klasörü, `StartScene` (GUID), hedef çözünürlük |
 | `*.meta` | 1 | Varlık GUID'i + içe aktarma ayarları |
 
 Kurallar:
@@ -427,7 +427,7 @@ sabitler.
 |---|---|---|
 | Kime ait | **Projeye** | **Kullanıcıya/makineye** |
 | Sürüm kontrolü | Girer | Girmez |
-| Nerede | `ProjectSettings/*.json` | `editor.json` / `%APPDATA%` |
+| Nerede | `.fxproject` (A3: ayrı `ProjectSettings/` klasörü gereksiz bulundu) | `editor.json` |
 | İçerik | Başlangıç sahnesi, hedef çözünürlük, fizik, sıralama katmanları | Tema, kısayollar, kamera hızı, snap varsayılanları |
 
 **Neden önemli:** Yanlış tarafa konan ayar takım çalışmasında ya sürekli
@@ -459,7 +459,7 @@ eksikler (çarpışma, animasyon, ses, sahne geçişi) ancak orada görünür.
 |---|---|---|
 | ~~**A1**~~ | ✅ Component meta-veri sistemi — [Faz-A1-Notlar.md](Faz-A1-Notlar.md) | Diğer dördünü de ucuzlatıyor |
 | ~~**A2**~~ | ✅ Game View / Scene View ayrımı — [Faz-A2-Notlar.md](Faz-A2-Notlar.md) | Kamera ve çözünürlük kavramlarını netleştirir |
-| **A3** | Project Settings + Preferences | A2'nin doğurduğu ayarların yeri |
+| ~~**A3**~~ | ✅ Project Settings + Preferences — [Faz-A3-Notlar.md](Faz-A3-Notlar.md) | A2'nin doğurduğu ayarların yeri |
 | **A4** | Script dosyası oluşturma + şablon | İterasyonun ilk adımı |
 | **A5** | Undo/Redo (eski 20a-20b) | A1'den sonra çok ucuzlar |
 

@@ -19,7 +19,11 @@ namespace FX
     {
         // Surum 2: StartScene artik yol degil GUID (0.6). Surum 1
         // dosyalari aciliyor ve ilk acilista sessizce donusturuluyor.
-        constexpr int kProjectVersion = 2;
+        // Surum 3: TargetWidth/TargetHeight eklendi. Eski dosyalar
+        // varsayilani aliyor - yeni ALAN eklemek surum artirmazdi ama
+        // Game View'in davranisi buna bagli oldugu icin surumu
+        // isaretliyoruz.
+        constexpr int kProjectVersion = 3;
 
         std::string WithTrailingSlash(std::string p)
         {
@@ -84,6 +88,18 @@ namespace FX
         auto& cfg = project->m_Config;
         cfg.Name           = j.value("Name", std::string("Isimsiz Proje"));
         cfg.AssetDirectory = j.value("AssetDirectory", std::string("assets"));
+
+        if (j.contains("TargetResolution") && j["TargetResolution"].is_array() &&
+            j["TargetResolution"].size() >= 2)
+        {
+            const auto& r = j["TargetResolution"];
+            cfg.TargetWidth  = r[0].get<std::uint32_t>();
+            cfg.TargetHeight = r[1].get<std::uint32_t>();
+        }
+
+        // Sifir bolme ve anlamsiz oran uretmesin.
+        if (cfg.TargetWidth  == 0) cfg.TargetWidth  = 1920;
+        if (cfg.TargetHeight == 0) cfg.TargetHeight = 1080;
         // Surum 1'de StartScene bir YOLDU, surum 2'de GUID. Tipe BAKARAK
         // ayiriyoruz: dogrudan value<uint64_t> cagirmak eski dosyalarda
         // istisna atiyor ve proje hic acilmiyordu.
@@ -179,6 +195,8 @@ namespace FX
         j["Name"]           = m_Config.Name;
         j["AssetDirectory"] = m_Config.AssetDirectory;
         j["StartScene"]     = static_cast<std::uint64_t>(m_Config.StartScene);
+        j["TargetResolution"] = nlohmann::json::array({ m_Config.TargetWidth,
+                                                        m_Config.TargetHeight });
 
         std::ofstream out(m_FilePath);
         if (!out)

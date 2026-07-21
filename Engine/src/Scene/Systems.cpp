@@ -178,6 +178,20 @@ namespace FX
         }
     }
 
+    void ScriptSystem::DestroyInstance(Entity entity)
+    {
+        if (!entity || !entity.HasComponent<NativeScriptComponent>())
+            return;
+
+        auto& nsc = entity.GetComponent<NativeScriptComponent>();
+        if (!nsc.Instance)
+            return;
+
+        nsc.Instance->OnDestroy();
+        delete nsc.Instance;
+        nsc.Instance = nullptr;
+    }
+
     void ScriptSystem::OnRuntimeStop(Scene& scene)
     {
         auto view = scene.GetRegistry().view<NativeScriptComponent>();

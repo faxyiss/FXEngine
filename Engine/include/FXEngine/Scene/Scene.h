@@ -20,6 +20,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace FX
 {
@@ -60,7 +61,29 @@ namespace FX
         // referanslar (EntityRef) yuklemeden sonra bozulur.
         Entity CreateEntityWithUUID(UUID uuid, const std::string& name = "Entity");
 
+        // ANINDA siler. Sistemler CALISIRKEN cagrilmasi guvenli DEGIL:
+        // registry'yi gezen bir view'in altindan diziyi degistirir.
+        // Oyun kodundan silmek icin DestroyEntityDeferred kullan.
         void DestroyEntity(Entity entity);
+
+        // Silme istegini KUYRUGA yazar; istek kare sonunda, butun
+        // sistemler bittikten sonra islenir (A-1).
+        //
+        // Neden gerekli: ScriptSystem::Update `view<NativeScriptComponent>`
+        // uzerinde gezerken script'in DestroyEntity cagirmasi yineleyicileri
+        // bozuyordu. Yani oyun kodu "bu nesne artik yok" diyemiyordu -
+        // 16c'de toplanan yildizi silemeyip 9999,9999'a tasimak zorunda
+        // kaldik. Motorun dort yerde uyguladigi "yapiyi degistiren islemler
+        // dongu disinda" kuralinin besincisi.
+        //
+        // Ayni entity iki kez istenirse ikincisi sessizce yok sayilir.
+        void DestroyEntityDeferred(Entity entity);
+
+        // Bekleyen silme isteklerini isler. OnUpdate sonunda kendiliginden
+        // cagriliyor; elle cagirmak yalnizca testlerde gerekli.
+        void FlushDestroyQueue();
+
+        bool HasPendingDestroys() const { return !m_PendingDestroy.empty(); }
 
         // Tum entity'leri siler. Sahne yuklerken registry.clear() yerine
         // bunu kullanmak zorundayiz: UUID haritasi da temizlenmeli, yoksa
@@ -128,6 +151,10 @@ namespace FX
 
         // Play modunda mi? Script'lerin yasayip yasamadigini belirler.
         bool m_Running = false;
+
+        // Bekleyen silme istekleri. Tutamak degil UUID: istek ile islenme
+        // arasinda gecen surede tutamak baska bir entity'ye ait olabilir.
+        std::vector<UUID> m_PendingDestroy;
 
         // Entity, registry'ye erismek zorunda -> arkadas sinif.
         // Alternatifi registry'yi public yapmakti; bu daha dar bir kapi.

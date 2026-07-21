@@ -16,6 +16,7 @@ add_executable(FXTests
     SceneSerializer.test.cpp
     ComponentMeta.test.cpp
     EntitySnapshot.test.cpp
+    DeferredDestroy.test.cpp
     AssetManager.test.cpp
     Project.test.cpp
     Input.test.cpp

@@ -98,6 +98,11 @@ namespace FX
         for (Entity child : children)
             DestroyEntity(child);
 
+        // Script'i olan bir entity oyun sirasinda silinebiliyor (A-1):
+        // OnDestroy cagrilmadan ve ornek silinmeden gitmesi hem
+        // "temizligimi yapamadim" hem de bellek sizintisi olurdu.
+        ScriptSystem::DestroyInstance(entity);
+
         // Parent'in cocuk listesinden kendimizi cikar.
         if (Entity parent = entity.GetParent())
         {
@@ -116,10 +121,47 @@ namespace FX
         m_Registry.destroy(entity);
     }
 
+    void Scene::DestroyEntityDeferred(Entity entity)
+    {
+        if (!entity || !entity.HasComponent<IDComponent>())
+            return;
+
+        const UUID id = entity.GetComponent<IDComponent>().ID;
+
+        // Ayni entity iki kez istenebilir (iki script birbirini silmek
+        // isteyebilir). Ikinci istek sessizce yok sayiliyor - hata degil.
+        for (UUID pending : m_PendingDestroy)
+            if (static_cast<std::uint64_t>(pending) == static_cast<std::uint64_t>(id))
+                return;
+
+        m_PendingDestroy.push_back(id);
+    }
+
+    void Scene::FlushDestroyQueue()
+    {
+        if (m_PendingDestroy.empty())
+            return;
+
+        // Kuyrugu TASIYORUZ: silinen bir entity'nin OnDestroy'u yeni
+        // silme istegi yazabilir. Uzerinde gezerken diziye eklemek
+        // yineleyicileri bozardi; yeni istekler sonraki kareye kalir.
+        std::vector<UUID> batch;
+        batch.swap(m_PendingDestroy);
+
+        for (UUID id : batch)
+        {
+            // Arada baska bir silme bunu da goturmus olabilir (parent'i
+            // silinen cocuk). FindEntityByUUID gecersiz doner, geciyoruz.
+            if (Entity entity = FindEntityByUUID(id))
+                DestroyEntity(entity);
+        }
+    }
+
     void Scene::Clear()
     {
         m_Registry.clear();
         m_EntityMap.clear();
+        m_PendingDestroy.clear();
     }
 
     Entity Scene::FindEntityByUUID(UUID uuid)
@@ -200,6 +242,10 @@ namespace FX
         FollowSystem::Update(*this, dt);
         MovementSystem::Update(m_Registry, dt);
         TransformSystem::Update(*this);
+
+        // Silme istekleri EN SONDA: hicbir sistem artik registry'yi
+        // gezmiyor, dolayisiyla yapiyi degistirmek guvenli.
+        FlushDestroyQueue();
     }
 
     void Scene::OnRender(const OrthographicCamera& camera)

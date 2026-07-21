@@ -50,6 +50,21 @@ namespace FX
         // Sahne, baska entity'leri bulmak icin (FindEntityByUUID).
         Scene* GetScene() const { return m_Entity.GetScene(); }
 
+        // Bu entity'yi (ya da baskasini) yok eder. Silme ANINDA olmaz,
+        // karenin sonunda olur: script'ler calisirken registry'yi
+        // degistirmek onu gezen sistemleri bozar.
+        //
+        // Silme istegi verdikten SONRA da OnUpdate'in geri kalani calisir
+        // ve component'lere erisim gecerlidir - nesne bu kare sonuna kadar
+        // yasiyor demektir.
+        void Destroy() { Destroy(m_Entity); }
+
+        void Destroy(Entity other)
+        {
+            if (Scene* scene = m_Entity.GetScene())
+                scene->DestroyEntityDeferred(other);
+        }
+
     protected:
         // Play basladiginda BIR KEZ. Kaynak bulma, baslangic durumu.
         virtual void OnCreate() {}

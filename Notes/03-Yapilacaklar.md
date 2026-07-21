@@ -11,26 +11,16 @@
 
 ## A. Motor delikleri — oyun yazmayı fiilen engelliyor
 
-### A-1. Script'ten entity yaratma / silme ▲ EN ACİL
+### A-1. Script'ten entity silme ✅ (2026-07-22)
 
-**Sorun:** `ScriptSystem::Update` `view<NativeScriptComponent>` üzerinde
-gezerken script içinden `DestroyEntity` çağırmak yineleyicileri bozuyor.
-16c'de yıldızı toplayınca **silemedik**, `9999, 9999`'a ışınladık.
+`Scene::DestroyEntityDeferred` + `FlushDestroyQueue` (OnUpdate sonunda),
+`ScriptableEntity::Destroy()/Destroy(other)`, oyun sırasında silinen
+entity'de `OnDestroy` çağrılıyor. 5 birim testi. Silme artık kare
+sonunda, view gezilirken değil.
 
-Bu bir özellik eksiği değil **model deliği**: motorda "oyun sırasında dünya
-değişir" kavramı yok. Mermi, düşman dalgası, patlama, can hakkı — hiçbiri
-yazılamaz.
-
-**Çözüm:** `Scene`'de gecikmeli komut kuyruğu. Script `Destroy(entity)` /
-`Instantiate(...)` çağırır, istek biriktirilir, sistemler bittikten sonra
-işlenir. Motorun zaten dört yerde uyguladığı *"yapıyı değiştiren işlemler
-döngü dışında"* kuralının beşincisi.
-
-- [ ] `Scene::DestroyEntityDeferred(Entity)` + kuyruk, `OnUpdate` sonunda boşaltma
-- [ ] `ScriptableEntity` üzerinden erişim (`Destroy()`, `Destroy(other)`)
-- [ ] Silinen entity'nin script'i: `OnDestroy` çağrılmalı
-- [ ] Aynı entity iki kez silinirse çökmemeli
-- [ ] Birim testi (penceresiz yazılabilir)
+**Kalan (A-1b):** runtime'da entity *yaratma* (spawn). `CreateEntity`
+zaten var ama script'ten çağrılınca aynı `view` sorunu — yeni entity
+de gecikmeli kuyruğa girmeli ya da A-2 (prefab) ile birlikte çözülmeli.
 
 ### A-2. Runtime'da prefab örnekleme
 

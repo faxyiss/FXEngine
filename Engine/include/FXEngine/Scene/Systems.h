@@ -22,6 +22,7 @@
 namespace FX
 {
     class Scene;
+    class Entity;
 
     // -----------------------------------------------------------------------
     // TransformSystem - hiyerarsiyi gezip dunya matrislerini hesaplar
@@ -85,6 +86,16 @@ namespace FX
         // Stop'ta: OnDestroy cagirir ve ornekleri siler.
         // Cagrilmazsa bellek sizar - Scene yikicisi da bunu cagirir.
         static void OnRuntimeStop(Scene& scene);
+
+        // TEK bir entity'nin script ornegini sonlandirir (OnDestroy + delete).
+        // Scene::DestroyEntity cagiriyor: oyun sirasinda silinen bir
+        // entity'nin script'i de olmeli, yoksa hem OnDestroy hic calismaz
+        // hem de ornek sizar.
+        //
+        // Neden burada? OnDestroy protected ve ScriptSystem onun tek
+        // arkadasi - motorun "yasam dongusunu yalnizca ScriptSystem
+        // yonetir" kurali korunuyor.
+        static void DestroyInstance(Entity entity);
     };
 
     // -----------------------------------------------------------------------

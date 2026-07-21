@@ -135,15 +135,16 @@ edilmeli.
 |---|---|
 | Prefab bağlantısı yok (örnek kaynağından bağımsız, override sistemi yok) | `PrefabSerializer` |
 | Linux/macOS dosya diyalogları boş gövde, dosya izleyici yok | `FileDialogs.cpp`, `FileWatcher.cpp` |
-| Çoklu seçimde Inspector yalnızca birincili düzenliyor (A1'den sonra ucuz) | `SceneHierarchyPanel` |
+| ~~Çoklu seçimde Inspector yalnızca birincili düzenliyor~~ | ✅ kapatıldı: değişen alan tüm seçili entity'lere uygulanıyor (`ComponentDrawer`) |
 
 ### Düşük
 - `Renderer2D` global durum (`s_Data` statik), batch bölme yolu hacky
-- `ContentBrowserPanel.cpp` 1308 satır — bölünebilir (acil değil)
+- `ContentBrowserPanel.cpp` ~1400 satır — bölünebilir (acil değil)
 - `GetRegistry()` çok açık — doğrudan `create`/`destroy` UUID haritasını bozar
 - `Renderer2D` ve `TextureLibrary` test dışı (OpenGL bağlamı ister)
 - Sadece Windows'ta denendi
 - `glLineWidth` > 1.0 garanti değil (seçim çerçevesi 2.0 istiyor)
+- ~~Yüklenemeyen doku görünmez kalıyor~~ ✅ mor "eksik doku" gösteriliyor (`TextureLibrary`)
 
 ---
 

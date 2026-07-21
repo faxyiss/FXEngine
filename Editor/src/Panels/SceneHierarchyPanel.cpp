@@ -160,12 +160,12 @@ namespace FXEd
 
         if (FX::Entity primary = m_Selection->GetPrimary())
         {
-            // Coklu secimde SADECE birincil duzenleniyor. Cok-hedefli
-            // alan duzenleme (Unity'nin "-" gosteren alanlari) ayri bir
-            // is; yaniltici olmamasi icin durumu acikca yaziyoruz.
+            // Coklu secim: birincilde degistirilen bir alan, ayni
+            // component'e sahip diger secili entity'lere de uygulaniyor
+            // (yalnizca degisen alan; her entity'nin kendi konumu korunur).
             if (m_Selection->Count() > 1)
             {
-                ImGui::TextDisabled("%d entity secili - duzenlenen: birincil",
+                ImGui::TextDisabled("%d entity secili - degisiklikler hepsine uygulanir",
                                     static_cast<int>(m_Selection->Count()));
                 ImGui::Separator();
             }
@@ -379,6 +379,16 @@ namespace FXEd
 
         ImGui::Separator();
 
+        // Coklu secim: birincil DISINDAKI secili entity'ler. Bir alan
+        // degisince ComponentDrawer bunlara da yaziyor. Tek secimde bos.
+        std::vector<FX::Entity> alsoApplyTo;
+        if (m_Selection && m_Selection->Count() > 1)
+        {
+            for (const FX::Entity sel : m_Selection->GetAll())
+                if (sel != entity)
+                    alsoApplyTo.push_back(sel);
+        }
+
         // --- Component'ler: tamami meta tablosundan (A1) --------------------
         // Eskiden burada component basina elle yazilmis bir blok vardi ve
         // yeni bir component eklerken burayi unutmak onu GORUNMEZ yapiyordu.
@@ -400,7 +410,7 @@ namespace FXEd
                 if (info.Name == std::string("Transform") && entity.GetParent())
                     ImGui::TextDisabled("(parent'a gore yerel)");
 
-                ComponentDrawer::DrawComponentBody(info, entity);
+                ComponentDrawer::DrawComponentBody(info, entity, alsoApplyTo);
             }
 
             // Yapiyi degistiren islem DONGU ICINDE guvenli degil:

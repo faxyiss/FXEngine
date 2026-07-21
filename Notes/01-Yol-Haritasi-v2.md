@@ -386,7 +386,7 @@ MVP sırasında bilinçli olarak bıraktıklarımız:
 | `ContentBrowserPanel.cpp` 1308 satır | Bölünebilir; 0.7'de `EditorApp` bölündü, bu ertelendi (yaklaşan fazlar oraya dokunmuyor). | `ContentBrowserPanel.cpp` |
 | ~~Editör kamerası `EditorApp` içinde~~ | ✅ Faz 10'da `EditorCamera` sınıfına taşındı. | — |
 | ~~Sahne yolu koda gömülü~~ | ✅ Faz 12'de dosya diyaloğuyla çözüldü. | — |
-| Hata durumunda yedek doku yok | Texture yüklenemezse `nullptr`; mor "eksik doku" dokusu daha iyi olurdu. | `TextureLibrary.cpp` |
+| ~~Hata durumunda yedek doku yok~~ | ✅ Atanmış ama yüklenemeyen doku artık 2x2 mor/siyah "eksik doku" gösteriyor (boş yol hâlâ `nullptr`). | `TextureLibrary.cpp` |
 | ~~Doku ayarı dosya başına saklanamıyor~~ | ✅ Faz 22'de `.meta` dosyalarına taşındı; spec çakışması ve uyarısı ortadan kalktı. | — |
 | **Varlık kimliği = dosya yolu** | Dosyayı taşımak/yeniden adlandırmak tüm referansları koparır. Çözüm: `.meta` dosyaları + GUID tabanlı `AssetManager`. | `SceneSerializer`, `TextureLibrary` (Faz 12) |
 | Dosya diyalogları sadece Win32 | Linux/macOS'ta boş gövde derleniyor; `nfd` veya portal gerekli. | `Editor/src/Platform/FileDialogs.cpp` |

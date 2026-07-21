@@ -59,11 +59,20 @@ namespace FX
 
         std::size_t GetCount() const { return m_Textures.size(); }
 
+        // Yuklenemeyen bir dokunun yerine gecen mor/siyah damali "eksik
+        // doku". Sessizce gorunmez kalmak yerine EKRANDA belli olsun -
+        // 2D grafik yazan herkesin tanidigi "bir sey eksik" isareti.
+        // Ilk istendiginde uretilir (OpenGL baglami gerektirir).
+        std::shared_ptr<Texture2D> MissingTexture();
+
     private:
         // Varligin .meta'sindaki ice aktarma ayarlarini TextureSpec'e
         // cevirir. Varlik kayitli degilse (proje disi, .meta yok)
         // varsayilanlar kullanilir.
         static TextureSpec SpecForAsset(const std::string& path);
+
+        // Tembel uretilen "eksik doku" (yukaridaki MissingTexture).
+        std::shared_ptr<Texture2D> m_Missing;
 
         // shared_ptr: kutuphane texture'i tutar, entity'ler de tutar.
         // Kutuphane temizlense bile hala kullanilan bir texture yasamaya

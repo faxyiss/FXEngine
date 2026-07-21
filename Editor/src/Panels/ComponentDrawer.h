@@ -12,6 +12,8 @@
 #include <FXEngine/Scene/ComponentMeta.h>
 #include <FXEngine/Scene/Entity.h>
 
+#include <vector>
+
 namespace FXEd::ComponentDrawer
 {
     // Editore ozgu cizicileri meta tabloya baglar. Editor acilista bir
@@ -19,5 +21,11 @@ namespace FXEd::ComponentDrawer
     void RegisterEditorUI(FX::TextureLibrary* library);
 
     // Bir component'in tum gorunur alanlarini ve ozel arayuzunu cizer.
-    void DrawComponentBody(const FX::ComponentInfo& info, FX::Entity entity);
+    //
+    // alsoApplyTo bos degilse COKLU SECIM duzenlemesi: birincilde
+    // degistirilen bir alan, ayni component'e sahip diger secili
+    // entity'lere de yazilir (yalnizca DEGISEN alan - digerleri korunur).
+    // Ozel arayuzler (doku slotu, kamera tekilligi) birincile ozel kalir.
+    void DrawComponentBody(const FX::ComponentInfo& info, FX::Entity entity,
+                           const std::vector<FX::Entity>& alsoApplyTo = {});
 }

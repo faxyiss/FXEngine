@@ -40,11 +40,13 @@ namespace FXEd::ComponentDrawer
         // Entity'yi ADIYLA gosteriyoruz ama sakladigimiz sey UUID.
         // Arayuz okunabilir olmali, veri modeli kalici - ikisi ayni sey
         // olmak zorunda degil.
-        void DrawEntityRef(const FX::FieldInfo& f, FX::EntityRef& ref, FX::Entity owner)
+        bool DrawEntityRef(const FX::FieldInfo& f, FX::EntityRef& ref, FX::Entity owner)
         {
             FX::Scene* scene = owner.GetScene();
             if (!scene)
-                return;
+                return false;
+
+            bool changed = false;
 
             FX::Entity target = scene->FindEntityByUUID(ref.Target);
 
@@ -62,10 +64,13 @@ namespace FXEd::ComponentDrawer
             Label(f.Label);
 
             if (!ImGui::BeginCombo("##ref", preview.c_str()))
-                return;
+                return false;
 
             if (ImGui::Selectable("Yok", !ref.IsSet()))
+            {
                 ref.Clear();
+                changed = true;
+            }
 
             auto view = scene->GetRegistry().view<FX::TagComponent, FX::IDComponent>();
             for (auto id : view)
@@ -82,30 +87,36 @@ namespace FXEd::ComponentDrawer
                 // yiginina UUID'yi itiyoruz ki secimler karismasin.
                 ImGui::PushID(static_cast<int>(static_cast<std::uint64_t>(uuid)));
                 if (ImGui::Selectable(candidate.GetName().c_str(), uuid == ref.Target))
+                {
                     ref.Target = uuid;
+                    changed = true;
+                }
                 ImGui::PopID();
             }
 
             ImGui::EndCombo();
+            return changed;
         }
 
-        void DrawField(const FX::FieldInfo& f, void* component, FX::Entity owner)
+        // Doner: bu alan bu karede degistiyse true (coklu secim yaymasi icin).
+        bool DrawField(const FX::FieldInfo& f, void* component, FX::Entity owner)
         {
             void* p = f.Get(component);
 
             ImGui::PushID(f.Name);
+            bool changed = false;
 
             switch (f.Type)
             {
             case FX::FieldType::Bool:
                 ImGui::Text("%s", f.Label);
                 ImGui::SameLine(kLabelWidth);
-                ImGui::Checkbox("##b", static_cast<bool*>(p));
+                changed = ImGui::Checkbox("##b", static_cast<bool*>(p));
                 break;
 
             case FX::FieldType::Int:
                 Label(f.Label);
-                ImGui::DragInt("##i", static_cast<int*>(p), f.DragSpeed);
+                changed = ImGui::DragInt("##i", static_cast<int*>(p), f.DragSpeed);
                 break;
 
             case FX::FieldType::Float:
@@ -117,7 +128,7 @@ namespace FXEd::ComponentDrawer
                 float shown = f.DegreesInUI ? glm::degrees(value) : value;
 
                 Label(f.Label);
-                ImGui::DragFloat("##f", &shown, f.DragSpeed);
+                changed = ImGui::DragFloat("##f", &shown, f.DragSpeed);
 
                 value = f.DegreesInUI ? glm::radians(shown) : shown;
                 ClampToRange(f, value);
@@ -126,25 +137,25 @@ namespace FXEd::ComponentDrawer
 
             case FX::FieldType::Vec2:
                 Label(f.Label);
-                ImGui::DragFloat2("##v2", glm::value_ptr(*static_cast<glm::vec2*>(p)),
-                                  f.DragSpeed);
+                changed = ImGui::DragFloat2("##v2", glm::value_ptr(*static_cast<glm::vec2*>(p)),
+                                            f.DragSpeed);
                 break;
 
             case FX::FieldType::Vec3:
                 Label(f.Label);
-                ImGui::DragFloat3("##v3", glm::value_ptr(*static_cast<glm::vec3*>(p)),
-                                  f.DragSpeed);
+                changed = ImGui::DragFloat3("##v3", glm::value_ptr(*static_cast<glm::vec3*>(p)),
+                                            f.DragSpeed);
                 break;
 
             case FX::FieldType::Vec4:
                 Label(f.Label);
-                ImGui::DragFloat4("##v4", glm::value_ptr(*static_cast<glm::vec4*>(p)),
-                                  f.DragSpeed);
+                changed = ImGui::DragFloat4("##v4", glm::value_ptr(*static_cast<glm::vec4*>(p)),
+                                            f.DragSpeed);
                 break;
 
             case FX::FieldType::Color:
                 Label(f.Label);
-                ImGui::ColorEdit4("##color", glm::value_ptr(*static_cast<glm::vec4*>(p)));
+                changed = ImGui::ColorEdit4("##color", glm::value_ptr(*static_cast<glm::vec4*>(p)));
                 break;
 
             case FX::FieldType::String:
@@ -158,16 +169,39 @@ namespace FXEd::ComponentDrawer
 
                 Label(f.Label);
                 if (ImGui::InputText("##s", buffer, sizeof(buffer)))
+                {
                     str = buffer;
+                    changed = true;
+                }
                 break;
             }
 
             case FX::FieldType::EntityRef:
-                DrawEntityRef(f, *static_cast<FX::EntityRef*>(p), owner);
+                changed = DrawEntityRef(f, *static_cast<FX::EntityRef*>(p), owner);
                 break;
             }
 
             ImGui::PopID();
+            return changed;
+        }
+
+        // Coklu secimde: birincilde degisen alani ayni tipteki diger
+        // entity'lere yazar. Yalnizca DEGISEN alan kopyalanir - digerleri
+        // (orn. her entity'nin kendi konumu) korunur.
+        void CopyFieldValue(const FX::FieldInfo& f, void* dst, const void* src)
+        {
+            switch (f.Type)
+            {
+            case FX::FieldType::Bool:   *static_cast<bool*>(dst)  = *static_cast<const bool*>(src);  break;
+            case FX::FieldType::Int:    *static_cast<int*>(dst)   = *static_cast<const int*>(src);   break;
+            case FX::FieldType::Float:  *static_cast<float*>(dst) = *static_cast<const float*>(src); break;
+            case FX::FieldType::Vec2:   *static_cast<glm::vec2*>(dst) = *static_cast<const glm::vec2*>(src); break;
+            case FX::FieldType::Vec3:   *static_cast<glm::vec3*>(dst) = *static_cast<const glm::vec3*>(src); break;
+            case FX::FieldType::Vec4:
+            case FX::FieldType::Color:  *static_cast<glm::vec4*>(dst) = *static_cast<const glm::vec4*>(src); break;
+            case FX::FieldType::String: *static_cast<std::string*>(dst) = *static_cast<const std::string*>(src); break;
+            case FX::FieldType::EntityRef: *static_cast<FX::EntityRef*>(dst) = *static_cast<const FX::EntityRef*>(src); break;
+            }
         }
 
         // --- Ozel arayuzler --------------------------------------------------
@@ -388,7 +422,8 @@ namespace FXEd::ComponentDrawer
         bind("Follow",         DrawFollowExtras);
     }
 
-    void DrawComponentBody(const FX::ComponentInfo& info, FX::Entity entity)
+    void DrawComponentBody(const FX::ComponentInfo& info, FX::Entity entity,
+                           const std::vector<FX::Entity>& alsoApplyTo)
     {
         void* component = info.GetPtr(entity);
         if (!component)
@@ -396,8 +431,24 @@ namespace FXEd::ComponentDrawer
 
         for (const FX::FieldInfo& f : info.Fields)
         {
-            if (!f.HiddenInInspector)
-                DrawField(f, component, entity);
+            if (f.HiddenInInspector)
+                continue;
+
+            const bool changed = DrawField(f, component, entity);
+
+            // Coklu secim: bu alan degistiyse ayni component'e sahip diger
+            // entity'lere de yaz. Sadece degisen alan - digerleri korunur.
+            if (changed && !alsoApplyTo.empty())
+            {
+                const void* srcField = f.Get(component);
+                for (FX::Entity other : alsoApplyTo)
+                {
+                    if (!info.Has(other))
+                        continue;
+                    if (void* otherComp = info.GetPtr(other))
+                        CopyFieldValue(f, f.Get(otherComp), srcField);
+                }
+            }
         }
 
         if (info.DrawExtraUI)

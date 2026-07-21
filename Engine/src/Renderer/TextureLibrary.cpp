@@ -29,10 +29,32 @@ namespace FX
         return spec;
     }
 
+    std::shared_ptr<Texture2D> TextureLibrary::MissingTexture()
+    {
+        if (m_Missing)
+            return m_Missing;
+
+        // 2x2 damali: mor / siyah. RGBA, satir satir.
+        constexpr unsigned char M[4] = { 255,   0, 255, 255 };  // mor
+        constexpr unsigned char K[4] = {   0,   0,   0, 255 };  // siyah
+        const unsigned char pixels[16] = {
+            M[0],M[1],M[2],M[3],  K[0],K[1],K[2],K[3],
+            K[0],K[1],K[2],K[3],  M[0],M[1],M[2],M[3],
+        };
+
+        TextureSpec spec;
+        spec.MinFilter = TextureFilter::Nearest;   // damalar keskin kalsin
+        spec.MagFilter = TextureFilter::Nearest;
+        spec.GenerateMipmaps = false;
+
+        m_Missing = std::make_shared<Texture2D>(2u, 2u, pixels, 4u, spec);
+        return m_Missing;
+    }
+
     std::shared_ptr<Texture2D> TextureLibrary::Load(const std::string& path)
     {
         if (path.empty())
-            return nullptr;
+            return nullptr;   // "doku atanmadi" - eksik degil, bos
 
         const auto it = m_Textures.find(path);
         if (it != m_Textures.end())
@@ -44,10 +66,12 @@ namespace FX
         {
             FX_CORE_ERROR("TextureLibrary: '%s' yuklenemedi.", path.c_str());
 
-            // BASARISIZ SONUCU ONBELLEGE ALMIYORUZ.
-            // Alsaydik, dosya sonradan duzeltilse bile hep nullptr donerdi.
-            // Bedeli: bozuk bir yol her istendiginde tekrar denenir.
-            return nullptr;
+            // BASARISIZ SONUCU ONBELLEGE ALMIYORUZ: dosya sonradan
+            // duzeltilse bile hep eksik doku donerdi. Bedeli, bozuk bir
+            // yolun her istendiginde tekrar denenmesi. Atanmis ama
+            // yuklenemeyen dokuyu gorunmez birakmak yerine mor "eksik
+            // doku" gosteriyoruz - sorun ekranda belli olsun.
+            return MissingTexture();
         }
 
         m_Textures[path] = texture;

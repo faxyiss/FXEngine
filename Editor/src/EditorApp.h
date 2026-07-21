@@ -25,6 +25,7 @@
 #include <deque>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace FXEd
 {
@@ -185,6 +186,9 @@ namespace FXEd
         // B-5: son derlemenin cmake ciktisini gosteren panel.
         void DrawBuildConsole();
         std::string m_BuildLog;
+        // Ciktidan ayiklanan "error ..." satirlari: konsolun en ustunde
+        // kirmizi ozet olarak gosteriliyor (dosya + satir hemen gorunsun).
+        std::vector<std::string> m_BuildErrors;
         bool        m_LastBuildOk    = false;
         bool        m_ShowBuildConsole = false;
         bool        m_ScrollBuildLog = false;   // yeni cikti gelince en alta kaydir

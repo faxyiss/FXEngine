@@ -23,6 +23,7 @@
 #include <fstream>
 #include <iomanip>
 #include <memory>
+#include <sstream>
 #include <string>
 
 namespace FXEd
@@ -444,6 +445,31 @@ namespace FXGame
         m_LastBuildOk      = (rc == 0);
         m_ShowBuildConsole = true;
         m_ScrollBuildLog   = true;
+
+        // Cikti icindeki hata satirlarini ayikla: konsolun en ustunde
+        // ozet olarak gosterilecek (uzun cmake ciktisinda dosya+satiri
+        // aramak zor). MSVC hatalari "dosya(satir): error Cxxxx" formatinda.
+        m_BuildErrors.clear();
+        if (!m_LastBuildOk)
+        {
+            std::istringstream stream(m_BuildLog);
+            std::string line;
+            while (std::getline(stream, line))
+            {
+                std::string low = line;
+                std::transform(low.begin(), low.end(), low.begin(),
+                               [](unsigned char c){ return static_cast<char>(std::tolower(c)); });
+                // "error C", "error LNK", "fatal error", "error MSB"...
+                if (low.find("error") != std::string::npos &&
+                    low.find("0 error") == std::string::npos)
+                {
+                    // Satir sonundaki \r'yi at (Windows cikti).
+                    if (!line.empty() && line.back() == '\r')
+                        line.pop_back();
+                    m_BuildErrors.push_back(line);
+                }
+            }
+        }
 
         if (!m_LastBuildOk)
         {

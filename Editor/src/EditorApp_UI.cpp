@@ -13,6 +13,7 @@
 #include <imgui_internal.h>   // BeginViewportSideBar
 #include <ImGuizmo.h>
 
+#include <algorithm>
 #include <cctype>
 #include <memory>
 #include <string>
@@ -921,22 +922,49 @@ namespace FXEd
         if (m_LastBuildOk)
             ImGui::TextColored(ImVec4(0.45f, 0.85f, 0.45f, 1.0f), "Son derleme: BASARILI");
         else
-            ImGui::TextColored(ImVec4(0.95f, 0.5f, 0.4f, 1.0f), "Son derleme: BASARISIZ");
+            ImGui::TextColored(ImVec4(0.95f, 0.5f, 0.4f, 1.0f), "Son derleme: BASARISIZ (%zu hata)",
+                               m_BuildErrors.size());
 
         ImGui::SameLine(ImGui::GetWindowWidth() - 80.0f);
         if (ImGui::SmallButton("Temizle"))
+        {
             m_BuildLog.clear();
+            m_BuildErrors.clear();
+        }
 
         ImGui::Separator();
 
-        // Salt-okunur, tek parca metin: cmake ciktisini oldugu gibi
-        // gosteriyoruz. Kaydirilabilir bir cocuk pencerede.
+        // --- Hata ozeti -------------------------------------------------
+        // cmake ciktisi uzun; hata satirlarini (dosya + satir + mesaj) EN
+        // USTE, kirmizi ve SATIR KAYDIRARAK gosteriyoruz ki uzun dosya
+        // yolu mesaji ekran disina itmesin.
+        if (!m_BuildErrors.empty())
+        {
+            ImGui::TextColored(ImVec4(0.95f, 0.5f, 0.4f, 1.0f), "Hatalar:");
+
+            const float summaryHeight =
+                std::min(m_BuildErrors.size() * ImGui::GetTextLineHeightWithSpacing() + 12.0f,
+                         160.0f);
+            ImGui::BeginChild("##builderrors", ImVec2(0.0f, summaryHeight), true);
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.6f, 0.5f, 1.0f));
+            ImGui::PushTextWrapPos(0.0f);   // pencere genisliginde sar
+            for (const auto& err : m_BuildErrors)
+                ImGui::TextWrapped("%s", err.c_str());
+            ImGui::PopTextWrapPos();
+            ImGui::PopStyleColor();
+            ImGui::EndChild();
+
+            ImGui::Spacing();
+            ImGui::TextDisabled("Tam cikti:");
+        }
+
+        // --- Tam cikti --------------------------------------------------
+        // Salt-okunur, ham cmake ciktisi. Yatay kaydirma acik: derleyici
+        // satirlarini oldugu gibi gormek isteyen olur.
         ImGui::BeginChild("##buildlog", ImVec2(0.0f, 0.0f), true,
                           ImGuiWindowFlags_HorizontalScrollbar);
         ImGui::TextUnformatted(m_BuildLog.c_str(),
                                m_BuildLog.c_str() + m_BuildLog.size());
-        // Yeni cikti geldiginde en alta kaydir; kullanici yukari kaydirdiysa
-        // ona dokunma.
         if (m_ScrollBuildLog)
         {
             ImGui::SetScrollHereY(1.0f);

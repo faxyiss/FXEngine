@@ -468,3 +468,17 @@ Kullanıcı ilk gerçek script'i yazıp test ederken üç düzeltme istedi:
 + `assets/scripts/` script'leri birlikte tarandı, **3 script** kayıtlı,
 Game.dll temiz derlendi, self-test geçti, `FXTests` 51/238. Space/Game
 toolbar/sağ-tık davranışının görsel onayı kullanıcıda.
+
+### Derleme hatalarının görünürlüğü
+
+Kullanıcı "derleme başarısızsa hatayı nerede görüyorum?" dedi. Hata
+konumu (dosya + satır + sütun) cmake çıktısında **zaten vardı** —
+MSVC formatı: `Bozuk.h(14,9): error C2143: ... [Game.vcxproj]`. Sorun
+görünürlüktü: konsol paneli dar, satırlar kaydırılmıyordu, uzun mutlak
+yol mesajı ekran dışına itiyordu ve hata cmake gürültüsünde kayboluyordu.
+
+Düzeltme: `BuildGame` çıktıdaki `error` içeren satırları ayıklayıp
+`m_BuildErrors`'a koyuyor; `DrawBuildConsole` bunları en üstte **kırmızı,
+satır kaydırmalı** bir "Hatalar" özeti olarak gösteriyor (dosya+satır
+hemen görünür). Tam ham çıktı altta, yatay kaydırmalı, duruyor. Durum
+satırı hata sayısını da yazıyor. Görsel onay kullanıcıda.

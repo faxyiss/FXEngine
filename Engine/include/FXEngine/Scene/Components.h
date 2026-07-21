@@ -28,6 +28,10 @@
 
 namespace FX
 {
+    // NativeScriptComponent yalnizca isaretci tasiyor; tam tanim
+    // gerekmiyor ve Components.h'i hafif tutuyoruz.
+    class ScriptableEntity;
+
     // -----------------------------------------------------------------------
     // IDComponent - entity'nin KALICI kimligi
     // -----------------------------------------------------------------------
@@ -234,6 +238,43 @@ namespace FX
     };
 
     // -----------------------------------------------------------------------
+    // NativeScriptComponent - entity'ye C++ davranisi baglar (Faz 16a)
+    // -----------------------------------------------------------------------
+    // Component VERI kalmaya devam ediyor: icinde mantik yok, sadece
+    // "hangi script sinifi" bilgisi ve ornegin kendisi var.
+    //
+    // Fonksiyon ISARETCILERI, std::function degil: Bind<T>() derleme
+    // zamaninda biliniyor, kapatma (closure) durumu yok ve component
+    // her sahne kopyalamasinda kopyalaniyor - trivially copyable kalmasi
+    // Scene::Copy'yi basit tutuyor.
+    //
+    // Instance'in SAHIBI ScriptSystem: yaratmayi ve yok etmeyi o yapar,
+    // cunku ne zaman yasayacaklari (yalnizca Play modunda) onun bilgisi.
+    struct NativeScriptComponent
+    {
+        ScriptableEntity* Instance = nullptr;
+
+        ScriptableEntity* (*Instantiate)() = nullptr;
+        void (*Destroy)(NativeScriptComponent*) = nullptr;
+
+        // Serilestirme ve Inspector icin (16b): sinif adini biz
+        // tasimaliyiz, C++'ta calisma zamaninda tur adi guvenilir degil.
+        std::string ScriptName;
+
+        template<typename T>
+        void Bind(const std::string& name)
+        {
+            ScriptName  = name;
+            Instantiate = []() -> ScriptableEntity* { return new T(); };
+            Destroy     = [](NativeScriptComponent* nsc)
+            {
+                delete nsc->Instance;
+                nsc->Instance = nullptr;
+            };
+        }
+    };
+
+    // -----------------------------------------------------------------------
     // Component tip listesi
     // -----------------------------------------------------------------------
     // Sahne kopyalamanin (Scene::Copy) hangi component'leri tasiyacagi
@@ -256,5 +297,6 @@ namespace FX
         SpriteRendererComponent,
         VelocityComponent,
         FollowComponent,
-        CameraComponent>;
+        CameraComponent,
+        NativeScriptComponent>;
 }

@@ -65,6 +65,29 @@ namespace FX
     };
 
     // -----------------------------------------------------------------------
+    // ScriptSystem - NativeScriptComponent'lerin yasam dongusu (Faz 16a)
+    // -----------------------------------------------------------------------
+    // Digerlerinden farkli olarak DURUM olusturur: script ornekleri
+    // heap'te yasar ve Start ile Stop arasinda var olurlar. Bu yuzden
+    // uc ayri giris noktasi var - "her karede cagir" yetmiyor.
+    //
+    // Yalnizca Play modunda calisir. Edit modunda script'in calismasi
+    // demek, duzenlerken nesnelerin kacmasi demektir (Faz 10'un dersi).
+    class ScriptSystem
+    {
+    public:
+        // Play basladiginda: ornekleri yaratir ve OnCreate cagirir.
+        static void OnRuntimeStart(Scene& scene);
+
+        // Her sabit adimda: OnUpdate.
+        static void Update(Scene& scene, float dt);
+
+        // Stop'ta: OnDestroy cagirir ve ornekleri siler.
+        // Cagrilmazsa bellek sizar - Scene yikicisi da bunu cagirir.
+        static void OnRuntimeStop(Scene& scene);
+    };
+
+    // -----------------------------------------------------------------------
     // SpriteRenderSystem - cizilecekleri Renderer2D'ye gonderir
     // -----------------------------------------------------------------------
     class SpriteRenderSystem

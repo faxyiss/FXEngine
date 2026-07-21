@@ -17,6 +17,7 @@ add_executable(FXTests
     AssetManager.test.cpp
     Project.test.cpp
     Input.test.cpp
+    Script.test.cpp
     TestSupport.h)
 
 target_link_libraries(FXTests PRIVATE FXEngine Catch2::Catch2WithMain)

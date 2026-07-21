@@ -1,5 +1,6 @@
 #include "SceneHierarchyPanel.h"
 #include "Panels/ContentBrowserPanel.h"
+#include "Scripts/SpinScript.h"
 
 #include <FXEngine/Scene/Components.h>
 #include <FXEngine/Asset/AssetManager.h>
@@ -705,6 +706,29 @@ namespace FXEd
                 entity.RemoveComponent<FX::FollowComponent>();
         }
 
+        if (entity.HasComponent<FX::NativeScriptComponent>())
+        {
+            bool keep = true;
+            if (ImGui::CollapsingHeader("Native Script", &keep,
+                                        ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                const auto& nsc = entity.GetComponent<FX::NativeScriptComponent>();
+
+                ImGui::Text("Script");
+                ImGui::SameLine(110.0f);
+                ImGui::TextUnformatted(nsc.ScriptName.empty() ? "(bagli degil)"
+                                                              : nsc.ScriptName.c_str());
+
+                // Ornek yalnizca Play'de var; bunu gostermek "script neden
+                // calismiyor?" sorusunu bastan cevapliyor.
+                ImGui::TextDisabled(nsc.Instance ? "Durum: calisiyor"
+                                                 : "Durum: Play'de baslayacak");
+            }
+
+            if (!keep)
+                entity.RemoveComponent<FX::NativeScriptComponent>();
+        }
+
         ImGui::Separator();
         DrawAddComponentMenu(entity);
     }
@@ -739,6 +763,29 @@ namespace FXEd
                 {
                     entity.AddComponent<FX::VelocityComponent>();
                     ImGui::CloseCurrentPopup();
+                }
+            }
+
+            // GECICI (16a): script secimi elle listeleniyor. 16b'de bir
+            // script kayit defteri (factory) gelince bu liste kendini
+            // dolduracak ve secim serilestirilebilecek.
+            if (!entity.HasComponent<FX::NativeScriptComponent>())
+            {
+                if (ImGui::BeginMenu("Native Script"))
+                {
+                    if (ImGui::MenuItem("Spin (kendi etrafinda doner)"))
+                    {
+                        entity.AddComponent<FX::NativeScriptComponent>()
+                              .Bind<SpinScript>("Spin");
+                        ImGui::CloseCurrentPopup();
+                    }
+                    if (ImGui::MenuItem("Move (ok tuslari)"))
+                    {
+                        entity.AddComponent<FX::NativeScriptComponent>()
+                              .Bind<MoveScript>("Move");
+                        ImGui::CloseCurrentPopup();
+                    }
+                    ImGui::EndMenu();
                 }
             }
 

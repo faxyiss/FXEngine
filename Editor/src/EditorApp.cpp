@@ -902,6 +902,10 @@ namespace FXEd
 
         m_ScenePaused = false;
 
+        // Script'ler burada dogar (Faz 16a). Kopya sahnede yasarlar,
+        // yani Stop'ta yaptiklari her sey kopyayla birlikte yok olur.
+        m_Scene->OnRuntimeStart();
+
         if (FX::Entity cam = m_Scene->GetPrimaryCameraEntity())
         {
             FX_INFO("Play: sahne kamerasi '%s' (size=%.1f)", cam.GetName().c_str(),
@@ -919,6 +923,10 @@ namespace FXEd
     {
         if (!IsPlaying())
             return;
+
+        // Once script'leri durdur, SONRA kopyayi at: OnDestroy'un hala
+        // gecerli bir sahne gormesi gerekiyor.
+        m_RuntimeScene->OnRuntimeStop();
 
         m_Scene      = m_EditorScene.get();
         m_SceneState = SceneState::Edit;

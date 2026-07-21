@@ -2,7 +2,9 @@
 #include "FXEngine/Scene/Scene.h"
 #include "FXEngine/Scene/Entity.h"
 #include "FXEngine/Scene/Components.h"
+#include "FXEngine/Scene/ScriptableEntity.h"
 #include "FXEngine/Renderer/Renderer2D.h"
+#include "FXEngine/Core/Log.h"
 
 #include <cmath>
 
@@ -124,6 +126,50 @@ namespace FX
             transform.Translation.x += velocity.Linear.x * dt;
             transform.Translation.y += velocity.Linear.y * dt;
             transform.Rotation      += velocity.Angular  * dt;
+        }
+    }
+
+    void ScriptSystem::OnRuntimeStart(Scene& scene)
+    {
+        auto view = scene.GetRegistry().view<NativeScriptComponent>();
+        for (auto entityID : view)
+        {
+            auto& nsc = view.get<NativeScriptComponent>(entityID);
+
+            // Bind cagrilmamis olabilir (16b'de Inspector'dan script
+            // secilmeden once). Sessizce atliyoruz: eksik script bir
+            // hata degil, henuz doldurulmamis bir alan.
+            if (!nsc.Instantiate || nsc.Instance)
+                continue;
+
+            nsc.Instance = nsc.Instantiate();
+            nsc.Instance->m_Entity = Entity{ entityID, &scene };
+            nsc.Instance->OnCreate();
+        }
+    }
+
+    void ScriptSystem::Update(Scene& scene, float dt)
+    {
+        auto view = scene.GetRegistry().view<NativeScriptComponent>();
+        for (auto entityID : view)
+        {
+            auto& nsc = view.get<NativeScriptComponent>(entityID);
+            if (nsc.Instance)
+                nsc.Instance->OnUpdate(dt);
+        }
+    }
+
+    void ScriptSystem::OnRuntimeStop(Scene& scene)
+    {
+        auto view = scene.GetRegistry().view<NativeScriptComponent>();
+        for (auto entityID : view)
+        {
+            auto& nsc = view.get<NativeScriptComponent>(entityID);
+            if (!nsc.Instance)
+                continue;
+
+            nsc.Instance->OnDestroy();
+            nsc.Destroy(&nsc);
         }
     }
 

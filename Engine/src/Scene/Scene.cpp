@@ -51,6 +51,15 @@ namespace FX
             CopyComponents(AllComponents{}, dst, src);
         }
 
+        // Script ORNEKLERI kopyalanmaz, yalnizca baglantilari.
+        //
+        // Instance ham bir isaretci: kopyalasaydik iki sahne ayni nesneyi
+        // gosterir ve ikisi de silmeye calisirdi. Kopya sahne kendi
+        // orneklerini OnRuntimeStart'ta yaratir.
+        auto scripts = target->m_Registry.view<NativeScriptComponent>();
+        for (auto handle : scripts)
+            scripts.get<NativeScriptComponent>(handle).Instance = nullptr;
+
         return target;
     }
 
@@ -169,8 +178,34 @@ namespace FX
         return pool ? static_cast<std::uint32_t>(pool->free_list()) : 0u;
     }
 
+    Scene::~Scene()
+    {
+        OnRuntimeStop();
+    }
+
+    void Scene::OnRuntimeStart()
+    {
+        m_Running = true;
+        ScriptSystem::OnRuntimeStart(*this);
+    }
+
+    void Scene::OnRuntimeStop()
+    {
+        ScriptSystem::OnRuntimeStop(*this);
+        m_Running = false;
+    }
+
     void Scene::OnUpdate(float dt)
     {
+        // SCRIPT'LER EN ONDE: oyun mantigi hizi ve hedefi bu karede
+        // belirlesin, sonraki sistemler onu uygulasin. Sonda calissaydi
+        // yazdiklari bir kare gecikmeyle gorunurdu.
+        //
+        // Yalnizca Play modunda: Edit modunda script calismasi,
+        // duzenlerken nesnelerin kacmasi demek (Faz 10'un dersi).
+        if (m_Running)
+            ScriptSystem::Update(*this, dt);
+
         // SISTEM SIRASI BURADA TANIMLIDIR ve bu, Scene sinifinin
         // varlik sebebidir.
         //

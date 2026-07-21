@@ -121,6 +121,10 @@ namespace FX
         operator entt::entity() const { return m_EntityHandle; }
         entt::entity GetHandle() const { return m_EntityHandle; }
 
+        // Sahneye erisim: script'ler baska entity'leri bulmak icin
+        // (FindEntityByUUID) buna ihtiyac duyuyor.
+        Scene* GetScene() const { return m_Scene; }
+
         bool operator==(const Entity& other) const
         {
             return m_EntityHandle == other.m_EntityHandle && m_Scene == other.m_Scene;

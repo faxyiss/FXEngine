@@ -29,7 +29,10 @@ namespace FX
     {
     public:
         Scene() = default;
-        ~Scene() = default;
+        // Yikici .cpp'de: calisan bir sahne yok edilirse script ornekleri
+        // sizardi. OnRuntimeStop cagrilmis olsa bile ikinci kez cagirmak
+        // guvenli (Instance nullptr kontrolu var).
+        ~Scene();
 
         // Kopyalamayi yasakliyoruz: registry kopyalamak binlerce entity'yi
         // cogaltmak demek ve neredeyse her zaman kaza eseri olur.
@@ -77,6 +80,17 @@ namespace FX
         // isim yerine UUID kullanilmali.
         Entity FindEntityByName(const std::string& name);
 
+        // Oyun basladi/bitti (Faz 16a). Script'lerin omru bu ikisi
+        // ARASINDADIR: Edit modunda hicbir script ornegi yasamaz.
+        //
+        // Neden Scene'de? Cunku "sahnenin calisiyor olmasi" sahnenin
+        // durumu; editorun her tuketicisinin ScriptSystem'i ayri ayri
+        // cagirmasi gerekseydi biri unuturdu.
+        void OnRuntimeStart();
+        void OnRuntimeStop();
+
+        bool IsRunning() const { return m_Running; }
+
         // Mantik guncellemesi. SABIT adimli dt ile cagrilir (Application).
         void OnUpdate(float dt);
 
@@ -111,6 +125,9 @@ namespace FX
         // haritayi bozar. GetRegistry()'nin acik olmasi bu riski
         // tasiyor; ileride daha dar bir erisim gerekebilir.
         std::unordered_map<UUID, entt::entity> m_EntityMap;
+
+        // Play modunda mi? Script'lerin yasayip yasamadigini belirler.
+        bool m_Running = false;
 
         // Entity, registry'ye erismek zorunda -> arkadas sinif.
         // Alternatifi registry'yi public yapmakti; bu daha dar bir kapi.

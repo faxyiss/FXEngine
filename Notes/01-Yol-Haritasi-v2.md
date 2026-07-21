@@ -220,8 +220,10 @@ Tek tek PNG yerine tek atlas kullanmak hem batch'i hem belleği iyileştirir.
 
 ## Faz 16 — Native script component
 
-- [ ] **16a** `ScriptableEntity` taban sınıfı + `NativeScriptComponent`
-      (`OnCreate / OnUpdate / OnDestroy`) + `ScriptSystem` (yalnız Play)
+- [x] **16a** `ScriptableEntity` + `NativeScriptComponent` + `ScriptSystem`
+      + `Scene::OnRuntimeStart/Stop`. Örnek script'ler (Spin, Move)
+      Inspector'dan eklenebiliyor.
+      Ayrıntı: [Faz-16-Notlar.md](Faz-16-Notlar.md)
 - [ ] **16b** Editör tarafı: script kaydı (factory), Inspector'da script
       seçimi, serileştirme
 - [ ] **16c** Örnekler: `PlayerController`, `FollowTarget` (Faz 8'in

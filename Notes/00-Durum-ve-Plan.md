@@ -4,6 +4,8 @@
 > projenin nerede olduğunu, nelerin neden böyle yapıldığını ve sıradaki
 > işi buradan öğrenirsin.
 >
+> Mimarinin tamamı ve alınan yön kararları: **[02-Mimari.md](02-Mimari.md)**
+>
 > Son güncelleme: 2026-07-20 · Son commit: `759e1b6`
 
 ---
@@ -153,9 +155,14 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 | 0.5 | Catch2 + `UUID`/`Scene`/`SceneSerializer`/`AssetManager` testleri | ✅ 26 test / 80 assertion |
 | 0.6 | Faz 22 artıkları (Inspector doku ayarları, `StartScene` GUID, `AssetDirectory`) | ✅ `.fxproject` sürüm 2 |
 
-**Borç turu, 13a+13b, 16a ve 16b bitti. Sıradaki: Faz 16c** — gerçek
-örnek script'ler (`PlayerController`, `FollowTarget`) ve küçük bir oyun.
-Motor artık script'i sahneye kaydedip geri yükleyebiliyor.
+**2026-07-21: yön kararı alındı.** Editör temel araçları örnek oyunun
+önüne alındı, C# scripting ertelendi. Gerekçeler ve mimarinin tamamı:
+**[02-Mimari.md](02-Mimari.md)** — yeni bir şey eklemeden önce oku.
+
+**Sıradaki: A1 — component meta-veri sistemi.** Her component tek yerde
+tanımlanacak (ad, alan listesi, serileştirme, Inspector çizimi). Bu tek
+iş, Inspector'ı, script alanlarını, çok hedefli düzenlemeyi ve Undo'yu
+birden ucuzlatıyor; ileride C# köprüsünün dayanacağı yapı da bu.
 13c/13d ertelendi, gerekçesi [Faz-13-Notlar.md](Faz-13-Notlar.md)'de.
 
 ### Bölünmüş fazlar

@@ -395,20 +395,53 @@ MVP sırasında bilinçli olarak bıraktıklarımız:
 
 # Güncel sıra
 
-Borç turu (0.1–0.6) ve 13a–13b tamamlandı. Kalan:
+**2026-07-21'de yön kararı alındı** (ayrıntı: [02-Mimari.md](02-Mimari.md)
+Bölüm II). Editör temel araçları örnek oyunun önüne alındı, C# scripting
+ertelendi.
 
 ```
-16a → 16b → 16c → 14 → 15 → 18b → 17a-d
-    → 18c → 20a → 20b → 19 → 23 → 18d → 13c → 13d → 20c → 20d
+Aşama A:  A1 component meta → A2 Game View → A3 Settings
+          → A4 script dosyası → A5 Undo/Redo
+Aşama B:  oyun DLL'i + hot reload
+Aşama C:  C# kararı yeniden değerlendirilir
+Sonra:    16c → 14 → 15 → 18b → 17a-d → 18c → 19 → 23 → 18d
+          → 13c → 13d → 20c → 20d
 ```
+
+## Aşama A — Editör temelleri
+
+- [ ] **A1 — Component meta-veri sistemi.** Her component tek yerde:
+      ad, alan listesi, serileştirme, Inspector çizimi. Elle yazılan
+      kayıt (makro/reflection kütüphanesi yok). Script alanlarının
+      Inspector'dan ayarlanmasını ve Undo'yu da bu açar.
+- [ ] **A2 — Game View / Scene View ayrımı.** Sahne kamerasından ayrı
+      pencere; gizmo/ızgara yalnızca Scene View'da.
+- [ ] **A3 — Project Settings + Preferences.** Projeye ait ayarlar
+      (`ProjectSettings/`) ile kullanıcıya ait ayarlar (`editor.json`)
+      ayrılır.
+- [ ] **A4 — Script dosyası oluşturma + şablon.** İçerik panelinden
+      "Yeni Script" → şablon → sistem editöründe aç.
+- [ ] **A5 — Undo/Redo** (eski 20a + 20b). A1'den sonra çok ucuzlar.
+
+## Aşama B — İterasyon hızı
+
+- [ ] Oyun kodunu ayrı DLL'e alma + hot reload (C++ kalır, script
+      değişimi ~5 sn)
+
+## Aşama C — Script dili
+
+- [ ] C# (Mono/CoreCLR) kararı yeniden değerlendirilir. Ön koşulu A1.
 
 **Neden bu sıra:**
-- **16 mümkün olduğunca erken:** motor sahne düzenleyip çalıştırabiliyor
-  ama hâlâ *oyun* çalıştıramıyor. 16c'deki örnek oyun, hangi API'lerin
-  eksik olduğunu tasarım tartışmasından hızlı gösterir.
+- **A1 en önde:** component meta tablosu Inspector çizimini,
+  serileştirmeyi, script alanlarını, çok hedefli düzenlemeyi ve Undo
+  komutlarını birden ucuzlatıyor. Ayrıca ileride C# köprüsünün
+  dayanacağı yapı bu.
+- **A5 (Undo) A1'den sonra:** generic "alanı değiştir" komutu ancak alan
+  tablosu varken yazılabilir.
+- **16c örnek oyun ertelendi:** ilk tur eksikler zaten belli oldu
+  (Game View, settings, component sistemi, script dosyası). Araçlar
+  bitince yazılacak; ikinci tur eksikler orada görünecek.
 - **18b (`DrawCircle`) fizikten önce:** 17c'nin collider debug çizimi
   daireyi bekliyor.
-- **Undo (20a-b) fizikten sonra, metin/sesten önce:** her yeni faz
-  Undo'nun kapsamını büyütüyor; fizik component'lerini de kapsasın ama
-  daha fazla ertelemek maliyeti artırır. Ön koşulları (0.2, 0.3) hazır.
 - **13c/13d ve 18d en sona:** üçü de şu an var olmayan bir soruna çözüm.

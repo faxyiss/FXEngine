@@ -28,7 +28,7 @@
 
 #include "EditorApp.h"
 
-int main(int /*argc*/, char** /*argv*/)
+int main(int argc, char** argv)
 {
     // 1) Log EN BASTA. Bundan onceki hicbir log dogru renklenmez.
     FX::Log::Init();
@@ -44,6 +44,8 @@ int main(int /*argc*/, char** /*argv*/)
     // yoksa SDL kapandiktan sonra SDL fonksiyonu cagirmis oluruz.
     {
         FXEd::EditorApp app;
+        if (argc > 1)
+            app.SetStartupProject(argv[1]);
         app.Run();
     }
 

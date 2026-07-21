@@ -465,7 +465,14 @@ hızı her gün acıtıyor, Undo ara sıra.
       `s_Active`'e doğrudan başvuruyordu → gövdeleri `.cpp`'ye taşındı.
       Diğer paylaşılan durumlar zaten `.cpp` kapsamlıydı. **51 test yeşil,
       davranış değişikliği sıfır.**
-- [ ] **B-2** — boş `Game.dll` hedefi + `<proje>/assets/scripts/` tarama
+- [x] **B-2 — `Game.dll` hedefi + proje script taraması.** Her proje
+      kendi `Game.dll`'ini derliyor: `<proje>/.fxbuild/` iskelesi editör
+      tarafından **üretiliyor** (elle yazılmaz), `assets/scripts/*.h`
+      `CONFIGURE_DEPENDS` ile taranıyor. Motor kendini tarif eden bir
+      `FXEngineConfig-<Config>.cmake` üretiyor — include yolları ikinci
+      bir yerde tekrarlanmıyor. Namespace `FXGame`. DLL tek sembol dışa
+      aktarıyor: `FXRegisterScripts`. **Editör henüz yüklemiyor.**
+      Yan kazanç: `FXEditor.exe <yol.fxproject>`.
 - [ ] **B-3** — `FXRegisterScripts()` dışa aktarımı; ilk iş EnTT tip
       kimliğini DLL sınırında ölçmek
 - [ ] **B-4** — gölge kopya + `FreeLibrary`/`LoadLibrary` döngüsü

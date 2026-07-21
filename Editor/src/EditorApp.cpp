@@ -98,7 +98,12 @@ namespace FXEd
         // Proje SECILMEDEN varlik yuklemiyoruz: varlik yollari ve doku
         // onbellegi projeye goreli cozuluyor. Once yukleyip sonra proje
         // acsaydik eski kokten gelen dokular onbellekte kalirdi.
-        m_ShowLauncher = true;
+        // Komut satirinda .fxproject verildiyse karsilama ekranini atla.
+        // (Dosya iliskilendirmesi ve test icin; elle acmayi degistirmez.)
+        if (!m_StartupProject.empty())
+            OpenProject(m_StartupProject);
+        else
+            m_ShowLauncher = true;
 
         FX_INFO("");
         FX_INFO("Editor hazir. Panelleri surukleyerek yeniden duzenleyebilirsin;");

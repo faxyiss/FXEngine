@@ -84,4 +84,123 @@ buna bağlı.
 
 ---
 
-## B-2 — (sırada) Boş `Game.dll` hedefi
+## B-2 — `Game.dll` hedefi + proje script taraması (2026-07-21) ✅
+
+### Cevaplanması gereken soru: `Game.dll`'in CMake projesi nerede yaşar?
+
+Plan bunu açık bırakmıştı. İki seçenek vardı:
+
+| Seçenek | Neden hayır / evet |
+|---|---|
+| FXEngine deposunda sabit bir `Game/` hedefi | Tek bir projeye çivilenirdi. Her projenin kendi oyun kodu var; ikinci projeyi açtığında hangi DLL? |
+| **Her proje kendi `Game.dll`'ini derler** | ✅ Seçilen. Oyun kodu projeye ait, tıpkı sahneler ve dokular gibi |
+
+Yani `Game.dll`'in derlemesi **ayrı bir CMake projesi** ve kullanıcının
+proje klasöründe duruyor:
+
+```
+<proje>/
+  assets/scripts/*.h      ← KULLANICININ sahiplendiği tek yer
+  .fxbuild/               ← URETILEN iskele, elle düzenlenmez
+    CMakeLists.txt
+    GameMain.cpp
+    GameRegistrations.h.in
+    cmake/                ← CMake'in kendi çıktı ağacı
+    out/Game.dll
+```
+
+`.fxbuild/` **üretiliyor, elle yazılmıyor** — proje her açıldığında
+`GameProject::WriteBuildFiles()` tarafından. Gerekçe: motorun include
+yolları veya kayıt mekanizması değiştiğinde altı ay önce oluşturulmuş bir
+proje kırılmasın. Kullanıcının dokunduğu tek yer `assets/scripts/`.
+
+### İkinci soru: oyun projesi motoru nasıl buluyor?
+
+Naif çözüm, `.fxbuild/CMakeLists.txt` içine include yollarını elle
+yazmaktı. Bu **aynı bilgiyi iki yerde tutmak** olurdu (§7) ve bir bağımlılık
+eklendiği gün ayrışırdı.
+
+Bunun yerine motor **kendini tarif eden bir dosya üretiyor**:
+
+```cmake
+# Engine/CMakeLists.txt
+file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/FXEngineConfig-$<CONFIG>.cmake" ...)
+```
+
+İçinde `FXEngine` adında bir `IMPORTED SHARED` hedef var; oyun projesi
+onu `include()` edip `target_link_libraries(Game PRIVATE FXEngine)`
+diyor. Bilgi tek yerden, hedefin kendisinden okunuyor.
+
+Üç ayrıntı:
+
+- **`INCLUDE_DIRECTORIES`, `INTERFACE_INCLUDE_DIRECTORIES` değil.** Yalnızca
+  ilki transitif olarak hesaplanıyor; SDL3/glm/EnTT/json/glad yolları
+  ancak böyle geliyor. Bedeli: `PRIVATE` olan `Engine/src` ve `stb` de
+  listeye giriyor. `Engine/src` tüketen tarafta `list(FILTER ... EXCLUDE)`
+  ile eleniyor.
+- **Boş liste girdileri** (`;;`) kapalı generator ifadelerinden kalıyor ve
+  CMake boş include yolunu hata sayıyor — onlar da eleniyor.
+- **Dosya adında `$<CONFIG>`.** Debug ile Release'in hem `FX_DEBUG`'ı hem
+  `.lib` yolu farklı. Editör kendi config'ine ait olanı seçiyor
+  (`FX_BUILD_CONFIG` derleme tanımı).
+
+### Kayıt: A4'ün mekanizması taşındı, yeniden yazılmadı
+
+`.fxbuild/CMakeLists.txt`, A4'ün `Editor/CMakeLists.txt`'te yaptığının
+aynısını yapıyor: `CONFIGURE_DEPENDS` ile klasörü tarar, her `<Ad>.h`
+için bir include + bir `Register` satırı üretir. Planın öngördüğü gibi
+üreteç **taşındı, silinmedi**.
+
+**Namespace `FXEd` değil `FXGame`.** Proje script'i editöre değil oyuna
+ait; `FXEd` (= FXEditor) orada yanlış isim olurdu. B-3'te `Spin`/`Move`
+taşınırken bir kereye mahsus yeniden adlandırılacaklar.
+
+### DLL'in dışa aktardığı tek sembol
+
+```cpp
+extern "C" __declspec(dllexport) void FXRegisterScripts();
+```
+
+`extern "C"`: `GetProcAddress`'e C++ mangling'i ile ad vermek derleyiciye
+bağımlı olurdu. Bu sembol B-2'de yazıldı ama **editör onu henüz
+yüklemiyor** — yükleme B-3.
+
+### Yan kazanç: komut satırından proje açma
+
+`FXEditor.exe <yol.fxproject>` artık karşılama ekranını atlayıp projeyi
+açıyor. B-2'yi doğrulamanın tek yolu buydu (aksi halde her denemede GUI'den
+proje seçmek gerekiyordu); dosya ilişkilendirmesi için de hazır duruyor.
+
+### Doğrulama
+
+| Ne | Sonuç |
+|---|---|
+| Editör projeyi açınca `.fxbuild/` iskelesi yazılıyor mu | ✅ üç dosya da yerinde |
+| Script'i **olmayan** projede DLL derleniyor mu | ✅ boş `Game.dll` üretildi |
+| `assets/scripts/Spin.h` eklenince | ✅ `GameRegistrations.h` içinde `Register<FXGame::Spin>("Spin")` |
+| DLL motora gerçekten bağlanıyor mu | ✅ `Spin` motorun `ScriptableEntity`/`TransformComponent`/`FX_INFO`'sunu kullanıyor, link temiz |
+| Sembol dışa aktarılmış mı | ✅ `dumpbin /exports` → `FXRegisterScripts` (bozulmamış ad) |
+| Editör DLL'i yüklüyor mu | ✅ **hayır** — B-2'nin ölçütü buydu |
+| `FXTests` | ✅ 51 test / 238 assertion |
+
+### Bilerek yapılmayanlar
+
+- **Editörden derleme tetiklenmiyor.** `cmake` elle çalıştırıldı; düğme B-5.
+- **`.fxbuild/` proje `.gitignore`'una eklenmiyor.** Projelerin henüz
+  `.gitignore`'u yok; proje şablonu konusu ayrı bir iş.
+- **Kurulu (installed) dağıtım düşünülmedi.** `FX_ENGINE_BUILD_DIR`
+  motorun build ağacını gösteriyor. Editör zaten derleyici şart koşuyor;
+  gerçek bir dağıtımda yerine install ağacı geçer.
+
+### Test artığı
+
+`FXTest2` projesinin `assets/scripts/Spin.h`'i bu doğrulamadan kaldı.
+B-3'ün başlangıç noktası olarak bilerek bırakıldı.
+
+---
+
+## B-3 — (sırada) Editör DLL'i yüklüyor
+
+İlk iş plandaki en ciddi risk: **EnTT tip kimliğini DLL sınırında ölçmek.**
+DLL'den `GetComponent<TransformComponent>()` çağırıp gerçekten aynı veriye
+eriştiğini görmeden devam edilmeyecek.

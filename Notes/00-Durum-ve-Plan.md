@@ -52,7 +52,8 @@ MVP (Faz 0–7) ve şu fazlar tamam: **8, 9, 10, 11, 12, 21, 22**,
 | `34d59da` · `c62dabe` | **A3** Project Settings + Preferences, ayrı "Ayarlar" menüsü |
 | `136d8bc` · `671915d` | **A4** Script dosyası oluşturma + otomatik kayıt |
 | `34f27db` · `46da685` | **Aşama B planı** yazıldı ve onaylandı |
-| _bu oturum_ | **B-1** `FXEngine` → `SHARED`; `Project::GetActive/HasActive` `.cpp`'ye taşındı |
+| `cdabcde` | **B-1** `FXEngine` → `SHARED`; `Project::GetActive/HasActive` `.cpp`'ye taşındı |
+| _bu oturum_ | **B-2** `<proje>/.fxbuild/` iskelesi + `Game.dll` + `FXEngineConfig-<Config>.cmake` |
 
 ### Şu an çalışan özellikler
 
@@ -152,8 +153,8 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 
 ```
 ✅ borç turu 0.1–0.7  ✅ 13a  ✅ 13b  ✅ 16a  ✅ 16b  ✅ A1  ✅ A2  ✅ A3  ✅ A4
-✅ B-1 (FXEngine → SHARED)
-▶  B-2 → B-3 → B-4 → B-5 → B-6
+✅ B-1 (FXEngine → SHARED)  ✅ B-2 (Game.dll hedefi)
+▶  B-3 → B-4 → B-5 → B-6
    → A5 Undo/Redo
    → C: C# kararı
    → 16c → 14 → 15 → 18b → 17a-d → 18c → 19 → 23 → 18d
@@ -180,12 +181,20 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 
 ---
 
-## 5b. YENİ OTURUMDA İLK İŞ: Aşama B — **B-2'den devam**
+## 5b. YENİ OTURUMDA İLK İŞ: Aşama B — **B-3'ten devam**
 
 **Plan:** [Asama-B-Plan.md](Asama-B-Plan.md) · **yapılanlar:**
-[Faz-B-Notlar.md](Faz-B-Notlar.md). B-1 bitti (motor artık DLL, 51 test
-yeşil). Sıradaki: **B-2** — boş bir `Game.dll` hedefi + `<proje>/assets/
-scripts/` tarama.
+[Faz-B-Notlar.md](Faz-B-Notlar.md).
+
+B-1 ✅ motor artık `FXEngine.dll` · B-2 ✅ her proje kendi `Game.dll`'ini
+derliyor (`<proje>/.fxbuild/` iskelesi editör tarafından üretiliyor,
+`assets/scripts/*.h` taranıyor, `FXRegisterScripts` dışa aktarılıyor).
+
+**Sıradaki B-3:** editör DLL'i `LoadLibrary` ile yükleyip kayıtları alacak.
+**İlk iş, plandaki en ciddi risk:** EnTT tip kimliğini DLL sınırında
+ölçmek — DLL'den `GetComponent<TransformComponent>()` gerçekten aynı
+veriye erişiyor mu? Teoriye güvenilmeyecek. Sonra `Spin`/`Move` örnek
+projeye taşınacak (§B6).
 
 **Neden A5'ten önce:** kullanıcı her script değişikliğinde editörü
 yeniden derleyip yeniden başlatmak zorunda; bu her gün acıtıyor.

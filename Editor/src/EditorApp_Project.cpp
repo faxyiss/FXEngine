@@ -1,6 +1,7 @@
 #include "EditorApp.h"
 #include "Platform/FileDialogs.h"
 #include "SampleScene.h"
+#include "Game/GameProject.h"
 
 #include <FXEngine/Core/Log.h>
 #include <FXEngine/Core/FileSystem.h>
@@ -363,6 +364,7 @@ namespace FXEd
         if (auto project = FX::Project::Create(dir, name))
         {
             PushRecentProject(project->GetFilePath());
+            PrepareGameBuild();
 
             NewScene();
             m_ContentBrowser.SetContext(&m_TextureLibrary);   // kok degisti
@@ -373,6 +375,13 @@ namespace FXEd
         {
             SetStatus("PROJE OLUSTURULAMADI");
         }
+    }
+
+    void EditorApp::PrepareGameBuild()
+    {
+        std::string error;
+        if (!GameProject::WriteBuildFiles(&error))
+            FX_WARN("Oyun derleme iskelesi kurulamadi: %s", error.c_str());
     }
 
     void EditorApp::OpenProject()
@@ -393,6 +402,7 @@ namespace FXEd
         }
 
         PushRecentProject(project->GetFilePath());
+        PrepareGameBuild();
 
         // Doku onbellegi ESKI projenin yollarini tutuyor. Temizlemezsek
         // yeni projedeki "assets/textures/x.png" eski projenin ayni

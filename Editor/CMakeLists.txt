@@ -19,6 +19,8 @@ add_executable(FXEditor
     src/ImGuiLayer.h
     src/EditorCamera.cpp
     src/EditorCamera.h
+    src/Game/GameProject.cpp
+    src/Game/GameProject.h
     src/Panels/ComponentDrawer.cpp
     src/Panels/ComponentDrawer.h
     src/Panels/SceneHierarchyPanel.cpp
@@ -64,7 +66,12 @@ target_sources(FXEditor PRIVATE ${FXEDITOR_SCRIPT_HEADERS})
 # "Yeni Script" bu klasore yaziyor. KAYNAK agacindaki yol - uretilen
 # dosyanin derlenebilmesi icin kaynakta durmasi gerekiyor.
 target_compile_definitions(FXEditor PRIVATE
-    FX_EDITOR_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/src/Scripts")
+    FX_EDITOR_SCRIPTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/src/Scripts"
+    # B-2: oyun projesi motoru buradan buluyor. Editor gelistirme
+    # zamaninda calisiyor ve zaten derleyici sart kosuyor; kurulu bir
+    # dagitimda bunun yerine install agaci gecer.
+    FX_ENGINE_BUILD_DIR="${CMAKE_BINARY_DIR}"
+    FX_BUILD_CONFIG="$<CONFIG>")
 
 target_include_directories(FXEditor PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src

@@ -138,3 +138,42 @@ target_compile_definitions(FXEngine PUBLIC
     $<$<CONFIG:Debug>:FX_DEBUG>
     $<$<CONFIG:RelWithDebInfo>:FX_DEBUG>
     $<$<CONFIG:Release>:FX_RELEASE>)
+
+# ---------------------------------------------------------------------------
+# Oyun projesi icin motor tarifi (Asama B-2)
+# ---------------------------------------------------------------------------
+# Game.dll AYRI bir CMake projesi olarak, kullanicinin proje klasorunde
+# derleniyor. Motora baglanmak icin include yollarina ve import
+# kutuphanesine ihtiyaci var. Bunlari orada elle yazsaydik ikinci bir
+# kopya olurdu ve er gec ayrisirdi; onun yerine hedeften OKUYUP bir
+# dosyaya yaziyoruz.
+#
+# INCLUDE_DIRECTORIES (INTERFACE_ degil): tek transitif olarak hesaplanan
+# olan bu - SDL3/glm/EnTT/json/glad'in yollari da icinde geliyor. Bedeli
+# PRIVATE src/ yolunun da listeye girmesi; tuketen taraf onu eliyor.
+#
+# Dosya adinda $<CONFIG>: Debug ile Release'in FX_DEBUG'i ve .lib yolu
+# farkli. Editor kendi config'ine ait olani secer.
+file(GENERATE
+    OUTPUT  "${CMAKE_BINARY_DIR}/FXEngineConfig-$<CONFIG>.cmake"
+    CONTENT
+"# URETILEN DOSYA - Engine/CMakeLists.txt tarafindan yazildi.
+add_library(FXEngine SHARED IMPORTED GLOBAL)
+
+set(FXENGINE_INCLUDE_DIRS \"$<TARGET_PROPERTY:FXEngine,INCLUDE_DIRECTORIES>\")
+set(FXENGINE_DEFINITIONS  \"$<TARGET_PROPERTY:FXEngine,COMPILE_DEFINITIONS>\")
+
+# src/ PRIVATE'ti, disari sizmasin. Bos girisler: kapali generator
+# ifadelerinden kaliyor ve CMake bos include yolunu hata sayiyor.
+list(FILTER FXENGINE_INCLUDE_DIRS EXCLUDE REGEX \"/Engine/src$\")
+list(FILTER FXENGINE_INCLUDE_DIRS EXCLUDE REGEX \"^$\")
+list(FILTER FXENGINE_DEFINITIONS  EXCLUDE REGEX \"^$\")
+
+set_target_properties(FXEngine PROPERTIES
+    IMPORTED_LOCATION             \"$<TARGET_FILE:FXEngine>\"
+    IMPORTED_IMPLIB               \"$<TARGET_LINKER_FILE:FXEngine>\"
+    INTERFACE_INCLUDE_DIRECTORIES \"\${FXENGINE_INCLUDE_DIRS}\"
+    INTERFACE_COMPILE_DEFINITIONS \"\${FXENGINE_DEFINITIONS}\")
+
+set(FXENGINE_BIN_DIR \"$<TARGET_FILE_DIR:FXEngine>\")
+")

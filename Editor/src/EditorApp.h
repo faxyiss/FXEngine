@@ -54,6 +54,11 @@ namespace FXEd
         bool OpenProject(const std::string& filepath);  // dogrudan yukler
         void PushRecentProject(const std::string& path);
 
+        // B-2: <proje>/.fxbuild/ iskelesini kurar. Proje her acildiginda
+        // cagriliyor - iskele URETILEN bir sey, eski projeler de yeni
+        // motorla derlenebilmeli.
+        void PrepareGameBuild();
+
         // Ertelenmis proje istekleri; ImGui cercevesi kapandiktan sonra.
         void ProcessProjectRequests();
 
@@ -66,6 +71,13 @@ namespace FXEd
         void StartWithoutProject();
 
         bool m_ShowLauncher = true;
+
+    public:
+        // Komut satirindan verilen .fxproject; OnInit bunu acar.
+        void SetStartupProject(const std::string& path) { m_StartupProject = path; }
+
+    private:
+        std::string m_StartupProject;
 
         // --- Sahne dosyasi islemleri (Faz 12) ---------------------------------
         void NewScene();

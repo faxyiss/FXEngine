@@ -1,5 +1,6 @@
 #include "Game/GameLibrary.h"
 
+#include <FXEngine/Core/EngineABI.h>
 #include <FXEngine/Core/Log.h>
 #include <FXEngine/Scene/Scene.h>
 #include <FXEngine/Scene/Entity.h>
@@ -19,6 +20,7 @@ namespace FXEd
     {
         using RegisterFn = void (*)();
         using SelfTestFn = int  (*)(FX::Scene*, unsigned long long);
+        using AbiFn      = int  (*)();
     }
 
     GameLibrary::~GameLibrary()
@@ -42,6 +44,7 @@ namespace FXEd
     bool GameLibrary::Load(const std::string& dllPath, std::string* error)
     {
         Unload();
+        m_AbiMismatch = false;
 
         namespace fs = std::filesystem;
 
@@ -94,6 +97,28 @@ namespace FXEd
             if (error)
                 *error = "LoadLibrary basarisiz (kod "
                        + std::to_string(::GetLastError()) + "): " + loadPath;
+            return false;
+        }
+
+        // ABI kontrolu KAYITTAN ONCE: uyumsuz bir DLL'in script'ini
+        // kaydetmek, Play'e basildiginda yanlis vtable girisine dallanmak
+        // demek. Damgasi olmayan DLL de uyumsuz sayilir - damga oncesi
+        // her derleme oyle.
+        const auto abiFn = reinterpret_cast<AbiFn>(
+            ::GetProcAddress(handle, "FXEngineABIVersion"));
+        const int dllAbi = abiFn ? abiFn() : 0;
+
+        if (dllAbi != FX_ENGINE_ABI_VERSION)
+        {
+            ::FreeLibrary(handle);
+            if (error)
+            {
+                *error = "Game.dll bu motorla uyumsuz (DLL surumu "
+                       + std::to_string(dllAbi) + ", motor "
+                       + std::to_string(FX_ENGINE_ABI_VERSION)
+                       + "). Oynatma seridindeki Derle dugmesine bas.";
+            }
+            m_AbiMismatch = true;
             return false;
         }
 

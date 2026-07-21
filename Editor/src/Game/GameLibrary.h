@@ -34,6 +34,12 @@ namespace FXEd
 
         bool IsLoaded() const { return m_Handle != nullptr; }
 
+        // Son Load, DLL eski bir motorla derlendigi icin mi basarisiz
+        // oldu? "Henuz derlenmemis proje" ile "yeniden derlenmesi gereken
+        // proje" ayri seyler: ilki normal, ikincisi kullaniciya
+        // soylenmeli.
+        bool HasAbiMismatch() const { return m_AbiMismatch; }
+
         // EnTT tip kimligi + veri erisimi DLL sinirinda calisiyor mu?
         // Load'dan sonra bir kez cagrilir. DLL'de sembol yoksa false.
         bool RunSelfTest(std::string* detail = nullptr);
@@ -41,5 +47,6 @@ namespace FXEd
     private:
         void*       m_Handle = nullptr;  // HMODULE (windows.h'i header'a sizdirmamak icin void*)
         std::string m_ShadowPath;        // yuklenen golge kopyanin yolu (B-4)
+        bool        m_AbiMismatch = false;
     };
 }

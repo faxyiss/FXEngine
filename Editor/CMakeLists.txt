@@ -23,6 +23,9 @@ add_executable(FXEditor
     src/Game/GameProject.h
     src/Game/GameLibrary.cpp
     src/Game/GameLibrary.h
+    src/Commands/CommandStack.h
+    src/Commands/StructuralCommands.cpp
+    src/Commands/StructuralCommands.h
     src/Panels/ComponentDrawer.cpp
     src/Panels/ComponentDrawer.h
     src/Panels/SceneHierarchyPanel.cpp

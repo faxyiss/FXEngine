@@ -1,4 +1,5 @@
 #include "EditorApp.h"
+#include "Commands/StructuralCommands.h"
 
 #include <FXEngine/Core/Log.h>
 #include <FXEngine/Core/Input.h>
@@ -575,24 +576,13 @@ namespace FXEd
         if (IsPlaying() || m_Selection.IsEmpty())
             return;
 
-        // Secim listesinin KOPYASI uzerinde geziyoruz: silme sirasinda
-        // secimi de temizliyoruz.
+        // Secim listesinin KOPYASI uzerinde geziyoruz: komut silme
+        // sirasinda secimi de temizliyor.
         const std::vector<FX::Entity> selection = m_Selection.GetAll();
-        int deleted = 0;
-
-        for (FX::Entity entity : selection)
-        {
-            // Listedeki bir entity, daha once silinen baskasinin cocugu
-            // olabilir; o zaten yok oldu.
-            if (!entity || !m_Scene->GetRegistry().valid(entity.GetHandle()))
-                continue;
-
-            m_Scene->DestroyEntity(entity);
-            ++deleted;
-        }
+        const int deleted = Structural::DestroyEntities(selection);
 
         m_Selection.Clear();
-        SetStatus(std::to_string(deleted) + " entity silindi");
+        SetStatus(std::to_string(deleted) + " entity silindi (Ctrl+Z ile geri)");
     }
 
     void EditorApp::ApplyGizmoDelta(const glm::mat4& delta, FX::Entity primary)

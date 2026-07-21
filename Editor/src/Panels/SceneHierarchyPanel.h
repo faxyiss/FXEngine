@@ -74,6 +74,7 @@ namespace FXEd
         // Agac uzerinde gezerken yapiyi degistirmek yineleyicileri bozar;
         // istekleri biriktirip dongu bittikten sonra uyguluyoruz.
         std::vector<FX::Entity> m_ToDelete;
+        FX::Entity m_CreateChildOf;   // "Alt Entity Ekle" istegi
         FX::Entity m_ReparentChild;
         FX::Entity m_ReparentTarget;
         bool       m_ReparentToRoot = false;

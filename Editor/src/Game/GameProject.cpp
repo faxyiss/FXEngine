@@ -152,12 +152,22 @@ namespace FXGame
 
 #include <GameRegistrations.h>
 
+#include <FXEngine/Core/EngineABI.h>
 #include <FXEngine/Scene/Scene.h>
 #include <FXEngine/Scene/Entity.h>
 #include <FXEngine/Scene/Components.h>
 
 // Editorun DLL'de aradigi semboller. Isim bozulmasin diye extern "C":
 // GetProcAddress'e C++ mangling'i ile ad vermek derleyiciye bagimli olurdu.
+
+// Bu DLL'in HANGI motor surumuyle derlendigi. Derleme zamaninda gomulur;
+// editor yuklemeden once kendi surumuyle karsilastirir. Uyusmazsa
+// yuklemez: eski bir DLL'in script'ini calistirmak vtable uyusmazligi
+// yuzunden cokme demek.
+extern "C" __declspec(dllexport) int FXEngineABIVersion()
+{
+    return FX_ENGINE_ABI_VERSION;
+}
 
 extern "C" __declspec(dllexport) void FXRegisterScripts()
 {

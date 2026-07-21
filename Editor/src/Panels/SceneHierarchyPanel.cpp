@@ -1,4 +1,5 @@
 #include "SceneHierarchyPanel.h"
+#include "Commands/StructuralCommands.h"
 #include "Panels/ComponentDrawer.h"
 
 #include <FXEngine/Core/Log.h>
@@ -111,7 +112,7 @@ namespace FXEd
                                            ImGuiPopupFlags_NoOpenOverItems))
         {
             if (ImGui::MenuItem("Bos Entity Olustur"))
-                m_Selection->Select(m_Scene->CreateEntity("Yeni Entity"));
+                Structural::CreateEntity("Yeni Entity");
             ImGui::EndPopup();
         }
 
@@ -124,6 +125,12 @@ namespace FXEd
         // Yapiyi degistiren islemler dongu DISINDA: agac uzerinde
         // gezerken parent/child listelerini degistirmek yineleyicileri
         // gecersiz kilardi.
+        if (m_CreateChildOf)
+        {
+            Structural::CreateEntity("Yeni Entity", m_CreateChildOf);
+            m_CreateChildOf = {};
+        }
+
         if (m_ReparentChild)
         {
             if (m_ReparentToRoot)
@@ -132,25 +139,23 @@ namespace FXEd
                 m_ReparentChild.SetParent(m_ReparentTarget);
         }
 
-        for (FX::Entity toDelete : m_ToDelete)
+        if (!m_ToDelete.empty())
         {
-            // Coklu silmede listedeki bir entity, daha once silinen
-            // baska birinin cocugu olabilir - o zaten yok oldu.
-            // Entity::operator bool registry'ye bakmiyor, bu yuzden
-            // gecerliligi burada sormak zorundayiz.
-            if (!toDelete || !m_Scene->GetRegistry().valid(toDelete.GetHandle()))
-                continue;
-
             // Secili entity silinenin ALTINDA olabilir; o da yok olacak.
             // Silmeden ONCE ayikliyoruz: sonrasinda IsAncestorOf'a
             // gecersiz entity sormus olurduk.
-            const std::vector<FX::Entity> selection = m_Selection->GetAll();
-            for (FX::Entity selected : selection)
+            for (FX::Entity toDelete : m_ToDelete)
             {
-                if (selected == toDelete || toDelete.IsAncestorOf(selected))
-                    m_Selection->Remove(selected);
+                if (!toDelete || !m_Scene->GetRegistry().valid(toDelete.GetHandle()))
+                    continue;
+
+                const std::vector<FX::Entity> selection = m_Selection->GetAll();
+                for (FX::Entity selected : selection)
+                    if (selected == toDelete || toDelete.IsAncestorOf(selected))
+                        m_Selection->Remove(selected);
             }
-            m_Scene->DestroyEntity(toDelete);
+
+            Structural::DestroyEntities(m_ToDelete);
         }
 
         // ===================================================================
@@ -268,13 +273,11 @@ namespace FXEd
             if (multi)
                 ImGui::TextDisabled("%d entity secili", static_cast<int>(selCount));
 
+            // Olusturma da dongu DISINDA: burasi registry view'i uzerinde
+            // gezilirken calisiyor ve yeni entity + parent bagi
+            // yineleyicileri bozardi.
             if (ImGui::MenuItem("Alt Entity Ekle"))
-            {
-                FX::Entity child = m_Scene->CreateEntity("Yeni Entity");
-                m_ReparentChild  = child;
-                m_ReparentTarget = entity;
-                m_Selection->Select(child);
-            }
+                m_CreateChildOf = entity;
             if (ImGui::MenuItem("Koke Tasi", nullptr, false, static_cast<bool>(entity.GetParent())))
             {
                 m_ReparentChild  = entity;
@@ -424,10 +427,9 @@ namespace FXEd
             if (FX::ComponentInfo* info = FX::ComponentRegistry::Find(m_ComponentToRemove))
             {
                 // Coklu secimde silme de hepsine uygulanir (ekleme gibi).
-                info->Remove(entity);
-                for (FX::Entity other : alsoApplyTo)
-                    if (info->Has(other))
-                        info->Remove(other);
+                std::vector<FX::Entity> targets{ entity };
+                targets.insert(targets.end(), alsoApplyTo.begin(), alsoApplyTo.end());
+                Structural::RemoveComponent(*info, targets);
             }
 
             m_ComponentToRemove.clear();
@@ -476,21 +478,9 @@ namespace FXEd
 
                 if (ImGui::MenuItem(info.Label))
                 {
-                    // Zaten sahip olana EKLEME (AddComponent assert eder);
-                    // yalnizca eksik olanlara.
-                    for (FX::Entity t : targets)
-                    {
-                        if (info.Has(t))
-                            continue;
-
-                        info.Add(t);
-
-                        // Bagimliliklari olan component'ler eksigini kendisi
-                        // tamamliyor (Follow -> Velocity).
-                        if (info.OnAdded)
-                            info.OnAdded(t);
-                    }
-
+                    // Zaten sahip olana eklemeyi (AddComponent assert eder)
+                    // komut kendi eliyor.
+                    Structural::AddComponent(info, targets);
                     ImGui::CloseCurrentPopup();
                 }
             }

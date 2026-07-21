@@ -6,9 +6,9 @@
 >
 > Mimarinin tamamı ve alınan yön kararları: **[02-Mimari.md](02-Mimari.md)**
 >
-> Son güncelleme: 2026-07-21 · Son commit: `2469052`
-> **Aşama A + Aşama B + script alanları tamam.** Sıradaki iş ve C# kararı
-> için **§5b**'ye bak.
+> Son güncelleme: 2026-07-21 · Son commit: `0ba9735`
+> **Aşama A + Aşama B + script alanları + yapısal Undo + ABI damgası
+> tamam.** Sıradaki iş ve C# kararı için **§5b**'ye bak.
 
 ---
 
@@ -73,6 +73,15 @@ MVP (Faz 0–7) ve şu fazlar tamam: **8, 9, 10, 11, 12, 21, 22**,
 | `496b5ba` | **A5 Undo/Redo** — `CommandStack` + Inspector alan düzenleme + gizmo dönüşümü |
 | `2469052` | **Script alanları** — `OnReflect` reflection + `NativeScriptComponent::Fields` |
 
+### Borç turu (2026-07-21, üçüncü tur)
+
+[Faz-YapisalUndo-ve-ABI-Notlar.md](Faz-YapisalUndo-ve-ABI-Notlar.md)
+
+| İş | Sonuç |
+|---|---|
+| **Yapısal Undo** | `EntitySnapshot`/`ComponentSnapshot` (motor) + `Structural` komutları (editör). Entity oluştur/sil, component ekle/sil, prefab ve doku bırakma geri alınabiliyor; çoklu seçim tek adım |
+| **ABI damgası** | `FX_ENGINE_ABI_VERSION`; eski `Game.dll` **yüklenmeden önce** yakalanıyor, konsol + durum çubuğunda uyarı |
+
 ### Şu an çalışan özellikler
 
 - **Proje sistemi:** karşılama ekranı, `.fxproject` **sürüm 3**
@@ -90,33 +99,16 @@ MVP (Faz 0–7) ve şu fazlar tamam: **8, 9, 10, 11, 12, 21, 22**,
   yükleniyor (gölge kopya). Derleme hataları konsolda dosya+satır
 - **Script alanları:** `OnReflect` ile bildirilen alanlar Inspector'da,
   değer component'te veri olarak, Play'de instance'a uygulanıyor
-- **Undo/Redo (A5):** Ctrl+Z / Ctrl+Shift+Z — Inspector alanları + gizmo
+- **Undo/Redo:** Ctrl+Z / Ctrl+Shift+Z — Inspector alanları, gizmo (A5)
+  **+ yapısal işlemler:** entity oluştur/sil, component ekle/sil, prefab
+  ve doku bırakma. Çoklu seçim tek adım
+- **Eski `Game.dll` yakalanıyor:** motor ABI damgası uyuşmazsa DLL
+  yüklenmiyor, konsol açılıp "Derle'ye bas" deniyor
 - **Çoklu seçim:** alan düzenleme + component ekle/sil hepsine uygulanıyor
 - **İçerik paneli:** kopyala/kes/yapıştır, yeniden adlandır, sil, sürükle-bırak
 - **Play/Stop:** kopya sahnede, Edit modu durağan
 - **Girdi:** `FX::Input` (sorgu) + `FX::Event` (olay)
-- **Testler:** `FXTests` **51 test / 238 assertion**
-
-### Şu an çalışan özellikler
-
-- **Proje sistemi:** karşılama ekranı, `.fxproject` **sürüm 3**
-  (ad, varlık klasörü, `StartScene` GUID, hedef çözünürlük), son projeler
-- **Varlık sistemi:** GUID kimlik, `.meta`, taşıma referansları kırmıyor,
-  doku ayarları dosya başına, dosya izleyici
-- **Sahne:** entity UUID'leri, hiyerarşi, prefab, sürüm 4 dosya formatı
-- **Component'ler tek yerde tanımlı (A1):** `ComponentMeta.cpp` →
-  `RegisterBuiltins`. Serileştirme, `Scene::Copy` ve Inspector üçü de
-  oradan besleniyor. Yeni component = **tek yere yazmak**
-- **Scene View / Game View ayrı (A2):** Scene her zaman editör
-  kamerasından + düzenleme yardımcılarıyla, Game her zaman sahne
-  kamerasından + yardımcısız. Play'de Game sekmesi öne gelir
-- **Ayarlar ayrı (A3):** Proje Ayarları → `.fxproject` (sürüm kontrolüne
-  girer) · Tercihler → `editor.json` (girmez). "Ayarlar" menüsünde
-- **Script (16a/16b/A4):** ad tabanlı `ScriptRegistry`, Dosya → "Yeni
-  Script", **kayıt CMake tarafından üretiliyor** (`CONFIGURE_DEPENDS`)
-- **Play/Stop:** kopya sahnede, Edit modu durağan
-- **Girdi:** `FX::Input` (sorgu) + `FX::Event` (olay)
-- **Testler:** `FXTests` **51 test / 238 assertion**
+- **Testler:** `FXTests` **56 test / 266 assertion**
 
 ---
 
@@ -167,7 +159,8 @@ edilmeli.
 ### Yüksek
 | Sorun | Nerede | Not |
 |---|---|---|
-| ~~**Undo/Redo yok**~~ | ✅ A5: `CommandStack` + Inspector alan düzenleme + gizmo dönüşümü geri alınabiliyor (Ctrl+Z/Ctrl+Shift+Z). Yapısal işlemler (entity/component ekle-sil) sonraki tur. [Faz-A5-Notlar.md](Faz-A5-Notlar.md) |
+| ~~**Undo/Redo yok**~~ | ✅ A5: `CommandStack` + alan düzenleme + gizmo ([Faz-A5-Notlar.md](Faz-A5-Notlar.md)) · ✅ **yapısal işlemler** de kapsandı: entity oluştur/sil, component ekle/sil, prefab ve doku bırakma ([Faz-YapisalUndo-ve-ABI-Notlar.md](Faz-YapisalUndo-ve-ABI-Notlar.md)). Kalan: parent değiştirme, yeniden adlandırma, script alanları |
+| ~~**Eski `Game.dll` sessizce uyumsuz**~~ | ✅ `FX_ENGINE_ABI_VERSION`: uyumsuz DLL yüklenmiyor, konsol + durum çubuğunda uyarı |
 
 ### Orta
 | Sorun | Nerede |
@@ -204,6 +197,7 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 ```
 ✅ borç turu 0.1–0.7  ✅ 13a  ✅ 13b  ✅ 16a  ✅ 16b  ✅ A1  ✅ A2  ✅ A3  ✅ A4
 ✅ Aşama B (B-1…B-6)  ✅ A5 Undo/Redo  ✅ Script alanları (OnReflect)
+✅ Yapısal Undo  ✅ Motor/DLL ABI damgası
 ▶  16c örnek oyun  →  18c sıralama katmanı  →  17 fizik  →  14/15 animasyon
    → sonra C: C# kararı (aşağıdaki değerlendirmeye bak)
    → 16c → 14 → 15 → 18b → 17a-d → 18c → 19 → 23 → 18d
@@ -276,12 +270,10 @@ ver.**
 
 - **Türkçe karakterli proje yolu açılmıyor** (§4'te ayrıntı). Boşluk
   sorun değil, ASCII-dışı karakter sorun.
-- **Undo yapısal işlemleri kapsamıyor:** entity sil/oluştur, component
-  ekle/sil. Alan düzenleme + gizmo kapsanıyor.
-- **Undo script alanlarını kapsamıyor** (A1 tablosunda değiller).
-- **`ScriptableEntity`'ye yeni sanal eklendi (vtable değişti):** eski
-  motorla derlenmiş `Game.dll` uyumsuz. Proje açtıktan sonra **bir kez
-  Derle** gerekiyor. Sürüm damgasıyla otomatik tespit yok.
+- **Undo hâlâ kapsamıyor:** parent değiştirme (sürükle-bırak), entity
+  yeniden adlandırma, script alanları. Yapısal ekle/sil kapsandı.
+- **Eski `Game.dll` artık sessiz değil** ama yine de bir kez **Derle**
+  gerekiyor: ABI damgası uyumsuzluğu tespit ediyor, otomatik derlemiyor.
 
 ---
 

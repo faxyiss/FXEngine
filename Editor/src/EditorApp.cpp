@@ -1,5 +1,6 @@
 #include "EditorApp.h"
 #include "Platform/FileDialogs.h"
+#include "Commands/StructuralCommands.h"
 #include "Panels/ComponentDrawer.h"
 
 #include <FXEngine/Core/Log.h>
@@ -76,6 +77,11 @@ namespace FXEd
         // bilmez; tablo yalnizca tasiyicidir.
         ComponentDrawer::RegisterEditorUI(&m_TextureLibrary, &m_Commands);
 
+        // Yapisal komutlarin (entity/component ekle-sil) ihtiyaci olan
+        // dort sey. Sahne isaretcisi Play/Stop ve sahne yuklemede
+        // degisiyor; SetScene ile guncelleniyor.
+        Structural::SetContext({ m_Scene, &m_Commands, &m_Selection, &m_TextureLibrary });
+
         // Logo proje acilmadan ONCE yukleniyor: o sirada varlik koku
         // hala exe klasoru (bkz. FileSystem::GetProjectDirectory).
         {
@@ -116,6 +122,12 @@ namespace FXEd
         FX_INFO("Gizmo: Z kapali, X tasi, C dondur, B olcekle (Ctrl = kademeli)");
     }
 
+    void EditorApp::RebindScene()
+    {
+        m_HierarchyPanel.SetContext(m_Scene);
+        Structural::SetScene(m_Scene);
+    }
+
     void EditorApp::SetStatus(const std::string& message)
     {
         m_StatusMessage = message;
@@ -139,7 +151,7 @@ namespace FXEd
         // Secim ESKI sahneye ait bir tutamak tasiyordu; yeni sahnede
         // anlamsiz. Faz 8'de ogrendigimiz ders: tutamak sahneye bagli,
         // kimlik degil.
-        m_HierarchyPanel.SetContext(m_Scene);
+        RebindScene();
         m_Selection.Clear();
 
         m_ScenePaused = false;
@@ -180,7 +192,7 @@ namespace FXEd
         // Play sirasinda birikmis komutlar kopyaya aitti.
         m_Commands.Clear();
 
-        m_HierarchyPanel.SetContext(m_Scene);
+        RebindScene();
         m_Selection.Clear();
 
         m_FocusSceneView = true;

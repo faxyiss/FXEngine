@@ -139,7 +139,7 @@ namespace FXEd
                     m_EditorScene = std::make_unique<FX::Scene>();
                     m_Scene       = m_EditorScene.get();
                     SampleScene::Build(*m_Scene, m_Checkerboard, m_Circle);
-                    m_HierarchyPanel.SetContext(m_Scene);
+                    RebindScene();
                     m_Selection.Clear();
                     m_Commands.Clear();
                 }

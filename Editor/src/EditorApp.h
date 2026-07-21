@@ -109,6 +109,12 @@ namespace FXEd
         // Secili tum entity'leri siler (Delete tusu).
         void DeleteSelection();
 
+        // m_Scene degistikten SONRA cagrilir: sahneye bagli her tuketiciyi
+        // (panel, yapisal komutlar) yeni sahneye baglar. Tek yerde durmasi
+        // sart - alti farkli sahne degisim noktasi var ve birinde unutulan
+        // baglama, komutlarin OLU bir sahneye dokunmasi demek.
+        void RebindScene();
+
         // Coklu secimde gizmo birincil uzerinde duruyor; kalanlara ayni
         // dunya-uzayi deltasi uygulaniyor.
         void ApplyGizmoDelta(const glm::mat4& delta, FX::Entity primary);

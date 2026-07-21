@@ -3,6 +3,7 @@
 #include "SampleScene.h"
 #include "Game/GameProject.h"
 #include "Game/GameLibrary.h"
+#include "Commands/StructuralCommands.h"
 
 #include <FXEngine/Core/Log.h>
 #include <FXEngine/Core/FileSystem.h>
@@ -353,7 +354,7 @@ namespace FXGame
 
         const FX::UUID player = SampleScene::Build(*m_Scene, m_Checkerboard, m_Circle);
 
-        m_HierarchyPanel.SetContext(m_Scene);
+        RebindScene();
         m_Selection.Select(m_Scene->FindEntityByUUID(player));
 
         m_ShowLauncher = false;
@@ -414,6 +415,20 @@ namespace FXGame
             // basilana kadar (B-5) Game.dll yok. Sessiz gecmiyoruz ama
             // hata da degil.
             FX_INFO("Oyun kutuphanesi yuklenmedi: %s", error.c_str());
+
+            // ESKI DLL ise baska: proje calisiyor GORUNUR ama script'ler
+            // yoktur. Log'a yazip gecmek bu yuzden yetmiyor - konsolu
+            // acip durum cubuguna da yaziyoruz.
+            if (m_GameLibrary.HasAbiMismatch())
+            {
+                m_BuildErrors.clear();
+                m_BuildErrors.push_back(error);
+                m_BuildLog = error + "\n\nMotor guncellenmis; projenin oyun kodu "
+                             "eski motorla derlenmis durumda. Derle'ye basmak "
+                             "yeterli.\n";
+                m_ShowBuildConsole = true;
+                SetStatus("Game.dll eski motorla derlenmis - Derle'ye bas.");
+            }
             return;
         }
 
@@ -577,7 +592,7 @@ namespace FXGame
         // yeni sahnede anlamsiz ve tehlikeli.
         m_Commands.Clear();
 
-        m_HierarchyPanel.SetContext(m_Scene);
+        RebindScene();
         SetStatus("Yeni bos sahne");
     }
 
@@ -649,7 +664,7 @@ namespace FXGame
 
         // Panel secimini temizliyoruz: secili entity KULLANICI tercihiydi,
         // yeni sahnede karsiligi olmayabilir.
-        m_HierarchyPanel.SetContext(m_Scene);
+        RebindScene();
     }
 
     // -----------------------------------------------------------------------
@@ -879,6 +894,7 @@ namespace FXGame
             if (instance)
             {
                 m_Selection.Select(instance);
+                Structural::PushCreated(instance, "Prefab ekle: " + instance.GetName());
                 SetStatus("Prefab eklendi: " + instance.GetName());
             }
             else
@@ -911,6 +927,7 @@ namespace FXGame
         entity.AddComponent<FX::SpriteRendererComponent>(texture);
 
         m_Selection.Select(entity);
+        Structural::PushCreated(entity, "Sprite olustur: " + entity.GetName());
         SetStatus("Sprite olusturuldu: " + entity.GetName());
     }
 

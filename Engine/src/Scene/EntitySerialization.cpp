@@ -86,6 +86,38 @@ namespace FX::Detail
         }
     }
 
+    json SerializeComponent(const ComponentInfo& info, Entity entity)
+    {
+        json obj = json::object();
+
+        for (const FieldInfo& f : info.Fields)
+            WriteField(f, info.GetPtr(entity), obj);
+
+        // Alan tablosunun ifade edemedigi veri (doku slotu).
+        if (info.SaveExtra)
+            info.SaveExtra(info.GetPtr(entity), obj);
+
+        return obj;
+    }
+
+    void ApplyComponent(const ComponentInfo& info, Entity entity,
+                        const json& obj, TextureLibrary* library)
+    {
+        if (!obj.is_object())
+            return;
+
+        // Varsayilanla olusturup uzerine dosyadakini yaziyoruz:
+        // eksik alanlar component'in kendi varsayilanini alir,
+        // fallback degerleri ikinci bir yerde tekrarlanmaz.
+        void* component = info.AddAndGetPtr(entity);
+
+        for (const FieldInfo& f : info.Fields)
+            ReadField(f, component, obj);
+
+        if (info.LoadExtra)
+            info.LoadExtra(component, obj, library);
+    }
+
     json SerializeEntity(Entity entity)
     {
         json e;
@@ -113,16 +145,7 @@ namespace FX::Detail
             if (!info.SerializedByTable || !info.Has(entity))
                 continue;
 
-            json obj = json::object();
-
-            for (const FieldInfo& f : info.Fields)
-                WriteField(f, info.GetPtr(entity), obj);
-
-            // Alan tablosunun ifade edemedigi veri (doku slotu).
-            if (info.SaveExtra)
-                info.SaveExtra(info.GetPtr(entity), obj);
-
-            e[info.Name] = obj;
+            e[info.Name] = SerializeComponent(info, entity);
         }
 
         return e;
@@ -135,20 +158,7 @@ namespace FX::Detail
             if (!info.SerializedByTable || !j.contains(info.Name))
                 continue;
 
-            const json& obj = j[info.Name];
-            if (!obj.is_object())
-                continue;
-
-            // Varsayilanla olusturup uzerine dosyadakini yaziyoruz:
-            // eksik alanlar component'in kendi varsayilanini alir,
-            // fallback degerleri ikinci bir yerde tekrarlanmaz.
-            void* component = info.AddAndGetPtr(entity);
-
-            for (const FieldInfo& f : info.Fields)
-                ReadField(f, component, obj);
-
-            if (info.LoadExtra)
-                info.LoadExtra(component, obj, library);
+            ApplyComponent(info, entity, j[info.Name], library);
         }
     }
 }

@@ -358,9 +358,12 @@ Faz 21 proje, Faz 22 varlık).
 
 ## Faz 20 — Kalite ve araçlar
 
-- [ ] **20a** Undo / Redo çekirdeği — komut deseni, `CommandStack`
-- [ ] **20b** Komutların editöre yayılması: transform, component
-      ekle/sil, hiyerarşi değişikliği, silme (0.2 + 0.3 ön koşul)
+- [x] **20a** Undo / Redo çekirdeği — komut deseni, `CommandStack` (A5)
+- [x] **20b** Komutların editöre yayılması: transform + alan düzenleme
+      (A5), entity oluştur/sil ve component ekle/sil
+      ([Faz-YapisalUndo-ve-ABI-Notlar.md](Faz-YapisalUndo-ve-ABI-Notlar.md)).
+      **Kalan:** hiyerarşi değişikliği (sürükle-bırak), yeniden
+      adlandırma, script alanları
 - [ ] **20c** Profiling: kapsam zamanlayıcıları, Chrome tracing çıktısı
 - [ ] **20d** CI (GitHub Actions, Windows + Linux), editör teması,
       kilitlenme raporlama
@@ -396,7 +399,7 @@ MVP sırasında bilinçli olarak bıraktıklarımız:
 | `GetRegistry()` çok açık | Registry'ye doğrudan `create`/`destroy` çağırmak UUID haritasını bozar. Daha dar bir erişim gerekebilir. | `Scene.h` (Faz 8) |
 | `FollowSystem` Scene'e bağımlı | Diğer sistemler sadece registry alıyor, bu Scene alıyor (UUID haritası için). Test etmesi daha zor. | `Systems.cpp` (Faz 8) |
 | ~~Seçim `SceneHierarchyPanel` içinde~~ | ✅ 0.2'de `SelectionContext`'e taşındı; sahibi `EditorApp`, paneller tüketici. | `SelectionContext.h` |
-| ~~Test yok~~ | ✅ 0.5'te Catch2 geldi (`UUID`, `Scene`, `SceneSerializer`, `AssetManager`). Renderer ve `FileWatcher` hâlâ test dışı. | `Tests/` |
+| ~~Test yok~~ | ✅ 0.5'te Catch2 geldi (`UUID`, `Scene`, `SceneSerializer`, `AssetManager`, `EntitySnapshot`). Renderer ve `FileWatcher` hâlâ test dışı. | `Tests/` |
 | Sadece Windows'ta denendi | Kod taşınabilir yazıldı ama Linux'ta hiç derlenmedi. | — |
 
 ---
@@ -454,9 +457,15 @@ Sonra:    16c → 14 → 15 → 18b → 17a-d → 18c → 19 → 23 → 18d
       do/undo) + Inspector alan düzenleme (generic, A1 alan tablosuyla) +
       gizmo dönüşümü. Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y, "Düzen" menüsü.
       Çoklu seçimle uyumlu. Sahne/Play değişince yığın temizleniyor.
-      **Yapılmayan (sonraki tur):** entity silme/oluşturma ve component
-      ekle/sil geri alma (yapısal, serileştirme gerektiriyor).
       Ayrıntı: [Faz-A5-Notlar.md](Faz-A5-Notlar.md)
+- [x] **Yapısal Undo** (A5'in bıraktığı borç). `EntitySnapshot` /
+      `ComponentSnapshot` motora eklendi (JSON tabanlı, UUID koruyan);
+      entity oluştur/sil, component ekle/sil, prefab ve doku bırakma
+      geri alınabiliyor. Çoklu seçim tek adım.
+      Ayrıntı: [Faz-YapisalUndo-ve-ABI-Notlar.md](Faz-YapisalUndo-ve-ABI-Notlar.md)
+- [x] **Motor/DLL ABI damgası.** `FX_ENGINE_ABI_VERSION`; eski motorla
+      derlenmiş `Game.dll` yüklenmeden önce yakalanıyor ve görünür uyarı
+      veriyor (eskiden sessizce uyumsuzdu).
 
 ## Aşama B — İterasyon hızı
 

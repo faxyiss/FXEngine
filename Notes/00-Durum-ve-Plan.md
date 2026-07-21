@@ -153,9 +153,9 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 | 0.5 | Catch2 + `UUID`/`Scene`/`SceneSerializer`/`AssetManager` testleri | ✅ 26 test / 80 assertion |
 | 0.6 | Faz 22 artıkları (Inspector doku ayarları, `StartScene` GUID, `AssetDirectory`) | ✅ `.fxproject` sürüm 2 |
 
-**Borç turu, 13a+13b ve 16a bitti. Sıradaki: Faz 16b** — script kayıt
-defteri (factory), Inspector'da script seçimi, **serileştirme**
-(şu an `NativeScriptComponent` sahne dosyasına yazılmıyor).
+**Borç turu, 13a+13b, 16a ve 16b bitti. Sıradaki: Faz 16c** — gerçek
+örnek script'ler (`PlayerController`, `FollowTarget`) ve küçük bir oyun.
+Motor artık script'i sahneye kaydedip geri yükleyebiliyor.
 13c/13d ertelendi, gerekçesi [Faz-13-Notlar.md](Faz-13-Notlar.md)'de.
 
 ### Bölünmüş fazlar

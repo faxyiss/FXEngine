@@ -32,6 +32,7 @@ set(FXENGINE_SOURCES
     src/Scene/Scene.cpp
     src/Scene/Entity.cpp
     src/Scene/Systems.cpp
+    src/Scene/ScriptRegistry.cpp
     src/Scene/EntitySerialization.cpp
     src/Scene/SceneSerializer.cpp
     src/Scene/PrefabSerializer.cpp
@@ -68,6 +69,8 @@ set(FXENGINE_HEADERS
     include/FXEngine/Scene/Entity.h
     include/FXEngine/Scene/Scene.h
     include/FXEngine/Scene/Systems.h
+    include/FXEngine/Scene/ScriptableEntity.h
+    include/FXEngine/Scene/ScriptRegistry.h
     include/FXEngine/Scene/SceneSerializer.h
     include/FXEngine/Scene/PrefabSerializer.h
     src/Scene/EntitySerialization.h

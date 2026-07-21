@@ -240,38 +240,24 @@ namespace FX
     // -----------------------------------------------------------------------
     // NativeScriptComponent - entity'ye C++ davranisi baglar (Faz 16a)
     // -----------------------------------------------------------------------
-    // Component VERI kalmaya devam ediyor: icinde mantik yok, sadece
-    // "hangi script sinifi" bilgisi ve ornegin kendisi var.
+    // Component VERI kalmaya devam ediyor: icinde tek bir AD var.
     //
-    // Fonksiyon ISARETCILERI, std::function degil: Bind<T>() derleme
-    // zamaninda biliniyor, kapatma (closure) durumu yok ve component
-    // her sahne kopyalamasinda kopyalaniyor - trivially copyable kalmasi
-    // Scene::Copy'yi basit tutuyor.
+    // 16a'da burada fonksiyon isaretcileri duruyordu (Bind<T>). 16b'de
+    // kaldirildi: sahne dosyasina fonksiyon isaretcisi yazilamaz, ad
+    // yazilabilir. Adi sinifa cevirme isi ScriptRegistry'nin.
     //
     // Instance'in SAHIBI ScriptSystem: yaratmayi ve yok etmeyi o yapar,
     // cunku ne zaman yasayacaklari (yalnizca Play modunda) onun bilgisi.
+    // Serilestirilmez - calisma zamani durumudur.
     struct NativeScriptComponent
     {
-        ScriptableEntity* Instance = nullptr;
-
-        ScriptableEntity* (*Instantiate)() = nullptr;
-        void (*Destroy)(NativeScriptComponent*) = nullptr;
-
-        // Serilestirme ve Inspector icin (16b): sinif adini biz
-        // tasimaliyiz, C++'ta calisma zamaninda tur adi guvenilir degil.
         std::string ScriptName;
 
-        template<typename T>
-        void Bind(const std::string& name)
-        {
-            ScriptName  = name;
-            Instantiate = []() -> ScriptableEntity* { return new T(); };
-            Destroy     = [](NativeScriptComponent* nsc)
-            {
-                delete nsc->Instance;
-                nsc->Instance = nullptr;
-            };
-        }
+        ScriptableEntity* Instance = nullptr;
+
+        NativeScriptComponent() = default;
+        explicit NativeScriptComponent(std::string name)
+            : ScriptName(std::move(name)) {}
     };
 
     // -----------------------------------------------------------------------

@@ -61,13 +61,63 @@ bir birim testi var.
 - `Scene::Copy` örneği kopyalamıyor, bağlantıyı kopyalıyor
 - Sahne yok edilince `OnDestroy` çağrılıyor (sızıntı yok)
 
-## 16b'ye kalanlar
+---
 
-- **Serileştirme yok.** `NativeScriptComponent` sahne dosyasına yazılmıyor;
-  Play'de eklenen script Stop'ta kaybolur, kaydedilen sahnede hiç görünmez.
-- **Script kaydı (factory) yok.** Inspector'daki liste elle yazılı
-  (`SceneHierarchyPanel.cpp` içinde `Spin` ve `Move`). Bir kayıt defteri
-  gelince liste kendini dolduracak ve ad→sınıf çözümü serileştirmeyi
-  mümkün kılacak.
-- Script'lerin editörde durması geçici: 16c'de gerçek örnekler
-  (`PlayerController`, `FollowTarget`) motorun örnek oyununa taşınacak.
+# Faz 16b — Kayıt defteri ve serileştirme
+
+16a'da script `Bind<T>()` ile **derleme zamanında** bağlanıyordu. Bu iki
+şeyi imkânsız kılıyordu: sahne dosyasına fonksiyon işaretçisi yazılamaz,
+ve Inspector'daki menü elle güncellenmeyi bekler.
+
+## Ne değişti
+
+**`ScriptRegistry`** (`Scene/ScriptRegistry.h`) — ad → sınıf eşlemesi.
+`Register<T>("Spin")`, `Create(name)`, `Contains`, `GetNames()`.
+
+**`NativeScriptComponent` sadeleşti:** fonksiyon işaretçileri kalktı,
+geriye tek bir `ScriptName` (+ çalışma zamanı `Instance`) kaldı.
+`ScriptSystem` örneği registry'den yaratıyor.
+
+**Serileştirme geldi:** `EntitySerialization` script adını yazıyor ve
+okuyor. Sahne formatı **kırılmadı** — yeni bir alan eklendi, eski dosyalar
+olduğu gibi açılıyor, sürüm artırmaya gerek kalmadı.
+
+**Inspector'da combo:** liste `ScriptRegistry::GetNames()`'ten geliyor,
+yani yeni bir script kaydedildiğinde kendiliğinden görünüyor. Elle yazılmış
+menü silindi.
+
+## Kararlar
+
+**Script'in kimliği ADIDIR, C++ tipi değil.** Faz 8'in "kimlik ile konum
+ayrı şeylerdir" fikrinin bir başka yüzü: dosyaya yazılabilen tek şey
+kimliktir, işaretçi değil.
+
+**Kayıt uygulamanın işi, motorun değil.** Motor hangi script'lerin var
+olduğunu bilemez; `RegisterEditorScripts()` editörde duruyor.
+
+**Bilinmeyen ad component'i silmiyor.** Sahne başka bir derlemeden gelmiş
+olabilir. Adı atsaydık, o sahneyi kaydeden kişi bağlantısını *sessizce*
+kaybederdi. Bunun yerine: Inspector'da kırmızı uyarı + `ScriptSystem`'den
+log. Bilgiyi korumak, sessiz temizlikten iyidir.
+
+**Aynı ad ikinci kez kaydedilemez.** Sessizce ezmek hangi sınıfın
+çalıştığını belirsiz kılardı.
+
+**Script seçimi menüde değil Inspector'da.** "Component Ekle" boş bir
+`NativeScript` ekliyor, seçim combo'dan yapılıyor — aynı seçim iki yerde
+yaşamasın.
+
+## Test
+
+41 test / 145 assertion (3'ü yeni):
+- Kayıtlı olmayan ad çökmüyor **ve ad korunuyor**
+- Aynı ad iki kez kaydedilmiyor
+- **Script adı sahne dosyasına yazılıp geri okunuyor** ve yüklenen sahne
+  gerçekten çalışıyor — 16b'nin asıl vaadi bu
+
+## 16c'ye kalanlar
+
+- Gerçek örnekler (`PlayerController`, `FollowTarget`) ve küçük bir oyun.
+- Script'lerin ayarlanabilir alanları (hız vb.) hâlâ koda gömülü;
+  Inspector'dan düzenlemek ayrı bir iş (reflection ya da elle tanımlanan
+  alan listesi).

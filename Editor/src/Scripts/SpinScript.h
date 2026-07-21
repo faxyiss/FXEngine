@@ -1,15 +1,15 @@
 #pragma once
 
 // ===========================================================================
-// Faz 16a'nin KANIT script'i.
+// Ornek script'ler ve kayitlari.
 //
-// Editorde duruyor cunku script kaydi (factory) ve Inspector arayuzu
-// 16b'nin isi; su an script'i baglayabilen tek yer editor kodu.
-// 16c'de gercek ornekler (PlayerController, FollowTarget) motorun
-// ornek oyununa tasinacak.
+// KAYIT UYGULAMANIN ISI, motorun degil: motor hangi script'lerin var
+// oldugunu bilemez. 16c'de gercek ornekler (PlayerController,
+// FollowTarget) buraya eklenecek.
 // ===========================================================================
 
 #include <FXEngine/Scene/ScriptableEntity.h>
+#include <FXEngine/Scene/ScriptRegistry.h>
 #include <FXEngine/Scene/Components.h>
 #include <FXEngine/Core/Input.h>
 #include <FXEngine/Core/Log.h>
@@ -58,4 +58,14 @@ namespace FXEd
     private:
         float m_Speed = 5.0f;
     };
+
+    // Editor acilirken bir kez cagrilir. Yeni bir script yazdiginda
+    // BURAYA da eklemen gerekiyor - kayit defterinin bedeli bu. Kars
+    // ederi: Inspector listesi, serilestirme ve sahne dosyasinin
+    // tasinabilirligi.
+    inline void RegisterEditorScripts()
+    {
+        FX::ScriptRegistry::Register<SpinScript>("Spin");
+        FX::ScriptRegistry::Register<MoveScript>("Move");
+    }
 }

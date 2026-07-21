@@ -3,6 +3,7 @@
 #include "FXEngine/Scene/Entity.h"
 #include "FXEngine/Scene/Components.h"
 #include "FXEngine/Scene/ScriptableEntity.h"
+#include "FXEngine/Scene/ScriptRegistry.h"
 #include "FXEngine/Renderer/Renderer2D.h"
 #include "FXEngine/Core/Log.h"
 
@@ -136,13 +137,22 @@ namespace FX
         {
             auto& nsc = view.get<NativeScriptComponent>(entityID);
 
-            // Bind cagrilmamis olabilir (16b'de Inspector'dan script
-            // secilmeden once). Sessizce atliyoruz: eksik script bir
-            // hata degil, henuz doldurulmamis bir alan.
-            if (!nsc.Instantiate || nsc.Instance)
+            // Script secilmemis olabilir; eksik script bir hata degil,
+            // henuz doldurulmamis bir alan.
+            if (nsc.ScriptName.empty() || nsc.Instance)
                 continue;
 
-            nsc.Instance = nsc.Instantiate();
+            nsc.Instance = ScriptRegistry::Create(nsc.ScriptName);
+            if (!nsc.Instance)
+            {
+                // Sahne dosyasindaki script bu derlemede kayitli degil.
+                // SESSIZ GECMEK en kotusu olurdu: kullanici "script neden
+                // calismiyor?" diye saatlerce arar.
+                FX_CORE_WARN("ScriptSystem: '%s' kayitli degil, atlandi.",
+                             nsc.ScriptName.c_str());
+                continue;
+            }
+
             nsc.Instance->m_Entity = Entity{ entityID, &scene };
             nsc.Instance->OnCreate();
         }
@@ -169,7 +179,8 @@ namespace FX
                 continue;
 
             nsc.Instance->OnDestroy();
-            nsc.Destroy(&nsc);
+            delete nsc.Instance;
+            nsc.Instance = nullptr;
         }
     }
 

@@ -224,8 +224,9 @@ Tek tek PNG yerine tek atlas kullanmak hem batch'i hem belleği iyileştirir.
       + `Scene::OnRuntimeStart/Stop`. Örnek script'ler (Spin, Move)
       Inspector'dan eklenebiliyor.
       Ayrıntı: [Faz-16-Notlar.md](Faz-16-Notlar.md)
-- [ ] **16b** Editör tarafı: script kaydı (factory), Inspector'da script
-      seçimi, serileştirme
+- [x] **16b** `ScriptRegistry` (ad → sınıf), Inspector'da combo ile
+      seçim, sahne dosyasına serileştirme. Bilinmeyen ad component'i
+      silmiyor — bilgi korunuyor, uyarı veriliyor.
 - [ ] **16c** Örnekler: `PlayerController`, `FollowTarget` (Faz 8'in
       `EntityRef`'ini kullanır) + küçük bir örnek oyun
 

@@ -1,5 +1,6 @@
 ﻿#include "EditorApp.h"
 #include "Platform/FileDialogs.h"
+#include "Scripts/SpinScript.h"
 
 #include <FXEngine/Core/Log.h>
 #include <FXEngine/Core/Input.h>
@@ -84,6 +85,10 @@ namespace FXEd
             FX::FramebufferTextureFormat::DEPTH24STENCIL8
         };
         m_Framebuffer = std::make_unique<FX::Framebuffer>(fbSpec);
+
+        // Script'ler her seyden once kayitli olmali: sahne yuklemesi
+        // (StartScene) adlari cozmeye calisacak.
+        RegisterEditorScripts();
 
         m_HierarchyPanel.SetSelection(&m_Selection);
         m_HierarchyPanel.SetTextureLibrary(&m_TextureLibrary);

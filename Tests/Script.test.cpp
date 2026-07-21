@@ -4,6 +4,10 @@
 #include <FXEngine/Scene/Entity.h>
 #include <FXEngine/Scene/Components.h>
 #include <FXEngine/Scene/ScriptableEntity.h>
+#include <FXEngine/Scene/ScriptRegistry.h>
+#include <FXEngine/Scene/SceneSerializer.h>
+
+#include "TestSupport.h"
 
 namespace
 {
@@ -35,15 +39,29 @@ namespace
             GetComponent<FX::TransformComponent>().Translation.x += dt;
         }
     };
+
+    // Testler kayit defterine bagli; her testte yeniden kaydetmek
+    // yerine bir kez, ilk kullanimda.
+    void EnsureRegistered()
+    {
+        static bool done = false;
+        if (done)
+            return;
+
+        FX::ScriptRegistry::Register<CountingScript>("Counting");
+        FX::ScriptRegistry::Register<MoveRightScript>("MoveRight");
+        done = true;
+    }
 }
 
 TEST_CASE("Script yalnizca Play ile Stop arasinda yasar", "[script]")
 {
+    EnsureRegistered();
     g_Counters = {};
 
     FX::Scene scene;
     FX::Entity e = scene.CreateEntity("Scripted");
-    e.AddComponent<FX::NativeScriptComponent>().Bind<CountingScript>("Counting");
+    e.AddComponent<FX::NativeScriptComponent>("Counting");
 
     // Edit modu: OnUpdate cagrilsa bile script calismamali.
     scene.OnUpdate(0.016f);
@@ -67,9 +85,11 @@ TEST_CASE("Script yalnizca Play ile Stop arasinda yasar", "[script]")
 
 TEST_CASE("Script kendi entity'sinin component'ini degistirebiliyor", "[script]")
 {
+    EnsureRegistered();
+
     FX::Scene scene;
     FX::Entity e = scene.CreateEntity();
-    e.AddComponent<FX::NativeScriptComponent>().Bind<MoveRightScript>("MoveRight");
+    e.AddComponent<FX::NativeScriptComponent>("MoveRight");
 
     scene.OnRuntimeStart();
     scene.OnUpdate(0.5f);
@@ -78,7 +98,37 @@ TEST_CASE("Script kendi entity'sinin component'ini degistirebiliyor", "[script]"
     CHECK(e.GetComponent<FX::TransformComponent>().Translation.x == 0.5f);
 }
 
-TEST_CASE("Bind edilmemis script cokmuyor", "[script]")
+TEST_CASE("Kayitli olmayan script adi cokmuyor", "[script]")
+{
+    // Sahne baska bir derlemeden gelmis olabilir: dosyadaki ad bu
+    // derlemede kayitli olmayabilir. Uyari basilir, program devam eder.
+    FX::Scene scene;
+    FX::Entity e = scene.CreateEntity();
+    e.AddComponent<FX::NativeScriptComponent>("BoyleBirSeyYok");
+
+    scene.OnRuntimeStart();
+    scene.OnUpdate(0.016f);
+    scene.OnRuntimeStop();
+
+    CHECK(e.GetComponent<FX::NativeScriptComponent>().Instance == nullptr);
+
+    // Ad KORUNUYOR: bilgi kaybolmamali, sahne dogru derlemede yine calissin.
+    CHECK(e.GetComponent<FX::NativeScriptComponent>().ScriptName == "BoyleBirSeyYok");
+}
+
+TEST_CASE("ScriptRegistry ayni adi iki kez kaydetmiyor", "[script]")
+{
+    EnsureRegistered();
+
+    const std::size_t before = FX::ScriptRegistry::GetNames().size();
+    FX::ScriptRegistry::Register<CountingScript>("Counting");
+
+    CHECK(FX::ScriptRegistry::GetNames().size() == before);
+    CHECK(FX::ScriptRegistry::Contains("Counting"));
+    CHECK_FALSE(FX::ScriptRegistry::Contains("YokBoyle"));
+}
+
+TEST_CASE("Script secilmemis component cokmuyor", "[script]")
 {
     // Inspector'dan component eklenip script secilmeden birakilabilir;
     // bu bir hata degil, henuz doldurulmamis bir alan.
@@ -97,11 +147,12 @@ TEST_CASE("Scene::Copy script ORNEGINI kopyalamiyor", "[script]")
 {
     // Ham isaretci kopyalansaydi iki sahne ayni nesneyi gosterir ve
     // ikisi de silmeye calisirdi.
+    EnsureRegistered();
     g_Counters = {};
 
     FX::Scene source;
     FX::Entity e = source.CreateEntity();
-    e.AddComponent<FX::NativeScriptComponent>().Bind<CountingScript>("Counting");
+    e.AddComponent<FX::NativeScriptComponent>("Counting");
 
     source.OnRuntimeStart();
     REQUIRE(g_Counters.Created == 1);
@@ -135,7 +186,7 @@ TEST_CASE("Sahne yok edilince script'ler temizleniyor", "[script]")
     {
         FX::Scene scene;
         FX::Entity e = scene.CreateEntity();
-        e.AddComponent<FX::NativeScriptComponent>().Bind<CountingScript>("Counting");
+        e.AddComponent<FX::NativeScriptComponent>("Counting");
 
         scene.OnRuntimeStart();
         REQUIRE(g_Counters.Created == 1);
@@ -145,4 +196,37 @@ TEST_CASE("Sahne yok edilince script'ler temizleniyor", "[script]")
     }
 
     CHECK(g_Counters.Destroyed == 1);
+}
+
+TEST_CASE("Script adi sahne dosyasina yazilip geri okunuyor", "[script][serializer]")
+{
+    // 16b'nin asil vaadi: script secimi sahnede KALICI.
+    FXTest::TempProject project;
+    EnsureRegistered();
+
+    FX::UUID id;
+    {
+        FX::Scene scene;
+        FX::Entity e = scene.CreateEntity("Donen");
+        e.AddComponent<FX::NativeScriptComponent>("Counting");
+        id = e.GetUUID();
+
+        FX::SceneSerializer serializer(&scene, nullptr);
+        REQUIRE(serializer.Serialize("assets/scenes/script.fxscene"));
+    }
+
+    FX::Scene loaded;
+    FX::SceneSerializer serializer(&loaded, nullptr);
+    REQUIRE(serializer.Deserialize("assets/scenes/script.fxscene"));
+
+    FX::Entity e = loaded.FindEntityByUUID(id);
+    REQUIRE(e);
+    REQUIRE(e.HasComponent<FX::NativeScriptComponent>());
+    CHECK(e.GetComponent<FX::NativeScriptComponent>().ScriptName == "Counting");
+
+    // Yuklenen sahne gercekten calisiyor mu?
+    g_Counters = {};
+    loaded.OnRuntimeStart();
+    CHECK(g_Counters.Created == 1);
+    loaded.OnRuntimeStop();
 }

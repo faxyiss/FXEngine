@@ -130,6 +130,17 @@ namespace FX::Detail
             };
         }
 
+        if (entity.HasComponent<NativeScriptComponent>())
+        {
+            // Yalnizca AD yaziliyor. Instance calisma zamani durumudur
+            // ve zaten Play disinda yoktur; fonksiyon isaretcisi de
+            // dosyaya yazilamaz. Faz 8'in dersi burada da gecerli:
+            // dosyaya yazilan sey KIMLIK olmali.
+            e["NativeScript"] = {
+                { "Name", entity.GetComponent<NativeScriptComponent>().ScriptName }
+            };
+        }
+
         return e;
     }
 
@@ -228,6 +239,16 @@ namespace FX::Detail
             auto& cc = entity.AddOrReplaceComponent<CameraComponent>();
             cc.OrthographicSize = c.value("OrthographicSize", 8.0f);
             cc.Primary          = c.value("Primary", true);
+        }
+
+        if (j.contains("NativeScript"))
+        {
+            // Adin kayitli olup olmadigina BAKMIYORUZ: bilgiyi korumak
+            // istiyoruz. Script bu derlemede yoksa uyari ScriptSystem'den
+            // gelir; component'i atsaydik sahneyi kaydeden kisi
+            // baglantisini sessizce kaybederdi.
+            entity.AddOrReplaceComponent<NativeScriptComponent>(
+                j["NativeScript"].value("Name", std::string()));
         }
     }
 }

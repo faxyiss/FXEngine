@@ -1,6 +1,6 @@
 #include "SceneHierarchyPanel.h"
 #include "Panels/ContentBrowserPanel.h"
-#include "Scripts/SpinScript.h"
+#include <FXEngine/Scene/ScriptRegistry.h>
 
 #include <FXEngine/Scene/Components.h>
 #include <FXEngine/Asset/AssetManager.h>
@@ -712,12 +712,39 @@ namespace FXEd
             if (ImGui::CollapsingHeader("Native Script", &keep,
                                         ImGuiTreeNodeFlags_DefaultOpen))
             {
-                const auto& nsc = entity.GetComponent<FX::NativeScriptComponent>();
+                auto& nsc = entity.GetComponent<FX::NativeScriptComponent>();
 
                 ImGui::Text("Script");
                 ImGui::SameLine(110.0f);
-                ImGui::TextUnformatted(nsc.ScriptName.empty() ? "(bagli degil)"
-                                                              : nsc.ScriptName.c_str());
+                ImGui::SetNextItemWidth(-1.0f);
+
+                const char* preview = nsc.ScriptName.empty() ? "(secilmedi)"
+                                                             : nsc.ScriptName.c_str();
+
+                // Liste ScriptRegistry'den geliyor: yeni bir script
+                // kaydedildiginde burada kendiliginden goruunur.
+                if (ImGui::BeginCombo("##script", preview))
+                {
+                    if (ImGui::Selectable("(secilmedi)", nsc.ScriptName.empty()))
+                        nsc.ScriptName.clear();
+
+                    for (const std::string& name : FX::ScriptRegistry::GetNames())
+                    {
+                        if (ImGui::Selectable(name.c_str(), nsc.ScriptName == name))
+                            nsc.ScriptName = name;
+                    }
+                    ImGui::EndCombo();
+                }
+
+                // Sahne baska bir derlemeden gelmis olabilir: dosyadaki
+                // ad bu derlemede kayitli olmayabilir. Sessiz kalmak
+                // "script neden calismiyor?" sorusunu doguruyordu.
+                if (!nsc.ScriptName.empty() && !FX::ScriptRegistry::Contains(nsc.ScriptName))
+                {
+                    ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.35f, 1.0f),
+                                       "'%s' bu derlemede kayitli degil!",
+                                       nsc.ScriptName.c_str());
+                }
 
                 // Ornek yalnizca Play'de var; bunu gostermek "script neden
                 // calismiyor?" sorusunu bastan cevapliyor.
@@ -766,26 +793,15 @@ namespace FXEd
                 }
             }
 
-            // GECICI (16a): script secimi elle listeleniyor. 16b'de bir
-            // script kayit defteri (factory) gelince bu liste kendini
-            // dolduracak ve secim serilestirilebilecek.
             if (!entity.HasComponent<FX::NativeScriptComponent>())
             {
-                if (ImGui::BeginMenu("Native Script"))
+                if (ImGui::MenuItem("Native Script"))
                 {
-                    if (ImGui::MenuItem("Spin (kendi etrafinda doner)"))
-                    {
-                        entity.AddComponent<FX::NativeScriptComponent>()
-                              .Bind<SpinScript>("Spin");
-                        ImGui::CloseCurrentPopup();
-                    }
-                    if (ImGui::MenuItem("Move (ok tuslari)"))
-                    {
-                        entity.AddComponent<FX::NativeScriptComponent>()
-                              .Bind<MoveScript>("Move");
-                        ImGui::CloseCurrentPopup();
-                    }
-                    ImGui::EndMenu();
+                    // Bos ekleniyor; hangi script oldugu Inspector'daki
+                    // listeden secilir. Menuye script listesini de
+                    // koysaydik ayni secim iki yerde yasardi.
+                    entity.AddComponent<FX::NativeScriptComponent>();
+                    ImGui::CloseCurrentPopup();
                 }
             }
 

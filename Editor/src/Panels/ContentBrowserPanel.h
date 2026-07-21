@@ -146,6 +146,12 @@ namespace FXEd
         void MoveItem(const std::filesystem::path& source,
                       const std::filesystem::path& targetDir);
 
+        // Bir ogeyi hedefe KOPYALAR (cogaltir). Hedefte ayni ad varsa
+        // "x (1)" gibi numaralandirir. Kopya YENI bir varlik oldugu icin
+        // .meta KOPYALANMAZ - yeni GUID'i bir sonraki tarama uretir.
+        void CopyItem(const std::filesystem::path& source,
+                      const std::filesystem::path& targetDir);
+
         // Surukleme yukunu kabul edip tasimayi baslatan yardimci.
         // Klasor ogesi, "ust klasor" dugmesi ve kirinti yolu parcalari
         // ayni davranisi paylasiyor.
@@ -168,6 +174,17 @@ namespace FXEd
         // gecersiz kilar. Coklu secimde birden fazla kaynak olabiliyor.
         std::vector<std::filesystem::path> m_MoveSources;
         std::filesystem::path              m_MoveTarget;
+
+        // Kopyala/Kes/Yapistir. Pano secili ogeleri tutuyor; m_ClipboardCut
+        // true ise yapistirmada TASINIR (ve pano temizlenir), false ise
+        // KOPYALANIR. Yapistirma dongu disinda uygulanir (tasima gibi).
+        std::vector<std::filesystem::path> m_Clipboard;
+        bool                               m_ClipboardCut = false;
+        bool                               m_PasteRequested = false;
+        std::filesystem::path              m_PasteTarget;
+
+        // Panoya secimi alir (kes ise cut=true). Menu/kisayoldan cagriliyor.
+        void CopySelectionToClipboard(bool cut);
 
         // Secili ogeler. Klasor degisince temizleniyor: baska bir
         // klasordeki ogeleri secili tutmak, gorunmeyen dosyalar uzerinde

@@ -452,6 +452,22 @@ namespace FXEd
             ClearSelection();
         }
 
+        // Klavye kisayollari: yalnizca panel (veya cocuklari) odaktayken,
+        // yoksa Ctrl+C viewport'ta da tetiklenirdi.
+        if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))
+        {
+            if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_C))
+                CopySelectionToClipboard(false);
+            if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_X))
+                CopySelectionToClipboard(true);
+            if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_V) &&
+                !m_Clipboard.empty())
+            {
+                m_PasteTarget    = m_Current;
+                m_PasteRequested = true;
+            }
+        }
+
         // Bos alana sag tik: klasor islemleri.
         if (ImGui::BeginPopupContextWindow("IcerikBosAlan",
                                            ImGuiPopupFlags_MouseButtonRight |
@@ -464,6 +480,11 @@ namespace FXEd
             }
             if (ImGui::MenuItem("Yeni Script..."))
                 m_NewScriptDir = m_Current;   // o an gezilen klasore olustur
+            if (ImGui::MenuItem("Yapistir", "Ctrl+V", false, !m_Clipboard.empty()))
+            {
+                m_PasteTarget    = m_Current;
+                m_PasteRequested = true;
+            }
             if (ImGui::MenuItem("Dosya Ice Aktar..."))
                 m_ImportRequest = true;
             ImGui::Separator();
@@ -493,6 +514,28 @@ namespace FXEd
             if (sources.size() > 1)
                 SetMessage(std::to_string(sources.size()) + " oge tasindi -> " +
                            dst.filename().string());
+
+            ClearSelection();
+        }
+
+        // Yapistirma da cerceve SONUNDA: kopyalama/tasima dizin listesini
+        // gecersiz kilar, listeyi gezerken cagrilamaz.
+        if (m_PasteRequested)
+        {
+            m_PasteRequested = false;
+            const auto items  = m_Clipboard;
+            const auto target = m_PasteTarget;
+
+            for (const auto& item : items)
+            {
+                if (m_ClipboardCut) MoveItem(item, target);
+                else                CopyItem(item, target);
+            }
+
+            // Kesme tek kullanimlik: yapistirinca pano bosalir. Kopyalama
+            // pano'yu tutar - ayni sey birden fazla yere yapistirilabilsin.
+            if (m_ClipboardCut)
+                m_Clipboard.clear();
 
             ClearSelection();
         }
@@ -822,6 +865,17 @@ namespace FXEd
                 m_NameBuffer[sizeof(m_NameBuffer) - 1] = 0;
                 m_RenameTarget = path;
             }
+            if (ImGui::MenuItem("Kopyala", "Ctrl+C"))
+                CopySelectionToClipboard(false);
+            if (ImGui::MenuItem("Kes", "Ctrl+X"))
+                CopySelectionToClipboard(true);
+            // Bir klasorun uzerine yapistir -> onun ICINE. Dosyaya yapistir
+            // -> icinde bulundugu klasore (yani m_Current).
+            if (!m_Clipboard.empty() && ImGui::MenuItem("Yapistir", "Ctrl+V"))
+            {
+                m_PasteTarget    = isDirectory ? path : m_Current;
+                m_PasteRequested = true;
+            }
             if (ImGui::MenuItem(selCount > 1 ? "Secilenleri Sil..." : "Sil..."))
                 m_DeleteTarget = path;
             ImGui::Separator();
@@ -1123,6 +1177,91 @@ namespace FXEd
 
         FX_INFO("Tasindi: %s -> %s", src.string().c_str(), target.string().c_str());
         Refresh();
+    }
+
+    void ContentBrowserPanel::CopyItem(const std::filesystem::path& source,
+                                       const std::filesystem::path& targetDir)
+    {
+        std::error_code ec;
+        const auto src = std::filesystem::weakly_canonical(source, ec);
+        const auto dst = std::filesystem::weakly_canonical(targetDir, ec);
+
+        if (ec || src.empty() || dst.empty())
+        {
+            SetMessage("Yol cozulemedi.");
+            return;
+        }
+
+        // Bir klasoru kendi alt agacina kopyalamak sonsuz dongu olurdu.
+        if (std::filesystem::is_directory(src, ec))
+        {
+            for (auto p = dst; !p.empty(); p = p.parent_path())
+            {
+                if (p == src)
+                {
+                    SetMessage("Bir klasor kendi icine kopyalanamaz.");
+                    return;
+                }
+                if (p == p.parent_path())
+                    break;
+            }
+        }
+
+        // Benzersiz hedef ad: "x.png" varsa "x (1).png". Tasimadan farkli
+        // olarak burada reddetmiyoruz - kopyalamanin amaci zaten cogaltmak.
+        auto target = dst / src.filename();
+        if (std::filesystem::exists(target, ec))
+        {
+            const std::string stem = src.stem().string();
+            const std::string ext  = src.extension().string();
+            for (int i = 1; ; ++i)
+            {
+                target = dst / (stem + " (" + std::to_string(i) + ")" + ext);
+                if (!std::filesystem::exists(target, ec))
+                    break;
+            }
+        }
+
+        std::filesystem::copy(src, target,
+                              std::filesystem::copy_options::recursive, ec);
+        if (ec)
+        {
+            SetMessage("Kopyalanamadi: " + ec.message());
+            FX_ERROR("Kopyalama basarisiz: %s (%s)",
+                     src.string().c_str(), ec.message().c_str());
+            return;
+        }
+
+        // Kopya YENI bir varlik: kendi GUID'ini almali. .meta'yi
+        // kopyalasaydik iki dosya ayni GUID'i tasir ve referanslar
+        // karisirdi. Tek dosyada .meta zaten kopyalanmadi (ayri dosya);
+        // klasor kopyasinda ise icindeki .meta'lari temizliyoruz.
+        if (std::filesystem::is_directory(target, ec))
+        {
+            for (auto& entry : std::filesystem::recursive_directory_iterator(target, ec))
+            {
+                if (entry.is_regular_file() && entry.path().extension() == ".meta")
+                {
+                    std::error_code rmec;
+                    std::filesystem::remove(entry.path(), rmec);
+                }
+            }
+        }
+
+        SetMessage(src.filename().string() + " kopyalandi -> " +
+                   target.filename().string());
+        Refresh();
+    }
+
+    void ContentBrowserPanel::CopySelectionToClipboard(bool cut)
+    {
+        if (m_Selected.empty())
+            return;
+
+        m_Clipboard    = m_Selected;
+        m_ClipboardCut = cut;
+        SetMessage(std::to_string(m_Clipboard.size()) +
+                   (cut ? " oge kesildi." : " oge kopyalandi."));
     }
 
     void ContentBrowserPanel::DrawModals()

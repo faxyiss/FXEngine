@@ -482,3 +482,19 @@ Düzeltme: `BuildGame` çıktıdaki `error` içeren satırları ayıklayıp
 satır kaydırmalı** bir "Hatalar" özeti olarak gösteriyor (dosya+satır
 hemen görünür). Tam ham çıktı altta, yatay kaydırmalı, duruyor. Durum
 satırı hata sayısını da yazıyor. Görsel onay kullanıcıda.
+
+### İçerik panelinde kopyala / kes / yapıştır
+
+Yeniden adlandır ve sil zaten vardı; kopyala/kes/yapıştır eklendi.
+- Öğe sağ tık menüsü: **Kopyala** (Ctrl+C), **Kes** (Ctrl+X), **Yapıştır**
+  (Ctrl+V). Boş alan menüsünde de **Yapıştır**. Klavye kısayolları yalnız
+  panel odaktayken (`IsWindowFocused(RootAndChildWindows)`) çalışıyor.
+- **Kes** = yapıştırınca `MoveItem` (GUID korunur, `.meta` taşınır), pano
+  boşalır. **Kopyala** = `CopyItem`: dosyayı çoğaltır, ad çakışırsa
+  "x (1)" numaralandırır, pano yapıştırdıktan sonra durur (birden çok
+  yere yapıştırılabilsin).
+- **Kopya YENİ bir varlık:** `.meta` kopyalanmıyor — bir sonraki taramada
+  yeni GUID alıyor (iki dosya aynı GUID'i taşırsa referanslar karışırdı).
+  Klasör kopyasında içindeki `.meta`'lar da siliniyor.
+- Yapıştırma taşıma gibi çerçeve **sonunda** uygulanıyor (liste gezilirken
+  kopyalama/taşıma yineleyicileri bozar). Görsel onay kullanıcıda.

@@ -455,7 +455,11 @@ Sonra:    16c → 14 → 15 → 18b → 17a-d → 18c → 19 → 23 → 18d
 ## Aşama B — İterasyon hızı
 
 - [ ] Oyun kodunu ayrı DLL'e alma + hot reload (C++ kalır, script
-      değişimi ~5 sn)
+      değişimi ~5 sn). **Planı yazıldı ve onaylandı:**
+      [Asama-B-Plan.md](Asama-B-Plan.md). A5'ten ÖNCE yapılacak —
+      iterasyon hızı her gün acıtıyor, Undo ara sıra.
+      İlk ve en riskli adım: `FXEngine` statikten `SHARED`'e geçmeli,
+      yoksa exe ve DLL motor durumunun ayrı kopyalarını taşır.
 
 ## Aşama C — Script dili
 

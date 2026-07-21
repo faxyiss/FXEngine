@@ -463,10 +463,15 @@ eksikler (çarpışma, animasyon, ses, sahne geçişi) ancak orada görünür.
 | ~~**A4**~~ | ✅ Script dosyası + şablon + otomatik kayıt — [Faz-A4-Notlar.md](Faz-A4-Notlar.md) | İterasyonun ilk adımı |
 | **A5** | Undo/Redo (eski 20a-20b) | A1'den sonra çok ucuzlar |
 
-## Aşama B — İterasyon hızı
+## Aşama B — İterasyon hızı  ◀ SIRADA
 
 Oyun kodunu ayrı DLL'e alma + hot reload. C++ kalır, script değişimi
-~5 saniyeye iner.
+~5 saniyeye iner. **Plan: [Asama-B-Plan.md](Asama-B-Plan.md)** (onaylandı).
+
+A5'ten önce yapılıyor. Motorun statik kütüphaneden **paylaşımlı**
+kütüphaneye geçmesini gerektiriyor: aksi halde exe ve `Game.dll`
+`ScriptRegistry`/`ComponentMeta`/`Project` durumlarının ayrı kopyalarını
+taşır ve DLL'in kaydettiği script'i editör hiç görmez.
 
 ## Aşama C — Script dili kararı
 

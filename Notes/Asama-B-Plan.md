@@ -1,7 +1,7 @@
 # Aşama B — Oyun DLL'i + hot reload (PLAN)
 
-> Bu bir **plan**, uygulama notu değil. Kararlar onaylanınca uygulanacak
-> ve sonra `Faz-B-Notlar.md` yazılacak.
+> Bu bir **plan**, uygulama notu değil. **Kararlar onaylandı** (2026-07-21);
+> uygulandıkça `Faz-B-Notlar.md` yazılacak.
 >
 > Tarih: 2026-07-21
 
@@ -38,7 +38,7 @@ kopyasını** taşır. Motorun süreç genelinde tek olması gereken durumu ise
 
 Yani sorun "DLL nasıl yüklenir" değil, **motor durumunun tekliği**.
 
-### Karar önerisi B1: `FXEngine` paylaşımlı kütüphane olur
+### B1 — `FXEngine` paylaşımlı kütüphane olur
 
 `add_library(FXEngine SHARED ...)` + `CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS`.
 
@@ -64,7 +64,7 @@ de ona bağlanacak. `Faz 0`'daki "tek exe" sadeliği gidiyor.
 
 ### B2 — Script'ler nerede yaşar
 
-**Öneri:** `<proje>/assets/scripts/*.h`
+**Karar:** `<proje>/assets/scripts/*.h`
 
 - Kullanıcının içgüdüsü buydu (projede zaten boş bir `Scripts` klasörü açtı)
 - İçerik panelinde görünür, proje ile birlikte taşınır, sürüm kontrolüne girer
@@ -80,7 +80,7 @@ Konvansiyon A4'ten devam: `Zipla.h` → `class FXEd::Zipla` → `"Zipla"`.
 
 ### B3 — Derleme nasıl tetiklenir
 
-**Öneri:** Önce **elle "Derle" düğmesi** (oynatma şeridinde), otomatik
+**Karar:** Önce **elle "Derle" düğmesi** (oynatma şeridinde), otomatik
 tetikleme sonra.
 
 Gerekçe: dosya izleyiciyle otomatik derleme, yarım yazılmış bir dosyayı
@@ -127,16 +127,30 @@ Derle isteği
 işaretçi kalmıyor. **Doğrulanacak:** `m_EditorScene` ve `m_RuntimeScene`
 ikisinde de.
 
-### B6 — Editörün yerleşik script'leri ne olur
+### B6 — Editörün yerleşik script'leri örnek projeye taşınır
 
-`Spin` ve `Move` bugün `Editor/src/Scripts/` altında ve editöre derleniyor.
+`Spin` ve `Move` bugün `Editor/src/Scripts/` altında ve editöre
+derleniyor. **Karar: yerleşik kalmayacaklar, örnek projeye taşınacaklar.**
 
-**Öneri:** Kalsınlar, "yerleşik örnekler" olarak. `ScriptRegistry` iki
-kaynaktan beslenir: editörün yerleşikleri + projenin DLL'i. Aynı ad iki
-yerde varsa mevcut davranış geçerli (ikincisi yok sayılır + uyarı).
+Gerekçe: "motor örnek script taşır" fikri kavramsal olarak yanlış — motor
+oyun kodu barındırmaz, tıpkı editörü bilmediği gibi. Örnek script'lerin
+yeri örnek oyundur (16c).
 
-Böylece projesiz modda da script denenebilir ve A4'ün ürettiği
-`ScriptRegistrations.h` mekanizması boşa gitmez.
+**Ne zaman:** B-3 sırasında, DLL yüklemesi çalışır hale geldikten
+**sonra**. Önce taşınırlarsa hiç derlenmezler ve `"Spin"` adını kullanan
+mevcut sahneler kırılır.
+
+**Sonuçları — ikisi de kabul ediliyor:**
+
+1. **Projesiz modda hiç script olmayacak.** "Projesiz devam et" ile açılan
+   örnek sahnede `NativeScriptComponent` seçenekleri boş kalır. Karşılama
+   ekranındaki o mod zaten geçici bir kolaylık.
+2. **A4'ün üreteci taşınır, silinmez.** `ScriptRegistrations.h.in` +
+   CMake glob mekanizması aynen çalışıyor; yalnızca hedefi değişiyor:
+   `FXEditor` yerine `Game.dll`. A4'te yazılan "kayıt otomatik" kazanımı
+   korunuyor.
+
+`Editor/src/Scripts/` klasörü boşalınca kaldırılacak.
 
 ---
 

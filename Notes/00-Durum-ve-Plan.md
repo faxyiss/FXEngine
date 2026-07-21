@@ -6,7 +6,7 @@
 >
 > Mimarinin tamamı ve alınan yön kararları: **[02-Mimari.md](02-Mimari.md)**
 >
-> Son güncelleme: 2026-07-20 · Son commit: `759e1b6`
+> Son güncelleme: 2026-07-21 · Son commit: `34f27db`
 
 ---
 
@@ -19,49 +19,56 @@ derlenmedi).
 ```
 Engine/     motor kütüphanesi (FXEngine.lib) — editörü BİLMEZ
 Editor/     editör uygulaması (FXEditor.exe) — motora bağlıdır
+Tests/      FXTests.exe — yalnızca Engine'i test eder
 Notes/      her fazın tasarım notları (Türkçe)
 build/      CMake çıktısı
 ```
 
 **Tek yönlü bağımlılık:** Engine → hiçbir şey, Editor → Engine.
 
+> Aşama B bu tabloyu değiştirecek: `FXEngine` **paylaşımlı** kütüphane
+> olacak (gerekçe: [Asama-B-Plan.md](Asama-B-Plan.md) §1).
+
 ---
 
 ## 2. Nerede kaldık
 
 MVP (Faz 0–7) ve şu fazlar tamam: **8, 9, 10, 11, 12, 21, 22**,
-**borç turu 0.1–0.6**, **13a + 13b** + Faz 18'in çizgi/ızgara kısmı.
+**borç turu 0.1–0.7**, **13a + 13b**, **16a + 16b**, Faz 18'in
+çizgi/ızgara kısmı, ve **Aşama A'nın A1–A4'ü**.
 
-### Son oturumda yapılanlar
+### Son oturumda yapılanlar (2026-07-21)
 
 | Commit | İş |
 |---|---|
-| `759e1b6` | İçerik paneli: ızgarada çift tık çalışmıyordu; dosya açma eklendi |
-| `72f8b57` | **0.4** `FX::FileWatcher` — dışarıdan taşımada GUID korunuyor |
-| `54d81bf` | **0.2** `SelectionContext` — seçim panelden çıktı |
-| `f03e08a` | **0.3** Entity çoklu seçimi (Ctrl/Shift, gizmoda delta, toplu silme) |
-| `b0d9079` | **0.5** Catch2 + motor çekirdeği testleri |
-| `d9d51b8` | **0.6** Doku ayarları arayüzü, `StartScene` GUID (`.fxproject` v2) |
-| (bu) | **13a + 13b** `FX::Input`, `Event` sistemi, SDL çeviri katmanı |
+| `4caa520` | **0.7** Refactor turu: `EditorApp.cpp` 2033→4 dosya, demo sahne ayrıldı |
+| `e8d9d5c` | **A1** Component meta-veri sistemi (`ComponentRegistry`) |
+| `ee41e55` · `50473d0` | **A2** Game View / Scene View ayrımı + genel oynatma şeridi |
+| `e7e036d` | `EngineLogo` uygulama logosu (pencere ikonu + karşılama ekranı) |
+| `34d59da` · `c62dabe` | **A3** Project Settings + Preferences, ayrı "Ayarlar" menüsü |
+| `136d8bc` · `671915d` | **A4** Script dosyası oluşturma + otomatik kayıt |
+| `34f27db` | **Aşama B planı** yazıldı (henüz uygulanmadı) |
 
 ### Şu an çalışan özellikler
 
-- **Proje sistemi:** açılışta karşılama ekranı, `.fxproject`, son projeler,
-  motor/proje varlık kökü ayrımı
-- **Varlık sistemi:** GUID tabanlı kimlik, `.meta` dosyaları, taşıma
-  referansları kırmıyor, doku ayarları dosya başına
-- **Sahne:** entity UUID'leri, parent/child hiyerarşi, prefab, sürüm 4
-  dosya formatı (eskiler otomatik dönüşüyor)
-- **Play/Stop:** oyun kopya sahnede çalışıyor, Edit modu durağan,
-  `CameraComponent` ile sahne kamerası
-- **Viewport:** ızgara, seçim çerçevesi, gizmo (taşı/döndür/ölçekle),
-  sağ tuşla kaydırma, imlece zoom, `F` odaklan, `G` ızgara
-- **İçerik paneli:** ızgara/liste görünümü, çoklu seçim, sürükle-bırak
-  taşıma, içe aktarma, önizleme, çift tıkla açma, dosya izleyici
-- **Seçim:** `SelectionContext` (sahibi `EditorApp`), entity çoklu seçimi,
-  gizmoyla toplu dönüşüm
-- **Girdi:** `FX::Input` (sorgu) + `FX::Event` (olay); editörde ham SDL
-  girdi kullanımı yok
+- **Proje sistemi:** karşılama ekranı, `.fxproject` **sürüm 3**
+  (ad, varlık klasörü, `StartScene` GUID, hedef çözünürlük), son projeler
+- **Varlık sistemi:** GUID kimlik, `.meta`, taşıma referansları kırmıyor,
+  doku ayarları dosya başına, dosya izleyici
+- **Sahne:** entity UUID'leri, hiyerarşi, prefab, sürüm 4 dosya formatı
+- **Component'ler tek yerde tanımlı (A1):** `ComponentMeta.cpp` →
+  `RegisterBuiltins`. Serileştirme, `Scene::Copy` ve Inspector üçü de
+  oradan besleniyor. Yeni component = **tek yere yazmak**
+- **Scene View / Game View ayrı (A2):** Scene her zaman editör
+  kamerasından + düzenleme yardımcılarıyla, Game her zaman sahne
+  kamerasından + yardımcısız. Play'de Game sekmesi öne gelir
+- **Ayarlar ayrı (A3):** Proje Ayarları → `.fxproject` (sürüm kontrolüne
+  girer) · Tercihler → `editor.json` (girmez). "Ayarlar" menüsünde
+- **Script (16a/16b/A4):** ad tabanlı `ScriptRegistry`, Dosya → "Yeni
+  Script", **kayıt CMake tarafından üretiliyor** (`CONFIGURE_DEPENDS`)
+- **Play/Stop:** kopya sahnede, Edit modu durağan
+- **Girdi:** `FX::Input` (sorgu) + `FX::Event` (olay)
+- **Testler:** `FXTests` **51 test / 238 assertion**
 
 ---
 
@@ -167,36 +174,39 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 
 ---
 
-## 5b. YENİ OTURUMDA İLK İŞ: A5 — Undo/Redo
+## 5b. YENİ OTURUMDA İLK İŞ: Aşama B — oyun DLL'i + hot reload
 
-**Aşama A'nın son işi.** A1–A4 tamam (2026-07-21):
-[A1](Faz-A1-Notlar.md) · [A2](Faz-A2-Notlar.md) · [A3](Faz-A3-Notlar.md) ·
-[A4](Faz-A4-Notlar.md).
+**Plan hazır ve onaylandı:** [Asama-B-Plan.md](Asama-B-Plan.md).
+Yeni oturumda önce onu oku, sonra B-1'den başla.
 
-**Sorun:** Gizmo ile yanlış sürüklediğin bir nesneyi geri alamıyorsun.
-Teknik borç listesindeki tek **yüksek** öncelikli madde bu.
+**Neden A5'ten önce:** kullanıcı her script değişikliğinde editörü
+yeniden derleyip yeniden başlatmak zorunda; bu her gün acıtıyor.
+A5 (Undo) gecikmekten zarar görmüyor, A1'in alan tablosu onu zaten
+ucuzlattı.
 
-**A1 ve 0.3 bunu ucuzlattı — sebebini kaybetme:**
-- `ComponentRegistry`'nin alan tablosu sayesinde tek bir **generic
-  "alanı değiştir" komutu** yeter; component başına komut yazmak gerekmez
-  (alan erişimcisi + tip zaten tabloda).
-- `SelectionContext` çoklu seçim taşıyor, yani komutlar baştan "hangi
-  entity'ler üzerinde?" sorusunu çoğul cevaplayabilir. Tek-seçim
-  varsayımıyla yazılan her komut sonradan yeniden yazılırdı — 0.2/0.3
-  zinciri tam bu yüzden Undo'dan önce yapılmıştı.
+**Planın özeti (ayrıntı dosyada):**
 
-**Kapsam kararı gerekecek:** hangi işlemler geri alınabilir olmalı?
-En az: gizmo dönüşümü, Inspector alan değişikliği, entity oluştur/sil,
-parent değiştir, component ekle/kaldır. Sahne açma/kaydetme geri
-alınamaz olmalı (sınır net olsun).
+1. Asıl engel "DLL nasıl yüklenir" değil, **motor durumunun tekliği**.
+   `FXEngine` statik olduğu için exe ve `Game.dll` `ScriptRegistry`,
+   `ComponentMeta`, `FileSystem`, `Project`, `Renderer2D` durumlarının
+   **ayrı kopyalarını** taşırdı → DLL kendi kopyasına kaydeder, editör
+   hiç görmez.
+2. Çözüm: `FXEngine` → `SHARED`. **B-1 bu ve en riskli adım.**
+3. Script'ler `<proje>/assets/scripts/` altına taşınır; sahne referansı
+   **adla** kalır (Faz 16b kararı hot reload'ı mümkün kılan şey).
+4. Gölge kopya ile DLL kilidi aşılır; Play sırasında yeniden yükleme
+   **yasak** (vtable'lar geçersizleşir).
+5. En ciddi risk: **EnTT tip kimliği DLL sınırında**. B-3'ün ilk işi bunu
+   ölçmek — teoriye güvenilmeyecek.
 
-**Dikkat:** Çoklu seçimde tek bir gizmo sürüklemesi **tek** undo girişi
-olmalı, N değil. Aynı şekilde bir DragFloat sürüklemesi bırakılana kadar
-tek giriş (ImGui `IsItemDeactivatedAfterEdit`).
+**Kullanıcının verdiği kararlar:**
+- `Spin`/`Move` editörde yerleşik **kalmayacak**, örnek projeye taşınacak
+  (B-3 sırasında; öncesinde taşınırsa hiç derlenmezler)
+- Derleme **elle "Derle" düğmesiyle** tetiklenecek, otomatik sonra
 
-**Nereye dokunulacak:** yeni `CommandHistory` (Editor/), `EditorApp`
-(Ctrl+Z/Ctrl+Y), `ComponentDrawer` (alan değişikliklerini komuta
-çevirme), `SceneHierarchyPanel` (oluştur/sil/parent).
+**Uyarı:** `Editor/src/Scripts/Jump.h` kullanıcının A4 testinden kalan
+bir dosya. Aşama B'de script'ler projeye taşınırken silinecek ya da
+örnek projeye gidecek.
 
 ### A1'den sonra sırayla
 

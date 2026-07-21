@@ -23,7 +23,8 @@ namespace FXEd
     EditorApp::EditorApp()
         : FX::Application([]() {
               FX::WindowProps props;
-              props.Title     = "FXEditor - Faz 12";
+              props.Title     = "FXEditor";
+              props.IconPath  = "assets/textures/EngineLogo.png";
               props.Width     = 1600;
               props.Height    = 900;
               props.VSync     = true;
@@ -36,7 +37,7 @@ namespace FXEd
     void EditorApp::OnInit()
     {
         FX_INFO("=====================================");
-        FX_INFO("  FXEditor - Faz 12: Varlik yonetimi");
+        FX_INFO("  FXEditor");
         FX_INFO("=====================================");
 
         FX::RenderCommand::Init();
@@ -75,6 +76,16 @@ namespace FXEd
         // doku slotu, kamera tekilligi, script listesi. Motor bunlari
         // bilmez; tablo yalnizca tasiyicidir.
         ComponentDrawer::RegisterEditorUI(&m_TextureLibrary);
+
+        // Logo proje acilmadan ONCE yukleniyor: o sirada varlik koku
+        // hala exe klasoru (bkz. FileSystem::GetProjectDirectory).
+        {
+            FX::TextureSpec spec;
+            spec.FlipVertically = true;
+            auto logo = std::make_shared<FX::Texture2D>("assets/textures/EngineLogo.png", spec);
+            if (logo->IsValid())
+                m_Logo = logo;
+        }
 
         LoadEditorConfig();
 

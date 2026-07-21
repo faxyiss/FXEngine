@@ -1,4 +1,5 @@
 #include "FXEngine/Core/Window.h"
+#include "FXEngine/Core/FileSystem.h"
 #include "FXEngine/Core/Log.h"
 
 // SIRA KRITIK: glad her zaman SDL'in OpenGL header'larindan ONCE gelmeli.
@@ -7,10 +8,59 @@
 #include <glad/glad.h>
 #include <SDL3/SDL.h>
 
+// STB_IMAGE_IMPLEMENTATION Texture.cpp'de tanimli; burada yalnizca
+// bildirimlere ihtiyacimiz var.
+#include <stb_image.h>
+
+#include <string>
+
 namespace FX
 {
     namespace
     {
+        void ApplyWindowIcon(SDL_Window* window, const char* relativePath)
+        {
+            if (!relativePath || !*relativePath)
+                return;
+
+            const std::string full = FileSystem::ResolveEngineAsset(relativePath);
+
+            // Dokular ters yukleniyor (OpenGL sol-alt kokenli) ama SDL
+            // yuzeyi sol-UST bekliyor: bayragi aciktan kapatiyoruz,
+            // yoksa ikon bas asagi gorunur.
+            stbi_set_flip_vertically_on_load(0);
+
+            int w = 0, h = 0, channels = 0;
+            stbi_uc* pixels = stbi_load(full.c_str(), &w, &h, &channels, 4);
+
+            if (!pixels)
+            {
+                // Ikon kozmetik: bulunamamasi programi durdurmaz ama
+                // sessiz de kalmaz.
+                FX_CORE_WARN("Pencere ikonu yuklenemedi: %s (%s)",
+                             full.c_str(), stbi_failure_reason());
+                return;
+            }
+
+            SDL_Surface* surface = SDL_CreateSurfaceFrom(
+                w, h, SDL_PIXELFORMAT_RGBA32, pixels, w * 4);
+
+            if (surface)
+            {
+                SDL_SetWindowIcon(window, surface);
+                SDL_DestroySurface(surface);
+            }
+            else
+            {
+                FX_CORE_WARN("Ikon yuzeyi olusturulamadi: %s", SDL_GetError());
+            }
+
+            // SDL yuzeyi piksellere SAHIP OLMUYOR (CreateSurfaceFrom
+            // kopyalamiyor), ama SetWindowIcon veriyi kendi tarafina
+            // aldi; artik serbest birakabiliriz.
+            stbi_image_free(pixels);
+        }
+
         // -------------------------------------------------------------------
         // OpenGL debug output
         // -------------------------------------------------------------------
@@ -150,6 +200,8 @@ namespace FX
             FX_CORE_ERROR("Pencere olusturulamadi: %s", SDL_GetError());
             return;
         }
+
+        ApplyWindowIcon(m_Window, props.IconPath);
 
         // -------------------------------------------------------------------
         // 4) OpenGL context olustur ve etkinlestir

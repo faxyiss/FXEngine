@@ -85,6 +85,19 @@ namespace FXEd
         ImGui::BeginChild("##LauncherContent",
                           ImVec2(std::min(contentWidth, avail), 0.0f));
 
+        // Logo + baslik yan yana. Logo yoksa (dosya bulunamadi) baslik
+        // tek basina ciziliyor - kozmetik bir eksik programi durdurmamali.
+        if (m_Logo)
+        {
+            const float size = 64.0f;
+            // UV'ler ters: doku FlipVertically ile yuklendi, ImGui
+            // sol-ust bekliyor.
+            ImGui::Image(static_cast<ImTextureID>(m_Logo->GetRendererID()),
+                         ImVec2(size, size), ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
+            ImGui::SameLine(0.0f, 16.0f);
+        }
+
+        ImGui::BeginGroup();
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.80f, 0.35f, 1.0f));
         ImGui::SetWindowFontScale(1.8f);
         ImGui::TextUnformatted("FXEngine");
@@ -92,6 +105,7 @@ namespace FXEd
         ImGui::PopStyleColor();
 
         ImGui::TextDisabled("Bir proje ac veya yeni bir tane olustur.");
+        ImGui::EndGroup();
         ImGui::Spacing();
         ImGui::Separator();
         ImGui::Spacing();

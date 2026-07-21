@@ -34,6 +34,11 @@ namespace FX
         std::uint32_t Height = 720;
         bool          VSync  = true;
         bool          Resizable = true;
+
+        // Gorev cubugu ve baslik cubugu ikonu. Motor varlik kokune
+        // goreceli ("assets/textures/EngineLogo.png"); bos ise SDL'in
+        // varsayilani kullanilir.
+        const char*   IconPath = nullptr;
     };
 
     class Window

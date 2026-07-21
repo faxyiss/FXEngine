@@ -243,6 +243,11 @@ namespace FXEd
         // dosyanin tekrar tekrar yuklenmesini onler.
         FX::TextureLibrary m_TextureLibrary;
 
+        // Karsilama ekranindaki logo. MOTOR varligi, projeye ait degil:
+        // proje acilmadan once yuklenip tutuluyor, cunku proje acilinca
+        // "assets/..." artik proje kokune cozulur.
+        std::shared_ptr<FX::Texture2D> m_Logo;
+
         std::shared_ptr<FX::Texture2D> m_Checkerboard;
         std::shared_ptr<FX::Texture2D> m_Circle;
 

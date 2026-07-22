@@ -8,9 +8,10 @@
 >
 > Sıradaki somut işler: **[03-Yapilacaklar.md](03-Yapilacaklar.md)**
 >
-> Son güncelleme: 2026-07-21 · Son commit: `0ba9735`
-> **Aşama A + Aşama B + script alanları + yapısal Undo + ABI damgası
-> tamam.** Sıradaki iş ve C# kararı için **§5b**'ye bak.
+> Son güncelleme: 2026-07-22 · Son commit: `9fa6694`
+> **Aşama A + B, script alanları, 16c örnek oyun, A/B backlog grupları ve
+> B-7 tamam.** Bu oturumda yapılanlar için **§2 "Son oturum"**, sıradaki iş
+> için **[03-Yapilacaklar.md](03-Yapilacaklar.md)** ve **§5b**'ye bak.
 
 ---
 
@@ -42,9 +43,10 @@ build/      CMake çıktısı
 ## 2. Nerede kaldık
 
 MVP (Faz 0–7) ve şu fazlar tamam: **8, 9, 10, 11, 12, 21, 22**,
-**borç turu 0.1–0.7**, **13a + 13b**, **16a + 16b**, Faz 18'in
-çizgi/ızgara kısmı, **Aşama A (A1–A5)**, **Aşama B (B-1…B-6)** ve
-**script alanları**.
+**borç turu 0.1–0.7**, **13a + 13b**, **16a + 16b + 16c**, Faz 18'in
+çizgi/ızgara kısmı, **Aşama A (A1–A5)**, **Aşama B (B-1…B-7)**,
+**script alanları**, **yapısal Undo + ABI damgası**, ve
+**[03-Yapilacaklar.md](03-Yapilacaklar.md) A + B grupları**.
 
 ### Aşama A + B oturumları (2026-07-21)
 
@@ -85,6 +87,30 @@ MVP (Faz 0–7) ve şu fazlar tamam: **8, 9, 10, 11, 12, 21, 22**,
 | **ABI damgası** | `FX_ENGINE_ABI_VERSION`; eski `Game.dll` **yüklenmeden önce** yakalanıyor, konsol + durum çubuğunda uyarı |
 | **B-7 oyun projesi** | `.cpp` dosyaları da derleniyor; script tespiti dosya adına değil **içeriğe** bakıyor, script olmayan header'lar artık derlemeyi kırmıyor ([Faz-B7-Notlar.md](Faz-B7-Notlar.md)) |
 
+### Son oturumda yapılanlar (2026-07-22) — 16c sonrası backlog turu
+
+16c örnek oyunu (`C:\FXProjects\FirstFxGame`, topla-kaç) yazılınca çıkan
+eksikler **[03-Yapilacaklar.md](03-Yapilacaklar.md)**'a toplandı ve A + B
+grupları kapatıldı. Ayrıntı o dosyada; özet:
+
+| Commit | İş |
+|---|---|
+| `94eeb1e` | **[03-Yapilacaklar.md](03-Yapilacaklar.md)** — 16c'de çarpan eksiklerin tam listesi (A motor delikleri, B editör, C prefab, D metin/sıralama, E fizik…) |
+| `024b5f4` | **A-1** Script'ten entity silme: `Scene::DestroyEntityDeferred` + kare-sonu kuyruğu, `ScriptableEntity::Destroy()`. 16c'de yıldızı silemeyip ışınlıyorduk |
+| `5812d8c` | **A-3** Entity referansı script alanı: `Visit(EntityRef&)` + Inspector seçici. `FindEntityByName` yerine Inspector'dan hedef. `EntityRef` kendi header'ına çıktı |
+| `91626c6` · `ebdb5ed` | **B-2** çoğalt/kopyala-yapıştır (`Scene::DuplicateEntity`, Ctrl+D/C/V) · **B-1** hiyerarşide sıra (çocuk + kök, kaydet/yükle'de korunuyor) |
+| `a41b1fe` | **Sürükle-bırak sıralama** (Unity tarzı): satır arasına/üzerine bırakma, `Scene::PlaceEntity`. 18c render sırasının temeli |
+| `065adf8` | **A-2** Runtime spawn: `ScriptableEntity::Instantiate(prototip)` = `DuplicateEntity`. `ScriptSystem::Update` artık anlık kopya üzerinde geziyor (spawn güvenli) |
+| `9fa6694` | **"Yeni Script" → `.h` + `.cpp` seçeneği** (B-7'nin açtığı bölünmüş yapı editörden) |
+
+Ayrıca: **izin allowlist'i** (`.claude/settings.json`) — cmake/git/FXTests
+artık sormuyor. Ortak **`Detail::RemapReferences`** yazılınca
+PrefabSerializer'ın script EntityRef alanını ıskalayan gizli açığı da
+kapandı.
+
+**A ve B grupları BİTTİ.** Kalan: A-2'nin prototip-kendi-script'ini-çalıştırma
+sınırı (F: aktif/pasif bayrağı), sürükle-bırakta iki satır arası ince ayar.
+
 ### Şu an çalışan özellikler
 
 - **Proje sistemi:** karşılama ekranı, `.fxproject` **sürüm 3**
@@ -113,7 +139,9 @@ MVP (Faz 0–7) ve şu fazlar tamam: **8, 9, 10, 11, 12, 21, 22**,
 - **İçerik paneli:** kopyala/kes/yapıştır, yeniden adlandır, sil, sürükle-bırak
 - **Play/Stop:** kopya sahnede, Edit modu durağan
 - **Girdi:** `FX::Input` (sorgu) + `FX::Event` (olay)
-- **Testler:** `FXTests` **56 test / 266 assertion**
+- **Script'ten oyun kontrolü:** entity silme (`Destroy`), spawn
+  (`Instantiate(prototip)`), hedef referansı (`EntityRef` alanı)
+- **Testler:** `FXTests` **77 test / 352 assertion**
 
 ---
 
@@ -164,14 +192,15 @@ edilmeli.
 ### Yüksek
 | Sorun | Nerede | Not |
 |---|---|---|
-| ~~**Undo/Redo yok**~~ | ✅ A5: `CommandStack` + alan düzenleme + gizmo ([Faz-A5-Notlar.md](Faz-A5-Notlar.md)) · ✅ **yapısal işlemler** de kapsandı: entity oluştur/sil, component ekle/sil, prefab ve doku bırakma ([Faz-YapisalUndo-ve-ABI-Notlar.md](Faz-YapisalUndo-ve-ABI-Notlar.md)). Kalan: parent değiştirme, yeniden adlandırma, script alanları |
+| ~~**Undo/Redo yok**~~ | ✅ A5: alan düzenleme + gizmo · ✅ **yapısal**: entity oluştur/sil, component ekle/sil, prefab/doku bırakma, **çoğaltma, hiyerarşi taşıma/sıralama** ([Faz-YapisalUndo-ve-ABI-Notlar.md](Faz-YapisalUndo-ve-ABI-Notlar.md), [03-Yapilacaklar.md](03-Yapilacaklar.md)). Kalan: yeniden adlandırma, script alanları |
 | ~~**Eski `Game.dll` sessizce uyumsuz**~~ | ✅ `FX_ENGINE_ABI_VERSION`: uyumsuz DLL yüklenmiyor, konsol + durum çubuğunda uyarı |
 
 ### Orta
 | Sorun | Nerede |
 |---|---|
 | ~~Script alanları Inspector'dan ayarlanamıyor~~ | ✅ `OnReflect` + `NativeScriptComponent::Fields` ([Faz-ScriptAlanlari-Notlar.md](Faz-ScriptAlanlari-Notlar.md)). **Not:** vtable değişti, projelerde bir kez "Derle" gerekiyor |
-| Prefab bağlantısı yok (örnek kaynağından bağımsız, override sistemi yok) | `PrefabSerializer` |
+| Prefab bağlantısı yok (örnek kaynağından bağımsız, override sistemi yok) | `PrefabSerializer` — sıradaki büyük iş (03-Yapilacaklar.md C) |
+| A-2 spawn prototipi kendi script'ini çalıştırıyor (aktif/pasif bayrağı yok) | `03-Yapilacaklar.md` F |
 | Linux/macOS dosya diyalogları boş gövde, dosya izleyici yok | `FileDialogs.cpp`, `FileWatcher.cpp` |
 | ~~Çoklu seçimde Inspector yalnızca birincili düzenliyor~~ | ✅ kapatıldı: değişen alan + component ekleme/silme tüm seçili entity'lere uygulanıyor (`ComponentDrawer`, `SceneHierarchyPanel`) |
 
@@ -231,10 +260,11 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 
 ## 5b. YENİ OTURUMDA İLK İŞ
 
-Aşama A, Aşama B ve script alanları **bitti**. Sıradaki karar noktası
-aşağıda; önce bunu oku.
+Aşama A/B, script alanları, 16c örnek oyun ve backlog A + B grupları
+**bitti**. Sıradaki iş **"Önerilen sıra"**da (aşağıda): D-1 metin ya da
+18c render sıralaması. Somut madde listesi **[03-Yapilacaklar.md](03-Yapilacaklar.md)**'da.
 
-### Aşama C (C#) değerlendirmesi — 2026-07-21
+### Aşama C (C#) değerlendirmesi — 2026-07-21 (hâlâ geçerli)
 
 K1'in ön koşulları (A + B) tamamlandı, yani karar noktası geldi.
 **Değerlendirme sonucu: şimdi C# yapılmamalı.** Gerekçeler:
@@ -275,26 +305,39 @@ tamamı **[03-Yapilacaklar.md](03-Yapilacaklar.md)**'da. En kritik üçü:
 
 ### Önerilen sıra
 
-1. ~~**16c — küçük örnek oyun**~~ ✅ yazıldı
-2. **A-1 script'ten entity sil/yarat** — model deliği, küçük, birim testi
-   yazılabilir. Bu kapanmadan yazılacak her oyun 16c'nin numarasını
-   tekrarlamak zorunda
-3. **A-2 runtime prefab örnekleme** → **A-3 entity referansı alanı**
-4. **B-1 hiyerarşide sıra** · **B-2 kopyala/yapıştır** ·
-   **C prefab bağı + Apply/Revert** (en büyük editör işi, ikiye bölünecek)
-5. **19 metin** → **18c sıralama** → **17 fizik** → **14/15** → **23 ses**
+16c yazıldı ve çıkan eksiklerin **A + B grupları kapatıldı** (yukarıdaki
+"Son oturum" tablosu). Kalan sıra:
+
+1. ~~16c örnek oyun~~ ✅ · ~~A grubu (A-1/A-2/A-3)~~ ✅ · ~~B grubu~~ ✅
+2. **D-1 metin** (ekranda skor) — 16c'de somut eksikti, skor sadece log'da
+3. **18c render sıralaması** — hiyerarşi sırası altyapısı artık hazır
+   (`PlaceEntity` + kök/çocuk sırası kalıcı); "çizim sırası = hiyerarşi"
+   ya da `OrderInLayer` bunun üstüne oturur
+4. **C prefab bağı + Apply/Revert** (en büyük editör işi, ikiye bölünecek)
+5. **17 fizik** → **14/15 animasyon** → **23 ses**
 6. Sonra Aşama C'yi (C#) yeniden değerlendir.
 
 Gerekçeler ve maddelerin tamamı: **[03-Yapilacaklar.md](03-Yapilacaklar.md)**
+
+### Aşama C (C#) — hâlâ ertelendi
+
+K1'in ön koşulları (A + B) tamamlandı ama karar değişmedi: **şimdi C#
+yapılmamalı.** İterasyon hızını Aşama B çözdü; oyun yapmayı engelleyen
+şey dil değil eksik sistemler (fizik, animasyon, ses, metin). Ayrıntı
+aşağıda (§ "Aşama C değerlendirmesi").
 
 ### Yarım kalan / bilinen sorunlar
 
 - **Türkçe karakterli proje yolu açılmıyor** (§4'te ayrıntı). Boşluk
   sorun değil, ASCII-dışı karakter sorun.
-- **Undo hâlâ kapsamıyor:** parent değiştirme (sürükle-bırak), entity
-  yeniden adlandırma, script alanları. Yapısal ekle/sil kapsandı.
+- **A-2 spawn prototipi kendi script'ini de çalıştırıyor** — sahnedeki
+  gerçek bir entity olduğu için. Çözüm: entity "aktif/pasif" bayrağı
+  (03-Yapilacaklar.md F). Şimdilik prototipi ekran dışına koy.
+- **Undo hâlâ kapsamıyor:** entity yeniden adlandırma, script alanları.
+  (Yapısal ekle/sil/çoğalt/taşıma ve gizmo/alan kapsandı.)
 - **Eski `Game.dll` artık sessiz değil** ama yine de bir kez **Derle**
   gerekiyor: ABI damgası uyumsuzluğu tespit ediyor, otomatik derlemiyor.
+- **Sürükle-bırakta** iki satır arası ince ayar dışında hiyerarşi tam.
 
 ---
 

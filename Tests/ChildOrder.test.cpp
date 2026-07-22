@@ -130,6 +130,57 @@ TEST_CASE("Kok sirasi kaydet/yukle sonrasi korunuyor", "[order][serializer]")
     CHECK(RootNames(loaded) == std::vector<std::string>{ "Kamera", "A", "B" });
 }
 
+TEST_CASE("PlaceEntity kardes listesinde konuma tasiyor", "[order][place]")
+{
+    FX::Scene scene;
+    FX::Entity p = scene.CreateEntity("P");
+    FX::Entity a = scene.CreateEntity("A");
+    FX::Entity b = scene.CreateEntity("B");
+    FX::Entity c = scene.CreateEntity("C");
+    a.SetParent(p);
+    b.SetParent(p);
+    c.SetParent(p);   // P: A, B, C
+
+    // C'yi 0. konuma (en basa).
+    scene.PlaceEntity(c, p, 0);
+    CHECK(ChildNames(p) == std::vector<std::string>{ "C", "A", "B" });
+
+    // A'yi sona (index kirpilir).
+    scene.PlaceEntity(a, p, 99);
+    CHECK(ChildNames(p) == std::vector<std::string>{ "C", "B", "A" });
+}
+
+TEST_CASE("PlaceEntity kok ile cocuk arasinda tasiyor", "[order][place]")
+{
+    FX::Scene scene;
+    FX::Entity p = scene.CreateEntity("P");
+    FX::Entity r = scene.CreateEntity("R");   // ayri kok
+
+    // R'yi P'nin cocugu yap (0. konum).
+    scene.PlaceEntity(r, p, 0);
+    CHECK(r.GetParent() == p);
+    CHECK(ChildNames(p) == std::vector<std::string>{ "R" });
+    CHECK(RootNames(scene) == std::vector<std::string>{ "P" });
+
+    // R'yi tekrar koke al (kok listesinde 0. konuma).
+    scene.PlaceEntity(r, {}, 0);
+    CHECK_FALSE(r.GetParent());
+    CHECK(RootNames(scene) == std::vector<std::string>{ "R", "P" });
+}
+
+TEST_CASE("PlaceEntity dongusel tasimayi reddediyor", "[order][place]")
+{
+    FX::Scene scene;
+    FX::Entity p = scene.CreateEntity("P");
+    FX::Entity c = scene.CreateEntity("C");
+    c.SetParent(p);
+
+    // P'yi kendi cocugunun altina tasima girisimi: reddedilmeli.
+    scene.PlaceEntity(p, c, 0);
+    CHECK_FALSE(p.GetParent());          // hala kok
+    CHECK(c.GetParent() == p);           // c hala p'nin cocugu
+}
+
 TEST_CASE("Cocuk sirasi kaydet/yukle sonrasi korunuyor", "[order][serializer]")
 {
     FXTest::TempProject project;

@@ -61,6 +61,10 @@ namespace FXEd
         // uzerinde gezerken secim degistirmemenin de faydasi var.
         void ApplyPendingClick();
 
+        // Surukle-birak sonucu bir yeniden siralama/ebeveynleme istegini
+        // (m_Drop*) Structural::ReorderTo'ya cevirir. Dongu bittikten sonra.
+        void ApplyDropRequest();
+
         // Inspector'da secili entity'nin tum component'leri.
         void DrawComponents(FX::Entity entity);
 
@@ -78,6 +82,13 @@ namespace FXEd
         FX::Entity m_CreateChildOf;   // "Alt Entity Ekle" istegi
         FX::Entity m_ReorderEntity;   // "Yukari/Asagi Tasi" istegi
         int        m_ReorderDir = 0;
+
+        // Surukle-birak yeniden siralama istegi. Mode: 1 hedefin ONUNE,
+        // 2 hedefin UZERINE (cocuk), 3 hedefin ARKASINA. Hedef gecersizse
+        // kok listesinin sonuna. Dongu disinda islenir.
+        FX::Entity m_DropMoved;
+        FX::Entity m_DropTarget;
+        int        m_DropMode = 0;
         FX::Entity m_ReparentChild;
         FX::Entity m_ReparentTarget;
         bool       m_ReparentToRoot = false;

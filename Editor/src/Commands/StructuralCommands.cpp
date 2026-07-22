@@ -193,6 +193,67 @@ namespace FXEd::Structural
         return count;
     }
 
+    namespace
+    {
+        // entity'nin kardes listesindeki (cocuk ya da kok) 0-tabanli
+        // konumu. Bulunamazsa listenin sonu.
+        int SiblingIndex(FX::Entity entity)
+        {
+            if (!entity)
+                return 0;
+
+            std::vector<FX::Entity> siblings;
+            if (FX::Entity parent = entity.GetParent())
+                siblings = parent.GetChildren();
+            else
+                siblings = s_Ctx.Scene->GetRootEntities();
+
+            for (int i = 0; i < static_cast<int>(siblings.size()); ++i)
+                if (siblings[i] == entity)
+                    return i;
+            return static_cast<int>(siblings.size());
+        }
+    }
+
+    void ReorderTo(FX::Entity moved, FX::Entity newParent, int index)
+    {
+        if (!Ready() || !moved)
+            return;
+
+        // Eski konumu yakala (geri alma icin). Parent'i UUID olarak
+        // tutuyoruz: tutamak degil.
+        FX::Entity oldParent = moved.GetParent();
+        const FX::UUID oldParentID = oldParent ? oldParent.GetUUID() : FX::UUID(0);
+        const int      oldIndex    = SiblingIndex(moved);
+
+        const FX::UUID movedID     = moved.GetUUID();
+        const FX::UUID newParentID = newParent ? newParent.GetUUID() : FX::UUID(0);
+
+        // Ayni yere birakma: is yok (ve gereksiz undo adimi yaratma).
+        if (newParentID == oldParentID && (index == oldIndex || index == oldIndex + 1))
+            return;
+
+        s_Ctx.Scene->PlaceEntity(moved, newParent, index);
+
+        EditCommand cmd;
+        cmd.Name = "Hiyerarside tasi";
+        cmd.Undo = [movedID, oldParentID, oldIndex]()
+        {
+            FX::Entity m = Find(movedID);
+            if (!m) return;
+            FX::Entity p = oldParentID.IsValid() ? Find(oldParentID) : FX::Entity{};
+            s_Ctx.Scene->PlaceEntity(m, p, oldIndex);
+        };
+        cmd.Redo = [movedID, newParentID, index]()
+        {
+            FX::Entity m = Find(movedID);
+            if (!m) return;
+            FX::Entity p = newParentID.IsValid() ? Find(newParentID) : FX::Entity{};
+            s_Ctx.Scene->PlaceEntity(m, p, index);
+        };
+        s_Ctx.Commands->Push(std::move(cmd));
+    }
+
     void MoveInParent(FX::Entity entity, int direction)
     {
         if (!Ready() || !entity)

@@ -198,6 +198,46 @@ namespace FX
                           m_RootOrder.end());
     }
 
+    void Scene::PlaceEntity(Entity moved, Entity newParent, int index)
+    {
+        if (!moved)
+            return;
+
+        // Kendi alt agacinin icine (ya da kendine) tasima sonsuz donguye
+        // yol acar - TransformSystem zinciri hic bitmez.
+        if (newParent && (newParent == moved || moved.IsAncestorOf(newParent)))
+        {
+            FX_CORE_WARN("PlaceEntity reddedildi: dongusel hiyerarsi.");
+            return;
+        }
+
+        const UUID myID = moved.GetUUID();
+
+        // 1. Mevcut kardes listesinden cikar (eski parent'in Children'i ya da kok).
+        if (Entity oldParent = moved.GetParent())
+        {
+            auto& oc = oldParent.GetComponent<RelationshipComponent>().Children;
+            oc.erase(std::remove(oc.begin(), oc.end(), myID), oc.end());
+        }
+        else
+        {
+            RemoveRoot(myID);
+        }
+
+        // 2. Yeni parent bagi.
+        auto& rc = moved.AddOrReplaceIfMissing<RelationshipComponent>();
+        rc.Parent = newParent ? newParent.GetUUID() : UUID(0);
+
+        // 3. Hedef listede index konumuna ekle.
+        std::vector<UUID>& list = newParent
+            ? newParent.AddOrReplaceIfMissing<RelationshipComponent>().Children
+            : m_RootOrder;
+
+        const int n = static_cast<int>(list.size());
+        const int at = index < 0 ? 0 : (index > n ? n : index);
+        list.insert(list.begin() + at, myID);
+    }
+
     bool Scene::MoveRoot(UUID id, int direction)
     {
         if (direction == 0)

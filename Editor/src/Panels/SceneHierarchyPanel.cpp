@@ -61,6 +61,9 @@ namespace FXEd
         m_ToDuplicate.clear();
         m_ReorderEntity = {};
         m_ReorderDir    = 0;
+        m_DropMoved     = {};
+        m_DropTarget    = {};
+        m_DropMode      = 0;
         m_VisibleOrder.clear();
         m_ClickTarget    = {};
         m_ReparentChild  = {};
@@ -80,8 +83,10 @@ namespace FXEd
             if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("FX_ENTITY"))
             {
                 const auto handle = *static_cast<const entt::entity*>(payload->Data);
-                m_ReparentChild  = FX::Entity{ handle, m_Scene };
-                m_ReparentToRoot = true;
+                // Hedef gecersiz = kok listesinin sonuna.
+                m_DropMoved  = FX::Entity{ handle, m_Scene };
+                m_DropTarget = {};
+                m_DropMode   = 2;
             }
             ImGui::EndDragDropTarget();
         }
@@ -134,6 +139,9 @@ namespace FXEd
             m_ReorderEntity = {};
             m_ReorderDir    = 0;
         }
+
+        if (m_DropMoved && m_DropMode != 0)
+            ApplyDropRequest();
 
         if (!m_ToDuplicate.empty())
         {
@@ -335,15 +343,34 @@ namespace FXEd
             ImGui::EndDragDropSource();
         }
 
-        // Birak: suruklenen entity bunun cocugu olsun.
+        // Birak: fare satirin UST ucundaysa hedefin ONUNE, ALT ucundaysa
+        // ARKASINA (kardes olarak), ORTASINDAYSA UZERINE (cocuk) - Unity'nin
+        // hiyerarsi davranisi. Ince bir cizgi/cerceve nereye dusecegini
+        // gosteriyor.
         if (ImGui::BeginDragDropTarget())
         {
+            const ImVec2 rmin = ImGui::GetItemRectMin();
+            const ImVec2 rmax = ImGui::GetItemRectMax();
+            const float  h    = rmax.y - rmin.y;
+            const float  my   = ImGui::GetMousePos().y;
+
+            int mode;
+            if      (my < rmin.y + h * 0.30f) mode = 1;   // one
+            else if (my > rmax.y - h * 0.30f) mode = 3;   // arkasina
+            else                              mode = 2;   // uzerine
+
+            ImDrawList* dl = ImGui::GetForegroundDrawList();
+            const ImU32 col = IM_COL32(255, 200, 60, 255);
+            if      (mode == 1) dl->AddLine({ rmin.x, rmin.y }, { rmax.x, rmin.y }, col, 2.0f);
+            else if (mode == 3) dl->AddLine({ rmin.x, rmax.y }, { rmax.x, rmax.y }, col, 2.0f);
+            else                dl->AddRect(rmin, rmax, col, 0.0f, 0, 2.0f);
+
             if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("FX_ENTITY"))
             {
                 const auto dropped = *static_cast<const entt::entity*>(payload->Data);
-                m_ReparentChild  = FX::Entity{ dropped, m_Scene };
-                m_ReparentTarget = entity;
-                m_ReparentToRoot = false;
+                m_DropMoved  = FX::Entity{ dropped, m_Scene };
+                m_DropTarget = entity;
+                m_DropMode   = mode;
             }
             ImGui::EndDragDropTarget();
         }
@@ -354,6 +381,61 @@ namespace FXEd
                 DrawEntityNode(child);
             ImGui::TreePop();
         }
+    }
+
+    void SceneHierarchyPanel::ApplyDropRequest()
+    {
+        FX::Entity moved  = m_DropMoved;
+        FX::Entity target = m_DropTarget;
+        const int  mode   = m_DropMode;
+
+        m_DropMoved  = {};
+        m_DropTarget = {};
+        m_DropMode   = 0;
+
+        if (!moved)
+            return;
+
+        // Kendine ya da kendi alt agacina birakma anlamsiz / dongusel.
+        if (moved == target || (target && moved.IsAncestorOf(target)))
+            return;
+
+        FX::Entity newParent;
+        int        index;
+
+        if (!target)
+        {
+            // Bos alan: kok listesinin sonuna.
+            newParent = {};
+            index     = static_cast<int>(m_Scene->GetRootEntities().size());
+        }
+        else if (mode == 2)
+        {
+            // Uzerine: hedefin cocugu, sona.
+            newParent = target;
+            index     = static_cast<int>(target.GetChildren().size());
+        }
+        else
+        {
+            // One / arkasina: hedefin kardesi. Index, moved CIKARILMIS
+            // listeye gore (PlaceEntity once detach ediyor).
+            newParent = target.GetParent();
+            std::vector<FX::Entity> siblings =
+                newParent ? newParent.GetChildren() : m_Scene->GetRootEntities();
+
+            int pos = static_cast<int>(siblings.size());
+            int i = 0;
+            for (FX::Entity s : siblings)
+            {
+                if (s == moved)
+                    continue;   // detach sonrasi listede olmayacak
+                if (s == target) { pos = i; break; }
+                ++i;
+            }
+            index = (mode == 1) ? pos : pos + 1;
+        }
+
+        Structural::ReorderTo(moved, newParent, index);
     }
 
     void SceneHierarchyPanel::DrawComponents(FX::Entity entity)

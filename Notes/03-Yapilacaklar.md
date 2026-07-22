@@ -63,9 +63,15 @@ Sahne dosyası formatı **değişmedi** (sürüm 4): kök sırası ayrı bir ala
 değil, entity'lerin dosyadaki yazılma sırasından okunuyor — eski sahneler
 sorunsuz açılıyor.
 
-**Kalan (küçük):**
-- [ ] Sürükle-bırakla iki satır **arasına** bırakma (şu an sadece "üzerine",
-      o da parent yapıyor)
+**Sürükle-bırak (2026-07-22):** `Scene::PlaceEntity(moved, parent, index)`
+ilkeli — detach + index'e ekle, döngüsel reddediyor. Hiyerarşide bir
+entity'yi başka bir satırın **üst ucuna** (önüne), **alt ucuna** (arkasına)
+ya da **ortasına** (çocuğu) bırakabiliyorsun; ince sarı çizgi/çerçeve nereye
+düşeceğini gösteriyor (Unity davranışı). Kökler arası da çalışıyor.
+`Structural::ReorderTo` ile Undo'ya bağlı. 3 birim testi (`[place]`).
+
+Bu, ileride **render sıralaması** (18c: aynı Z'deki sprite'ların çizim
+sırası) için de temel — sıra artık kullanıcının denetiminde ve kalıcı.
 
 ### B-2. Hiyerarşide kopyala / yapıştır / çoğalt ✅ (2026-07-22)
 

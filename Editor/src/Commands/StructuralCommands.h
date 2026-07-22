@@ -75,6 +75,12 @@ namespace FXEd
         // +1 asagi). Geri alinabilir. Uctaysa is yapmaz.
         void MoveInParent(FX::Entity entity, int direction);
 
+        // Surukle-birak: moved'i newParent'in altina (gecersiz = kok), hedef
+        // kardesin ONUNE/ARKASINA (ya da newParent'a birakildiysa sonuna)
+        // tasir. Konumu Scene::PlaceEntity index'ine cevirir ve geri
+        // alinabilir yapar (eski parent + eski index yakalanir).
+        void ReorderTo(FX::Entity moved, FX::Entity newParent, int index);
+
         // Component'i eksik olan hedeflere ekler / sahip olanlardan siler.
         void AddComponent(const FX::ComponentInfo& info,
                           const std::vector<FX::Entity>& targets);

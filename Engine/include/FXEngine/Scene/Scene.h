@@ -122,6 +122,16 @@ namespace FX
         void RemoveRoot(UUID id);
         bool MoveRoot(UUID id, int direction);   // sirada kaydirir; uctaysa false
 
+        // moved'i newParent'in altina (gecersiz newParent = kok), kardes
+        // listesinde `index` konumuna tasir. Hem yeniden ebeveynleme hem
+        // yeniden siralama TEK ilkel: hiyerarside surukle-birak bunun
+        // uzerine kuruluyor (satirlar ARASINA birakma). index kardes
+        // sayisina kirpiliyor. Dongusel (kendi torununun altina) reddedilir.
+        //
+        // Onemli: index, moved LISTEDEN CIKARILDIKTAN SONRAKI listeye gore
+        // yorumlanir - cagiran hedef konumunu ona gore hesaplamali.
+        void PlaceEntity(Entity moved, Entity newParent, int index);
+
         // Ada gore arama. UUID'nin aksine isimler BENZERSIZ DEGILDIR -
         // ilk eslesen doner. Editor kolayligi icin var, oyun mantiginda
         // isim yerine UUID kullanilmali.

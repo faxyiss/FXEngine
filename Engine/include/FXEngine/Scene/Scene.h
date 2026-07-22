@@ -110,6 +110,18 @@ namespace FX
         // kare suresini yerdi.
         Entity FindEntityByUUID(UUID uuid);
 
+        // Kok (parent'i olmayan) entity'ler GORUNEN sirada. Cocuklarin
+        // sirasi RelationshipComponent.Children'da tutuluyor; koklerin
+        // karsiligi bu liste - yoksa kok sirasi entt olusturma sirasina
+        // duser ve kullanici degistiremezdi (B-1b).
+        std::vector<Entity> GetRootEntities();
+
+        // Kok sirasi bakimi. Entity::SetParent ve MoveInParent kullaniyor;
+        // disaridan cagrilmasi gerekmez ama zararsiz.
+        void AddRoot(UUID id);            // sona ekler (zaten varsa dokunmaz)
+        void RemoveRoot(UUID id);
+        bool MoveRoot(UUID id, int direction);   // sirada kaydirir; uctaysa false
+
         // Ada gore arama. UUID'nin aksine isimler BENZERSIZ DEGILDIR -
         // ilk eslesen doner. Editor kolayligi icin var, oyun mantiginda
         // isim yerine UUID kullanilmali.
@@ -160,6 +172,12 @@ namespace FX
         // haritayi bozar. GetRegistry()'nin acik olmasi bu riski
         // tasiyor; ileride daha dar bir erisim gerekebilir.
         std::unordered_map<UUID, entt::entity> m_EntityMap;
+
+        // Kok entity sirasi (bkz. GetRootEntities). CreateEntity sona ekler,
+        // SetParent parent kazaninca cikarir / koke donunce ekler,
+        // DestroyEntity cikarir. Cocuk sirasindan farkli olarak burada,
+        // cunku koklerin sahibi bir parent yok.
+        std::vector<UUID> m_RootOrder;
 
         // Play modunda mi? Script'lerin yasayip yasamadigini belirler.
         bool m_Running = false;

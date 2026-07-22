@@ -41,31 +41,12 @@ namespace FX
 
         json entities = json::array();
 
-        auto& registry = m_Scene->GetRegistry();
-        auto view = registry.view<TagComponent>();
-
-        // HIYERARSI SIRASINDA yaziyoruz: once kokler (olusturma sirasinda),
-        // sonra her kokun alt agaci COCUK LISTESI sirasinda (DFS). Neden?
-        // Yukleme cocuklari SetParent ile DOSYA sirasinda ekliyor; dosya
-        // hiyerarsi sirasindaysa kullanicinin "Yukari/Asagi Tasi" ile
-        // verdigi cocuk sirasi (RelationshipComponent.Children) kaydedilip
-        // geri geliyor (B-1). Eskiden dosya duz entt sirasindaydi ve
-        // yeniden siralama kaydet/yukle sonrasi kayboluyordu.
-        //
-        // EnTT view'lari TERS gezer (en son eklenen ilk gelir); kokleri
-        // olusturma sirasinda tutmak icin ters ceviriyoruz.
-        std::vector<entt::entity> rootsReversed;
-        rootsReversed.reserve(view.size());
-        for (auto id : view)
-        {
-            Entity e{ id, m_Scene };
-            const bool isRoot = !e.HasComponent<RelationshipComponent>() ||
-                                !e.GetComponent<RelationshipComponent>().Parent.IsValid();
-            if (isRoot)
-                rootsReversed.push_back(id);
-        }
-
-        // DFS: parent'i cocuklarindan ONCE, cocuklari kendi siralarinda yaz.
+        // HIYERARSI SIRASINDA yaziyoruz: once kokler (kok sirasinda), sonra
+        // her kokun alt agaci COCUK LISTESI sirasinda (DFS). Neden? Yukleme
+        // hem kokleri hem cocuklari DOSYA sirasinda ekliyor; dosya hiyerarsi
+        // sirasindaysa kullanicinin "Yukari/Asagi Tasi" ile verdigi sira
+        // (kokler icin Scene kok listesi, cocuklar icin
+        // RelationshipComponent.Children) kaydedilip geri geliyor (B-1).
         std::function<void(Entity)> writeSubtree = [&](Entity e)
         {
             entities.push_back(Detail::SerializeEntity(e));
@@ -73,8 +54,8 @@ namespace FX
                 writeSubtree(child);
         };
 
-        for (auto it = rootsReversed.rbegin(); it != rootsReversed.rend(); ++it)
-            writeSubtree(Entity{ *it, m_Scene });
+        for (Entity root : m_Scene->GetRootEntities())
+            writeSubtree(root);
 
         root["Entities"] = entities;
 

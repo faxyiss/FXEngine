@@ -70,7 +70,7 @@ namespace FX
 
         Entity parent = GetParent();
         if (!parent)
-            return false;   // kok sirasi ayri bir sorun (B-1'in kalan kismi)
+            return m_Scene->MoveRoot(GetUUID(), direction);   // kok sirasi (B-1b)
 
         auto& children = parent.GetComponent<RelationshipComponent>().Children;
         const UUID myID = GetUUID();
@@ -120,6 +120,8 @@ namespace FX
         if (!parent)
         {
             rc.Parent = UUID(0);
+            // Koke dondu: kok sirasina geri gir (en sona).
+            m_Scene->AddRoot(GetUUID());
             return;
         }
 
@@ -127,5 +129,8 @@ namespace FX
 
         auto& prc = parent.AddOrReplaceIfMissing<RelationshipComponent>();
         prc.Children.push_back(GetUUID());
+
+        // Artik kok degil: kok sirasindan cikar.
+        m_Scene->RemoveRoot(GetUUID());
     }
 }

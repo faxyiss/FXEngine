@@ -50,16 +50,20 @@ void OnReflect(FX::ScriptFieldVisitor& v) override { v.Visit("Hedef", m_Target);
 
 ## B. Editör — sahne düzenleme
 
-### B-1. Hiyerarşide sıra değiştirme ✅ kısmen (2026-07-22)
+### B-1. Hiyerarşide sıra değiştirme ✅ (2026-07-22)
 
-`Entity::MoveInParent(±1)` çocuğu listede kaydırıyor, hiyerarşi menüsünde
-"Yukarı/Aşağı Taşı", Undo'ya bağlı. **Serileştirme artık hiyerarşi (DFS)
-sırasında yazıyor** → çocuk sırası kaydet/yükle sonrası korunuyor
-(eskiden entt sırasına dönüyordu). 3 birim testi.
+`Entity::MoveInParent(±1)` hem çocukları (`RelationshipComponent.Children`)
+hem de **kökleri** (`Scene::m_RootOrder`) kaydırıyor. Hiyerarşi menüsünde
+"Yukarı/Aşağı Taşı" her entity'de, Undo'ya bağlı. Serileştirme hiyerarşi
+(DFS) sırasında yazıyor + kök listesi → sıra kaydet/yükle sonrası
+korunuyor. Panel kökleri `GetRootEntities` ile diziyor. Kök listesi
+`CreateEntity`/`SetParent`/`DestroyEntity`/`Copy`'de bakımlı. 6 birim testi.
 
-**Kalan (B-1b):**
-- [ ] **Kökler için sıra yok** — hâlâ entt view sırasında. Kök sırası bir
-      yerde tutulmalı (sahne formatı sürüm 5) — MoveInParent kökte no-op
+Sahne dosyası formatı **değişmedi** (sürüm 4): kök sırası ayrı bir alan
+değil, entity'lerin dosyadaki yazılma sırasından okunuyor — eski sahneler
+sorunsuz açılıyor.
+
+**Kalan (küçük):**
 - [ ] Sürükle-bırakla iki satır **arasına** bırakma (şu an sadece "üzerine",
       o da parent yapıyor)
 

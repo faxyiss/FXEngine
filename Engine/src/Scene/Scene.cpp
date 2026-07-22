@@ -45,6 +45,11 @@ namespace FX
         for (auto handle : scripts)
             scripts.get<NativeScriptComponent>(handle).Instance = nullptr;
 
+        // Kok sirasini aynen tasi: CopyTo, RelationshipComponent'i SetParent
+        // KULLANMADAN kopyaladigi icin target->m_RootOrder olusturma
+        // sirasinda birikti. UUID'ler korundugu icin dogrudan atayabiliriz.
+        target->m_RootOrder = source.m_RootOrder;
+
         return target;
     }
 
@@ -154,7 +159,61 @@ namespace FX
 
         m_EntityMap[uuid] = entity.GetHandle();
 
+        // Yeni entity kok olarak dogar (henuz parent'i yok). SetParent
+        // sonra cikarabilir.
+        m_RootOrder.push_back(uuid);
+
         return entity;
+    }
+
+    std::vector<Entity> Scene::GetRootEntities()
+    {
+        std::vector<Entity> roots;
+        roots.reserve(m_RootOrder.size());
+        for (UUID id : m_RootOrder)
+        {
+            Entity e = FindEntityByUUID(id);
+            if (!e)
+                continue;
+            // Guvenlik: listede olsa bile gercekten kok mu?
+            const bool isRoot = !e.HasComponent<RelationshipComponent>() ||
+                                !e.GetComponent<RelationshipComponent>().Parent.IsValid();
+            if (isRoot)
+                roots.push_back(e);
+        }
+        return roots;
+    }
+
+    void Scene::AddRoot(UUID id)
+    {
+        if (!id.IsValid())
+            return;
+        if (std::find(m_RootOrder.begin(), m_RootOrder.end(), id) == m_RootOrder.end())
+            m_RootOrder.push_back(id);
+    }
+
+    void Scene::RemoveRoot(UUID id)
+    {
+        m_RootOrder.erase(std::remove(m_RootOrder.begin(), m_RootOrder.end(), id),
+                          m_RootOrder.end());
+    }
+
+    bool Scene::MoveRoot(UUID id, int direction)
+    {
+        if (direction == 0)
+            return false;
+
+        const auto it = std::find(m_RootOrder.begin(), m_RootOrder.end(), id);
+        if (it == m_RootOrder.end())
+            return false;
+
+        const std::size_t idx = static_cast<std::size_t>(it - m_RootOrder.begin());
+        if (direction < 0 ? (idx == 0) : (idx + 1 >= m_RootOrder.size()))
+            return false;
+
+        const std::size_t target = (direction < 0) ? idx - 1 : idx + 1;
+        std::swap(m_RootOrder[idx], m_RootOrder[target]);
+        return true;
     }
 
     void Scene::DestroyEntity(Entity entity)
@@ -191,7 +250,11 @@ namespace FX
         // Ters yapsaydik, silinmis entity'nin IDComponent'ini okumaya
         // calisirdik - tanimsiz davranis.
         if (entity.HasComponent<IDComponent>())
-            m_EntityMap.erase(entity.GetComponent<IDComponent>().ID);
+        {
+            const UUID id = entity.GetComponent<IDComponent>().ID;
+            m_EntityMap.erase(id);
+            RemoveRoot(id);   // kok degilse zaten yok, zararsiz
+        }
 
         m_Registry.destroy(entity);
     }
@@ -237,6 +300,7 @@ namespace FX
         m_Registry.clear();
         m_EntityMap.clear();
         m_PendingDestroy.clear();
+        m_RootOrder.clear();
     }
 
     Entity Scene::FindEntityByUUID(UUID uuid)

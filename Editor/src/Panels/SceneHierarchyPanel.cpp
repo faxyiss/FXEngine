@@ -67,18 +67,12 @@ namespace FXEd
         m_ReparentTarget = {};
         m_ReparentToRoot = false;
 
-        // Sadece KOKLERI geziyoruz; cocuklar DrawEntityNode icinde
-        // ozyineleme ile ciziliyor.
-        auto view = registry.view<FX::TagComponent>();
-        for (auto entityID : view)
-        {
-            FX::Entity entity{ entityID, m_Scene };
-
-            const bool isRoot = !entity.HasComponent<FX::RelationshipComponent>() ||
-                                !entity.GetComponent<FX::RelationshipComponent>().Parent.IsValid();
-            if (isRoot)
-                DrawEntityNode(entity);
-        }
+        // Sadece KOKLERI geziyoruz, KOK SIRASINDA (Scene tutuyor); cocuklar
+        // DrawEntityNode icinde ozyineleme ile ciziliyor. Eskiden entt
+        // view sirasindaydi ve kullanici kokleri siralayamiyordu.
+        (void)registry;
+        for (FX::Entity entity : m_Scene->GetRootEntities())
+            DrawEntityNode(entity);
 
         // Bos alana birakma: koke tasi.
         if (ImGui::BeginDragDropTargetCustom(ImGui::GetCurrentWindow()->Rect(), ImGui::GetID("HierarchyRoot")))
@@ -315,13 +309,10 @@ namespace FXEd
                 else       m_ToDuplicate.push_back(entity);
             }
 
-            // Siralama yalnizca bir parent'i olan (kok olmayan) entity'de
-            // anlamli; kok sirasi henuz cozulmedi.
-            if (entity.GetParent())
-            {
-                if (ImGui::MenuItem("Yukari Tasi"))  { m_ReorderEntity = entity; m_ReorderDir = -1; }
-                if (ImGui::MenuItem("Asagi Tasi"))   { m_ReorderEntity = entity; m_ReorderDir = +1; }
-            }
+            // Siralama hem cocuklarda (RelationshipComponent.Children) hem
+            // de koklerde (Scene kok listesi) calisiyor.
+            if (ImGui::MenuItem("Yukari Tasi"))  { m_ReorderEntity = entity; m_ReorderDir = -1; }
+            if (ImGui::MenuItem("Asagi Tasi"))   { m_ReorderEntity = entity; m_ReorderDir = +1; }
             ImGui::Separator();
             if (ImGui::MenuItem("Prefab Olarak Kaydet..."))
                 m_PrefabRequest = entity;

@@ -229,6 +229,28 @@ extern "C" __declspec(dllexport) int FXEngineSelfTest(FX::Scene* scene,
                 text.replace(at, std::strlen(key), value);
             return text;
         }
+
+        // Motor tarifinin yeri iki duzende farkli:
+        //   KURULU dagitim : <kurulum>/bin/FXEditor.exe -> ../sdk/FXEngineConfig.cmake
+        //   gelistirme     : build agacindaki FXEngineConfig-<Config>.cmake
+        // Once kurulu yol denenir - ayni exe iki duzende de calisir, kurulum
+        // klasoru tasinsa bile yol exe'ye gore cozuldugu icin kirilmaz.
+        std::string EngineConfigPath()
+        {
+            char buf[MAX_PATH]{};
+            ::GetModuleFileNameA(nullptr, buf, MAX_PATH);
+
+            const fs::path exeDir = fs::path{ buf }.parent_path();
+            const fs::path installed =
+                exeDir.parent_path() / "sdk" / "FXEngineConfig.cmake";
+
+            std::error_code ec;
+            if (fs::exists(installed, ec))
+                return installed.generic_string();
+
+            return std::string{ FX_ENGINE_BUILD_DIR } + "/FXEngineConfig-"
+                 + FX_BUILD_CONFIG + ".cmake";
+        }
     }
 
     std::string ScriptsDir()     { return Join(Root(), "assets/scripts"); }
@@ -258,9 +280,7 @@ extern "C" __declspec(dllexport) int FXEngineSelfTest(FX::Scene* scene,
         std::error_code ec;
         fs::create_directories(ScriptsDir(), ec);
 
-        const std::string engineConfig =
-            std::string{ FX_ENGINE_BUILD_DIR } + "/FXEngineConfig-"
-            + FX_BUILD_CONFIG + ".cmake";
+        const std::string engineConfig = EngineConfigPath();
 
         if (!fs::exists(engineConfig))
         {

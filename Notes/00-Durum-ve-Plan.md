@@ -148,6 +148,11 @@ sınırı (F: aktif/pasif bayrağı), sürükle-bırakta iki satır arası ince 
   tabanlı). Apply kaynağa yazıp diğer örnekleri tazeler (override'lar
   korunur). Kalan: yapısal apply/revert (C-5)
   ([Faz-C4-Notlar.md](Faz-C4-Notlar.md), [03-Yapilacaklar.md](03-Yapilacaklar.md) C)
+- **Kurulabilir dağıtım:** `cmake --install` taşınabilir ağaç üretiyor
+  (`bin/` editör + `sdk/` motor başlıkları/lib/taşınabilir tarif),
+  `cpack -G ZIP -C Release` paketliyor. Editör motor tarifini önce
+  `exe/../sdk/`'da arıyor. Hedef makinede CMake + MSVC gerekir (Derle için)
+  ([Faz-Kurulum-Notlar.md](Faz-Kurulum-Notlar.md))
 - **Testler:** `FXTests` **87 test / 446 assertion**
 
 ---

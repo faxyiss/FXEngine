@@ -100,10 +100,12 @@ namespace FXEd
         std::string m_ComponentToRemove;
 
         // "Bagi Kir": prefab ornegini kaynagindan kopar (alt agac dahil).
-        // "Revert": ornegi kaynagina gore geri al. Ikisi de yapisal; istek
-        // dongu disinda, ornegin KOKUne cikilarak isleniyor.
+        // "Revert": ornegi kaynagina gore geri al. "Apply": degisiklikleri
+        // kaynaga yaz. Hepsi yapisal; istek dongu disinda, ornegin KOKUne
+        // cikilarak isleniyor.
         FX::Entity m_UnlinkPrefab;
         FX::Entity m_RevertPrefab;
+        FX::Entity m_ApplyPrefab;
 
         // Bu karede cizilen entity'ler, GORUNEN sirada (kapali dallarin
         // cocuklari yok). Shift araligi bunun uzerinden hesaplaniyor.

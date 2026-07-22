@@ -322,3 +322,118 @@ TEST_CASE("EntityRef override'i ornek uzayinda kiyaslaniyor", "[prefab]")
     CHECK(FX::PrefabOverrides::RevertField(child, *info, "Target"));
     CHECK(child.GetComponent<FX::FollowComponent>().Target.Target == root.GetUUID());
 }
+
+TEST_CASE("Apply kaynaga yaziyor ve diger ornekleri tazeliyor", "[prefab]")
+{
+    TempProject project;
+    FX::Scene scene;
+
+    PreparedPrefab p = MakePrefab(scene);
+
+    FX::PrefabSerializer prefab(&scene, kNoTextures);
+    FX::Entity a = prefab.Instantiate(p.RelPath, { 5.0f, 6.0f, 0.0f });
+    FX::Entity b = prefab.Instantiate(p.RelPath, { 20.0f, 0.0f, 0.0f });
+    REQUIRE(a);
+    REQUIRE(b);
+
+    FX::Entity aChild = a.GetChildren()[0];
+    FX::Entity bChild = b.GetChildren()[0];
+
+    // B'de bilincli bir override: Rotation. Apply bunu EZMEMELI.
+    bChild.GetComponent<FX::TransformComponent>().Rotation = 0.3f;
+
+    // A'da uygulanacak degisiklikler.
+    aChild.GetComponent<FX::TransformComponent>().Rotation = 0.7f;
+    aChild.GetComponent<FX::TransformComponent>().Scale    = { 2.0f, 2.0f };
+
+    REQUIRE(FX::PrefabOverrides::ApplyInstance(a, kNoTextures));
+
+    // Diger ornek: override edilmemis Scale yeni kaynaga cekildi,
+    // override edilen Rotation korundu.
+    CHECK(bChild.GetComponent<FX::TransformComponent>().Scale.x == 2.0f);
+    CHECK(bChild.GetComponent<FX::TransformComponent>().Rotation == 0.3f);
+
+    // Uygulanan ornek degismedi.
+    CHECK(aChild.GetComponent<FX::TransformComponent>().Rotation == 0.7f);
+
+    // Dosya: cocukta yeni degerler, KOK konumu kaynaktaki (0) kaldi -
+    // A'nin (5,6) yerlestirmesi kaynaga sizmadi.
+    std::ifstream in(FX::FileSystem::ResolveProjectAsset(p.RelPath));
+    REQUIRE(in);
+    nlohmann::json doc;
+    in >> doc;
+
+    bool rootChecked = false, childChecked = false;
+    for (const auto& e : doc["Entities"])
+    {
+        const FX::UUID id{ e.value("ID", std::uint64_t{ 0 }) };
+        if (id == p.SrcRoot)
+        {
+            CHECK(e["Transform"]["Translation"][0].get<float>() == 0.0f);
+            rootChecked = true;
+        }
+        if (id == p.SrcChild)
+        {
+            CHECK(e["Transform"]["Rotation"].get<float>() == 0.7f);
+            CHECK(e["Transform"]["Scale"][0].get<float>() == 2.0f);
+            childChecked = true;
+        }
+        CHECK_FALSE(e.contains("PrefabInstance"));
+    }
+    CHECK(rootChecked);
+    CHECK(childChecked);
+}
+
+TEST_CASE("Apply ic referansi kaynak uzayinda yaziyor", "[prefab]")
+{
+    // A orneginde Follow.Target A'nin kokune bakar (ornek kimligi).
+    // Dosyaya KAYNAK kimligiyle yazilmali - yoksa diger orneklerin
+    // cozemeyecegi bir referans olur.
+    TempProject project;
+    FX::Scene scene;
+
+    FX::Entity srcRoot  = scene.CreateEntity("Kok");
+    FX::Entity srcChild = scene.CreateEntity("Takipci");
+    srcChild.SetParent(srcRoot);
+
+    const std::string rel = "assets/prefabs/takip3.fxprefab";
+    FX::PrefabSerializer prefab(&scene, kNoTextures);
+    REQUIRE(prefab.Save(srcRoot, rel));
+    FX::AssetManager::ScanProject();
+
+    FX::Entity a = prefab.Instantiate(rel, { 0.0f, 0.0f, 0.0f });
+    REQUIRE(a);
+    FX::Entity aChild = a.GetChildren()[0];
+
+    // Ornekte cocuga Follow eklendi, hedef ornegin koku.
+    aChild.AddComponent<FX::FollowComponent>(a.GetUUID());
+
+    REQUIRE(FX::PrefabOverrides::ApplyInstance(a, kNoTextures));
+
+    // Dosyada hedef KAYNAK kokunun kimligi olmali.
+    std::ifstream in(FX::FileSystem::ResolveProjectAsset(rel));
+    REQUIRE(in);
+    nlohmann::json doc;
+    in >> doc;
+
+    bool found = false;
+    for (const auto& e : doc["Entities"])
+    {
+        const FX::UUID id{ e.value("ID", std::uint64_t{ 0 }) };
+        if (id != srcChild.GetUUID())
+            continue;
+
+        REQUIRE(e.contains("Follow"));
+        CHECK(e["Follow"]["Target"].get<std::uint64_t>() ==
+              static_cast<std::uint64_t>(srcRoot.GetUUID()));
+        found = true;
+    }
+    CHECK(found);
+
+    // Yeni bir ornek bu dosyadan dogru cozulmeli: hedef kendi koku.
+    FX::Entity c = prefab.Instantiate(rel, { 0.0f, 0.0f, 0.0f });
+    REQUIRE(c);
+    FX::Entity cChild = c.GetChildren()[0];
+    REQUIRE(cChild.HasComponent<FX::FollowComponent>());
+    CHECK(cChild.GetComponent<FX::FollowComponent>().Target.Target == c.GetUUID());
+}

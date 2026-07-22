@@ -91,5 +91,11 @@ namespace FXEd
         // ornegin KOKU olmali. Kaynak kayipsa / is olmadiysa komut yazmaz.
         // Undo/Redo, alt agaci snapshot'tan geri koyar (destroy + restore).
         void RevertPrefabInstance(FX::Entity instanceRoot);
+
+        // Ornekteki degisiklikleri kaynak dosyaya uygular (C-4) ve diger
+        // ornekleri tazeler. Undo dosyanin eski icerigini geri yazar ve
+        // diger ornek koklerini snapshot'tan geri koyar (uygulanan ornek
+        // Apply'da degismez, snapshot'a girmez).
+        void ApplyPrefabInstance(FX::Entity instanceRoot);
     }
 }

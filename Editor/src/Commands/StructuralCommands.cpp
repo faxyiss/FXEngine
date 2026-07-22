@@ -3,11 +3,17 @@
 #include "Commands/CommandStack.h"
 #include "SelectionContext.h"
 
+#include <FXEngine/Asset/AssetManager.h>
+#include <FXEngine/Core/FileSystem.h>
 #include <FXEngine/Scene/ComponentMeta.h>
 #include <FXEngine/Scene/Components.h>
 #include <FXEngine/Scene/EntitySnapshot.h>
+#include <FXEngine/Scene/PrefabOverrides.h>
 #include <FXEngine/Scene/PrefabSerializer.h>
 #include <FXEngine/Scene/Scene.h>
+
+#include <fstream>
+#include <sstream>
 
 namespace FXEd::Structural
 {
@@ -426,5 +432,91 @@ namespace FXEd::Structural
         s_Ctx.Commands->Push(std::move(cmd));
 
         SelectByIds({ rootId });
+    }
+
+    namespace
+    {
+        std::string ReadAllText(const std::string& path)
+        {
+            std::ifstream in(path, std::ios::binary);
+            if (!in)
+                return {};
+            std::ostringstream ss;
+            ss << in.rdbuf();
+            return ss.str();
+        }
+
+        void WriteAllText(const std::string& path, const std::string& text)
+        {
+            std::ofstream out(path, std::ios::binary);
+            out << text;
+        }
+    }
+
+    void ApplyPrefabInstance(FX::Entity instanceRoot)
+    {
+        if (!Ready() || !instanceRoot ||
+            !instanceRoot.HasComponent<FX::PrefabInstanceComponent>())
+            return;
+
+        instanceRoot = FX::PrefabOverrides::InstanceRoot(instanceRoot);
+
+        const FX::AssetHandle handle =
+            instanceRoot.GetComponent<FX::PrefabInstanceComponent>().Prefab;
+        const std::string relPath = FX::AssetManager::GetPath(handle);
+        if (relPath.empty())
+            return;
+
+        const std::string fullPath = FX::FileSystem::ResolveProjectAsset(relPath);
+
+        // Undo dosyanin ESKI icerigini geri yazacak; simdiden oku.
+        const std::string oldBytes = ReadAllText(fullPath);
+        if (oldBytes.empty())
+            return;
+
+        // Apply diger ornekleri de degistirir; onlarin oncesini yakala.
+        // Uygulanan ornegin kendisi Apply'da DEGISMEZ, snapshot gerekmez.
+        std::vector<FX::EntitySnapshot> before;
+        std::vector<FX::UUID>           ids;
+        for (FX::Entity r : FX::PrefabOverrides::InstanceRootsOf(*s_Ctx.Scene, handle))
+        {
+            if (r == instanceRoot)
+                continue;
+            before.push_back(FX::EntitySnapshot::Capture(r));
+            ids.push_back(r.GetUUID());
+        }
+
+        if (!FX::PrefabOverrides::ApplyInstance(instanceRoot, s_Ctx.Library))
+            return;
+
+        const std::string newBytes = ReadAllText(fullPath);
+
+        std::vector<FX::EntitySnapshot> after;
+        for (FX::UUID id : ids)
+            after.push_back(FX::EntitySnapshot::Capture(Find(id)));
+
+        EditCommand cmd;
+        cmd.Name = "Prefab'a uygula (Apply)";
+        cmd.Undo = [fullPath, oldBytes, before, ids]()
+        {
+            WriteAllText(fullPath, oldBytes);
+            for (std::size_t i = 0; i < ids.size(); ++i)
+            {
+                if (FX::Entity e = Find(ids[i]))
+                    s_Ctx.Scene->DestroyEntity(e);
+                before[i].Restore(*s_Ctx.Scene, s_Ctx.Library);
+            }
+        };
+        cmd.Redo = [fullPath, newBytes, after, ids]()
+        {
+            WriteAllText(fullPath, newBytes);
+            for (std::size_t i = 0; i < ids.size(); ++i)
+            {
+                if (FX::Entity e = Find(ids[i]))
+                    s_Ctx.Scene->DestroyEntity(e);
+                after[i].Restore(*s_Ctx.Scene, s_Ctx.Library);
+            }
+        };
+        s_Ctx.Commands->Push(std::move(cmd));
     }
 }

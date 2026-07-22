@@ -17,11 +17,14 @@
 // ===========================================================================
 
 #include "FXEngine/Scene/Entity.h"
+#include "FXEngine/Asset/Asset.h"
 
 #include <vector>
 
 namespace FX
 {
+    class Scene;
+    class TextureLibrary;
     struct ComponentInfo;
 
     namespace PrefabOverrides
@@ -38,5 +41,26 @@ namespace FX
         // baglanir). Doner: deger gercekten degisti mi.
         bool RevertField(Entity instance, const ComponentInfo& info,
                          const char* fieldName);
+
+        // Ayni prefab'a ait en distaki ata (ornegin koku). Prefab ornegi
+        // degilse entity'nin kendisi. Panel/komut katmani islemleri hep
+        // kokten baslatsin diye tek yerde.
+        Entity InstanceRoot(Entity entity);
+
+        // Sahnedeki bu prefab'a bagli TUM ornek kokleri (tekillestirilmis).
+        std::vector<Entity> InstanceRootsOf(Scene& scene, AssetHandle prefab);
+
+        // C-4 Apply: ornekteki degisiklikleri KAYNAK dosyaya yazar ve
+        // sahnedeki DIGER orneklerin override edilmemis alanlarini yeni
+        // kaynaga gunceller (override edilenler korunur - Unity davranisi).
+        //
+        // Dosyada kimlikler KAYNAK uzayinda kalir (SourceId'ler): diger
+        // orneklerin bagi kopmaz. Kok konumu kaynaktaki degerinde birakilir
+        // (ornege ozgu yerlestirme kaynaga sizmali degil - Revert'in
+        // simetrigi). Ornekte EKLENEN/SILINEN entity'ler dosyaya
+        // islenmez (yapisal apply C-5).
+        //
+        // Doner: dosya yazildi mi.
+        bool ApplyInstance(Entity instanceRoot, TextureLibrary* library);
     }
 }

@@ -4,6 +4,7 @@
 #include "FXEngine/Scene/Scene.h"
 #include "FXEngine/Asset/AssetManager.h"
 #include "FXEngine/Core/FileSystem.h"
+#include "FXEngine/Core/Log.h"
 
 #include "Scene/EntitySerialization.h"
 
@@ -12,7 +13,10 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
+#include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace FX::PrefabOverrides
 {
@@ -159,6 +163,131 @@ namespace FX::PrefabOverrides
         {
             return v.is_number_unsigned() ? v.get<std::uint64_t>() : 0;
         }
+
+        void CollectSubtree(Entity entity, std::vector<Entity>& out)
+        {
+            out.push_back(entity);
+            for (Entity child : entity.GetChildren())
+                CollectSubtree(child, out);
+        }
+
+        // Bir entity json'undaki TUM entity referanslarini (Parent, EntityRef
+        // alanlari, script "e" alanlari) tablodan gecirir. Tabloda olmayan
+        // deger dokunulmaz (disariya bakan referans). RemapReferences'in
+        // json duzeyindeki karsiligi: Apply canli entity yerine dosyaya
+        // yazilacak metin uzerinde calisiyor.
+        void RemapJsonRefs(json& entityJson,
+                           const std::unordered_map<UUID, UUID>& remap)
+        {
+            auto mapVal = [&remap](std::uint64_t v) -> std::uint64_t
+            {
+                const auto it = remap.find(UUID(v));
+                return it != remap.end() ? static_cast<std::uint64_t>(it->second) : v;
+            };
+
+            if (entityJson.contains("Parent"))
+                entityJson["Parent"] = mapVal(AsU64(entityJson["Parent"]));
+
+            for (const ComponentInfo& info : ComponentRegistry::GetAll())
+            {
+                if (!entityJson.contains(info.Name))
+                    continue;
+
+                json& comp = entityJson[info.Name];
+                for (const FieldInfo& f : info.Fields)
+                    if (f.Type == FieldType::EntityRef && comp.contains(f.Name))
+                        comp[f.Name] = mapVal(AsU64(comp[f.Name]));
+            }
+
+            // Script Entity alanlari - RemapReferences'taki bilginin json
+            // izdusumu (format ComponentMeta'daki NativeScript Extra'sindan).
+            if (entityJson.contains("NativeScript") &&
+                entityJson["NativeScript"].contains("Fields"))
+            {
+                for (auto& [name, fj] : entityJson["NativeScript"]["Fields"].items())
+                    if (fj.value("t", std::string()) == "e" && fj.contains("v"))
+                        fj["v"] = mapVal(AsU64(fj["v"]));
+            }
+        }
+
+        // Apply sonrasi BASKA bir ornegin tek entity'sini tazeler: eski
+        // kaynaga esit (override edilmemis) alanlar yeni kaynaga cekilir,
+        // override edilenler korunur (Unity davranisi).
+        void RefreshInstanceEntity(Entity e, const json& oldSrc,
+                                   const json& newSrc, TextureLibrary* library)
+        {
+            for (const ComponentInfo& info : ComponentRegistry::GetAll())
+            {
+                if (!info.SerializedByTable)
+                    continue;
+                if (std::string_view(info.Name) == "PrefabInstance")
+                    continue;
+                // Component iki kaynakta da yoksa/teksa yapisal degisim
+                // demektir - C-5'e birakildi.
+                if (!oldSrc.contains(info.Name) || !newSrc.contains(info.Name))
+                    continue;
+                if (!info.Has(e))
+                    continue;
+
+                const json& oldC = oldSrc[info.Name];
+                const json& newC = newSrc[info.Name];
+                if (oldC == newC)
+                    continue;   // kaynak bu component'te degismemis
+
+                void* comp = info.GetPtr(e);
+                const json cur = Detail::SerializeComponent(info, e);
+
+                for (const FieldInfo& f : info.Fields)
+                {
+                    if (!oldC.contains(f.Name) || !newC.contains(f.Name))
+                        continue;
+                    if (oldC[f.Name] == newC[f.Name])
+                        continue;   // bu alan degismemis
+
+                    if (f.Type == FieldType::EntityRef)
+                    {
+                        const std::uint64_t curV = AsU64(cur[f.Name]);
+                        if (ToSourceSpace(e, UUID(curV)) != AsU64(oldC[f.Name]))
+                            continue;   // override edilmis: dokunma
+
+                        std::uint64_t newV = AsU64(newC[f.Name]);
+                        if (newV != 0)
+                        {
+                            const AssetHandle handle =
+                                e.GetComponent<PrefabInstanceComponent>().Prefab;
+                            if (Entity m = FindBySourceId(InstanceRootOf(e),
+                                                          handle, UUID(newV)))
+                                newV = static_cast<std::uint64_t>(m.GetUUID());
+                        }
+                        static_cast<EntityRef*>(f.Get(comp))->Target = UUID(newV);
+                    }
+                    else
+                    {
+                        if (cur.contains(f.Name) && cur[f.Name] != oldC[f.Name])
+                            continue;   // override edilmis: dokunma
+                        Detail::ReadField(f, comp, newC);
+                    }
+                }
+
+                // Alan tablosu disindaki veri (doku GUID'i, script alanlari):
+                // tek blob olarak kiyaslanir. Ornek eski kaynakla aynida
+                // kaldiysa yeni kaynagin blobu yuklenir.
+                if (info.LoadExtra)
+                {
+                    auto extraOf = [&info](const json& c)
+                    {
+                        json ex = c;
+                        for (const FieldInfo& f : info.Fields)
+                            ex.erase(f.Name);
+                        return ex;
+                    };
+
+                    const json oldEx = extraOf(oldC);
+                    if (oldEx != extraOf(newC) && extraOf(cur) == oldEx)
+                        info.LoadExtra(comp, newC, library);
+                }
+            }
+        }
     }
 
     std::vector<const char*> OverriddenFields(Entity instance,
@@ -255,5 +384,188 @@ namespace FX::PrefabOverrides
         const json before = Detail::SerializeComponent(info, instance);
         Detail::ReadField(*field, comp, srcComp);
         return Detail::SerializeComponent(info, instance) != before;
+    }
+
+    Entity InstanceRoot(Entity entity)
+    {
+        if (!entity || !entity.HasComponent<PrefabInstanceComponent>())
+            return entity;
+        return InstanceRootOf(entity);
+    }
+
+    std::vector<Entity> InstanceRootsOf(Scene& scene, AssetHandle prefab)
+    {
+        std::vector<Entity> roots;
+        std::unordered_set<std::uint64_t> seen;
+
+        auto view = scene.GetRegistry().view<PrefabInstanceComponent>();
+        for (auto handle : view)
+        {
+            if (view.get<PrefabInstanceComponent>(handle).Prefab != prefab)
+                continue;
+
+            Entity root = InstanceRootOf(Entity{ handle, &scene });
+            if (seen.insert(static_cast<std::uint64_t>(root.GetUUID())).second)
+                roots.push_back(root);
+        }
+        return roots;
+    }
+
+    bool ApplyInstance(Entity instanceRoot, TextureLibrary* library)
+    {
+        if (!instanceRoot || !instanceRoot.HasComponent<PrefabInstanceComponent>())
+            return false;
+
+        instanceRoot = InstanceRootOf(instanceRoot);
+        Scene* scene = instanceRoot.GetScene();
+        if (!scene)
+            return false;
+
+        const AssetHandle handle =
+            instanceRoot.GetComponent<PrefabInstanceComponent>().Prefab;
+        const std::string relPath = AssetManager::GetPath(handle);
+        if (relPath.empty())
+        {
+            FX_CORE_ERROR("Apply: prefab kaynagi bulunamadi (kayip GUID).");
+            return false;
+        }
+
+        const std::string fullPath = FileSystem::ResolveProjectAsset(relPath);
+        json doc;
+        {
+            std::ifstream in(fullPath);
+            if (!in)
+            {
+                FX_CORE_ERROR("Apply: prefab dosyasi acilamadi: %s", fullPath.c_str());
+                return false;
+            }
+            try
+            {
+                in >> doc;
+            }
+            catch (const json::parse_error& err)
+            {
+                FX_CORE_ERROR("Apply: prefab dosyasi bozuk: %s", err.what());
+                return false;
+            }
+        }
+
+        if (!doc.contains("Entities") || !doc["Entities"].is_array())
+            return false;
+
+        // Ornek alt agaci + iki yonlu esleme.
+        std::vector<Entity> subtree;
+        CollectSubtree(instanceRoot, subtree);
+
+        std::unordered_map<UUID, UUID>   instToSrc;   // ornek UUID -> SourceId
+        std::unordered_map<UUID, Entity> srcToInst;   // SourceId -> ornek entity
+        for (Entity e : subtree)
+        {
+            if (!e.HasComponent<PrefabInstanceComponent>())
+                continue;
+            const auto& link = e.GetComponent<PrefabInstanceComponent>();
+            if (link.Prefab != handle || !link.SourceId.IsValid())
+                continue;
+            instToSrc[e.GetUUID()] = link.SourceId;
+            srcToInst[link.SourceId] = e;
+        }
+
+        // Yeni entity listesi ESKI dosyanin sirasiyla kurulur: eslesen
+        // kayit ornekten yeniden yazilir, eslesmeyen (ornekte silinmis)
+        // oldugu gibi korunur. Ornekte EKLENEN entity'ler dosyaya girmez
+        // (yapisal apply C-5).
+        json newEntities = json::array();
+        int  applied     = 0;
+
+        for (const auto& oldE : doc["Entities"])
+        {
+            const UUID srcId{ oldE.value("ID", std::uint64_t{ 0 }) };
+            const auto it = srcToInst.find(srcId);
+            if (it == srcToInst.end())
+            {
+                newEntities.push_back(oldE);
+                continue;
+            }
+
+            Entity inst = it->second;
+
+            json j = Detail::SerializeEntity(inst);
+            j["ID"] = static_cast<std::uint64_t>(srcId);
+            j.erase("PrefabInstance");
+
+            // Parent + ic referanslar kaynak uzayina.
+            RemapJsonRefs(j, instToSrc);
+
+            if (inst == instanceRoot)
+            {
+                j.erase("Parent");
+
+                // Kok konumu KAYNAKTAKI degerinde kalir: ornege ozgu
+                // yerlestirme kaynaga sizmamali (Revert'in simetrigi).
+                if (j.contains("Transform") && oldE.contains("Transform") &&
+                    oldE["Transform"].contains("Translation"))
+                    j["Transform"]["Translation"] = oldE["Transform"]["Translation"];
+            }
+
+            newEntities.push_back(std::move(j));
+            ++applied;
+        }
+
+        if (applied == 0)
+        {
+            FX_CORE_WARN("Apply: ornekle kaynak arasinda eslesen entity yok.");
+            return false;
+        }
+
+        // Diger ornekleri tazele - dosya yazilmadan, bellekteki eski/yeni
+        // kopyalarla (override kiyasi ESKI kaynaga karsi yapilmali).
+        std::unordered_map<UUID, const json*> oldById, newById;
+        for (const auto& e : doc["Entities"])
+            if (const UUID id{ e.value("ID", std::uint64_t{ 0 }) }; id.IsValid())
+                oldById[id] = &e;
+        for (const auto& e : newEntities)
+            if (const UUID id{ e.value("ID", std::uint64_t{ 0 }) }; id.IsValid())
+                newById[id] = &e;
+
+        for (Entity otherRoot : InstanceRootsOf(*scene, handle))
+        {
+            if (otherRoot == instanceRoot)
+                continue;
+
+            std::vector<Entity> others;
+            CollectSubtree(otherRoot, others);
+
+            for (Entity e : others)
+            {
+                if (!e.HasComponent<PrefabInstanceComponent>())
+                    continue;
+                const auto& link = e.GetComponent<PrefabInstanceComponent>();
+                if (link.Prefab != handle)
+                    continue;
+
+                const auto oldIt = oldById.find(link.SourceId);
+                const auto newIt = newById.find(link.SourceId);
+                if (oldIt != oldById.end() && newIt != newById.end())
+                    RefreshInstanceEntity(e, *oldIt->second, *newIt->second, library);
+            }
+        }
+
+        // Dosyaya yaz. Root kimligi ve surum korunur.
+        json out;
+        out["Version"]  = doc.value("Version", 1);
+        out["Type"]     = "FXPrefab";
+        out["Root"]     = doc.value("Root", std::uint64_t{ 0 });
+        out["Entities"] = std::move(newEntities);
+
+        std::ofstream file(fullPath);
+        if (!file)
+        {
+            FX_CORE_ERROR("Apply: prefab dosyasina yazilamadi: %s", fullPath.c_str());
+            return false;
+        }
+        file << std::setw(2) << out << std::endl;
+
+        FX_CORE_INFO("Prefab'a uygulandi: %s (%d entity).", relPath.c_str(), applied);
+        return true;
     }
 }

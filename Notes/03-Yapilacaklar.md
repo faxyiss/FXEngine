@@ -116,15 +116,13 @@ Yapısal ekle/sil kapsandı (2026-07-21). Kalanlar:
 
 ---
 
-## C. Prefab sistemi — bağ + Revert var, Apply/override sırada
+## C. Prefab sistemi — çekirdek TAMAM (C-1…C-4), yapısal kısım kaldı
 
-**Bugünkü durum:** C-1 bağı kurdu, C-2 Revert'i (kaynak → örnek) ekledi.
-Örnek prefab GUID'ini + kaynak entity UUID'ini tutuyor, Inspector'da
-görünüyor, "Revert" ile kaynağa döndürülebiliyor. Kalan yön **Apply**
-(örnek → kaynak) ve **override takibi**.
-
-16c'de bu doğrudan canımızı yaktı: `Star`'a script atadıktan sonra beş
-yıldızın hepsini tek tek düzeltmek gerekti. C-4 (Apply) bunu bitirecek.
+**Bugünkü durum:** bağ (C-1), Revert (C-2), override takibi (C-3) ve
+Apply (C-4) çalışıyor. 16c'nin "beş yıldızı tek tek düzelt" acısı kapandı:
+bir örnekte değiştir → Apply → kaynak + diğer örnekler güncellenir,
+override'lar korunur. Kalan: yapısal değişikliklerin (çocuk/component
+ekle-sil) semantiği ve kenar durumlar (C-5).
 
 ### C-1. Bağ + Inspector'da göster ✅ (2026-07-22)
 
@@ -157,15 +155,24 @@ Inspector'da sapan alanın etiketi **prefab mavisi**, değer widget'ına sağ
 tık → "Kaynak degerine dondur" (çoklu seçim + Undo). 3 birim testi.
 Ayrıntı: [Faz-C3-Notlar.md](Faz-C3-Notlar.md).
 
-### Kalanlar (C-4…C-5)
+### C-4. Apply (örnek → kaynak) ✅ (2026-07-23)
 
-- [ ] **C-4 Apply** — örneğin güncel halini `.fxprefab`'a geri yaz (kaynağın
-      kök UUID kimliği korunur), diğer açık örnekleri tazele. Undo kararı
-      gerek. C-3'ün tespiti hazır: "neyi uyguluyorum?" cevaplanabiliyor
-- [ ] **C-5 Yayılma + kenar durumlar** — kaynak değişince örnekler tazelensin;
-      prefab silinirse "kayıp" uyarısı (bağ tutulur, GUID korunuyor);
-      yapısal override (örnekte component/çocuk ekle-sil) kararı; nested
-      prefab; doku (Extra) ve script alanı override göstergesi
+`PrefabOverrides::ApplyInstance` — örneği kaynak dosyaya yazar (kimlikler
+kaynak uzayında kalır, kök konumu sızmaz) ve sahnedeki **diğer örnekleri**
+tazeler: override edilmemiş alanlar + Extra blob (doku, script alanları)
+yeni kaynağa çekilir, override'lar korunur. Undo: eski dosya baytları +
+diğer örnek snapshot'ları. Inspector'da **Apply** düğmesi. 2 birim testi.
+16c'nin "beş yıldızı tek tek düzelt" acısı kapandı. Ayrıntı:
+[Faz-C4-Notlar.md](Faz-C4-Notlar.md).
+
+### Kalan (C-5)
+
+- [ ] **C-5 Yapısal + kenar durumlar** — örnekte eklenen/silinen çocuk
+      entity ve component'lerin Apply/Revert/yayılma semantiği; kaynak
+      dışarıdan değişince açık sahnedeki örnekler tazelensin (FileWatcher);
+      prefab silinirse "kayıp" uyarısı davranışı; nested prefab; doku ve
+      script alanı override GÖSTERGESİ (yayılma zaten çalışıyor);
+      alan başına Apply
 
 **Not:** en büyük editör işi. C-1 bitti; en pahalı parça C-3/C-4 (override
 semantiği + yazma yolu).

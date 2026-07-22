@@ -141,13 +141,14 @@ sınırı (F: aktif/pasif bayrağı), sürükle-bırakta iki satır arası ince 
 - **Girdi:** `FX::Input` (sorgu) + `FX::Event` (olay)
 - **Script'ten oyun kontrolü:** entity silme (`Destroy`), spawn
   (`Instantiate(prototip)`), hedef referansı (`EntityRef` alanı)
-- **Prefab bağı (C-1/C-2/C-3):** örnek kaynağını biliyor
+- **Prefab sistemi (C-1…C-4):** örnek kaynağını biliyor
   (`PrefabInstanceComponent` = prefab GUID + kaynak entity UUID). Inspector'da
-  "Prefab: &lt;ad&gt;" + **Revert** + Bağı Kır; **sapan alanlar mavi etiketli**,
-  sağ tık → tek alanı kaynağa döndür (`FX::PrefabOverrides`, diff tabanlı).
-  Apply (örnek → kaynak) henüz yok
-  ([Faz-C3-Notlar.md](Faz-C3-Notlar.md), [03-Yapilacaklar.md](03-Yapilacaklar.md) C)
-- **Testler:** `FXTests` **85 test / 421 assertion**
+  "Prefab: &lt;ad&gt;" + **Apply** + **Revert** + Bağı Kır; sapan alanlar mavi
+  etiketli, sağ tık → tek alanı kaynağa döndür (`FX::PrefabOverrides`, diff
+  tabanlı). Apply kaynağa yazıp diğer örnekleri tazeler (override'lar
+  korunur). Kalan: yapısal apply/revert (C-5)
+  ([Faz-C4-Notlar.md](Faz-C4-Notlar.md), [03-Yapilacaklar.md](03-Yapilacaklar.md) C)
+- **Testler:** `FXTests` **87 test / 446 assertion**
 
 ---
 
@@ -267,10 +268,10 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 ## 5b. YENİ OTURUMDA İLK İŞ
 
 Aşama A/B, script alanları, 16c örnek oyun ve backlog A + B grupları
-**bitti**. Sıradaki iş **"Önerilen sıra"**da (aşağıda): **prefab C-4 Apply**
-(C-1 bağ + C-2 Revert + C-3 override takibi bitti), ya da D-1 metin /
-18c render sıralaması. Somut madde listesi
-**[03-Yapilacaklar.md](03-Yapilacaklar.md)**'da.
+**bitti**. Prefab çekirdeği (C-1…C-4) **bitti** — en büyük editör işi kapandı.
+Sıradaki iş: **D-1 metin** ya da **18c render sıralaması** (önerilen
+sıradaki sonraki iki madde); prefab C-5 (yapısal) acil değil. Somut madde
+listesi **[03-Yapilacaklar.md](03-Yapilacaklar.md)**'da.
 
 ### Aşama C (C#) değerlendirmesi — 2026-07-21 (hâlâ geçerli)
 

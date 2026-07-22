@@ -6,6 +6,8 @@
 #include <FXEngine/Scene/Entity.h>
 #include <FXEngine/Scene/Components.h>
 #include <FXEngine/Scene/PrefabSerializer.h>
+#include <FXEngine/Scene/PrefabOverrides.h>
+#include <FXEngine/Scene/ComponentMeta.h>
 #include <FXEngine/Scene/SceneSerializer.h>
 #include <FXEngine/Asset/AssetManager.h>
 #include <FXEngine/Core/FileSystem.h>
@@ -222,4 +224,101 @@ TEST_CASE("Revert ic referansi ornek kimligine yeniden esliyor", "[prefab]")
     // Revert sonrasi yine ornegin kokune bakmali (kaynagin kokune degil).
     CHECK(child.GetComponent<FX::FollowComponent>().Target.Target == root.GetUUID());
     CHECK(child.GetComponent<FX::FollowComponent>().Target.Target != srcRoot.GetUUID());
+}
+
+TEST_CASE("Override tespiti kaynaktan sapan alani buluyor", "[prefab]")
+{
+    TempProject project;
+    FX::Scene scene;
+
+    PreparedPrefab p = MakePrefab(scene);
+
+    FX::PrefabSerializer prefab(&scene, kNoTextures);
+    FX::Entity root  = prefab.Instantiate(p.RelPath, { 5.0f, 6.0f, 0.0f });
+    REQUIRE(root);
+    FX::Entity child = root.GetChildren()[0];
+
+    FX::ComponentInfo* tf = FX::ComponentRegistry::Find("Transform");
+    REQUIRE(tf);
+
+    // Cocuk el degmemis: sapma yok.
+    CHECK(FX::PrefabOverrides::OverriddenFields(child, *tf).empty());
+
+    // Kok konumu Instantiate'in override'i: yalniz Translation sapmis.
+    auto rootOv = FX::PrefabOverrides::OverriddenFields(root, *tf);
+    REQUIRE(rootOv.size() == 1);
+    CHECK(std::string(rootOv[0]) == "Translation");
+
+    // Cocugun rotasyonu degisince o da tespit ediliyor.
+    child.GetComponent<FX::TransformComponent>().Rotation = 0.5f;
+    auto childOv = FX::PrefabOverrides::OverriddenFields(child, *tf);
+    REQUIRE(childOv.size() == 1);
+    CHECK(std::string(childOv[0]) == "Rotation");
+}
+
+TEST_CASE("RevertField tek alani donduruyor, digerlerine dokunmuyor", "[prefab]")
+{
+    TempProject project;
+    FX::Scene scene;
+
+    PreparedPrefab p = MakePrefab(scene);
+
+    FX::PrefabSerializer prefab(&scene, kNoTextures);
+    FX::Entity root  = prefab.Instantiate(p.RelPath, { 0.0f, 0.0f, 0.0f });
+    REQUIRE(root);
+    FX::Entity child = root.GetChildren()[0];
+
+    auto& tf = child.GetComponent<FX::TransformComponent>();
+    tf.Rotation = 0.5f;
+    tf.Scale    = { 3.0f, 3.0f };
+
+    FX::ComponentInfo* info = FX::ComponentRegistry::Find("Transform");
+    REQUIRE(info);
+
+    CHECK(FX::PrefabOverrides::RevertField(child, *info, "Rotation"));
+
+    CHECK(tf.Rotation == 0.0f);        // geri dondu
+    CHECK(tf.Scale.x == 3.0f);         // diger override korundu
+
+    // Zaten kaynakta: ikinci cagri "degismedi" demeli.
+    CHECK_FALSE(FX::PrefabOverrides::RevertField(child, *info, "Rotation"));
+}
+
+TEST_CASE("EntityRef override'i ornek uzayinda kiyaslaniyor", "[prefab]")
+{
+    // Ic referans ornekte ornek kimligi tasir, kaynakta kaynak kimligi.
+    // Dogru kiyas icin uzay cevrimi sart - yoksa el degmemis Follow bile
+    // "sapmis" gorunurdu.
+    TempProject project;
+    FX::Scene scene;
+
+    FX::Entity srcRoot  = scene.CreateEntity("Kok");
+    FX::Entity srcChild = scene.CreateEntity("Takipci");
+    srcChild.SetParent(srcRoot);
+    srcChild.AddComponent<FX::FollowComponent>(srcRoot.GetUUID());
+
+    const std::string rel = "assets/prefabs/takip2.fxprefab";
+    FX::PrefabSerializer prefab(&scene, kNoTextures);
+    REQUIRE(prefab.Save(srcRoot, rel));
+    FX::AssetManager::ScanProject();
+
+    FX::Entity root  = prefab.Instantiate(rel, { 0.0f, 0.0f, 0.0f });
+    REQUIRE(root);
+    FX::Entity child = root.GetChildren()[0];
+
+    FX::ComponentInfo* info = FX::ComponentRegistry::Find("Follow");
+    REQUIRE(info);
+
+    // El degmemis: ic referans sapma DEGIL.
+    CHECK(FX::PrefabOverrides::OverriddenFields(child, *info).empty());
+
+    // Hedef bozulunca tespit ediliyor...
+    child.GetComponent<FX::FollowComponent>().Target.Target = FX::UUID(0);
+    auto ov = FX::PrefabOverrides::OverriddenFields(child, *info);
+    REQUIRE(ov.size() == 1);
+    CHECK(std::string(ov[0]) == "Target");
+
+    // ...ve RevertField hedefi ORNEGIN kokune donduruyor (kaynagin degil).
+    CHECK(FX::PrefabOverrides::RevertField(child, *info, "Target"));
+    CHECK(child.GetComponent<FX::FollowComponent>().Target.Target == root.GetUUID());
 }

@@ -15,6 +15,7 @@
 namespace FX
 {
     struct ComponentInfo;
+    struct FieldInfo;
 }
 
 namespace FX::Detail
@@ -31,6 +32,13 @@ namespace FX::Detail
     nlohmann::json SerializeComponent(const ComponentInfo& info, Entity entity);
     void ApplyComponent(const ComponentInfo& info, Entity entity,
                         const nlohmann::json& obj, TextureLibrary* library);
+
+    // TEK alani JSON'dan component'e okur (obj[f.Name] yoksa dokunmaz).
+    // ApplyComponent'in altindaki adim; alan duzeyinde revert (C-3) bunu
+    // dogrudan kullaniyor - ApplyComponent'ten fark, LoadExtra'yi
+    // CALISTIRMAMASI (tek alan geri alinirken doku/script verisi
+    // etkilenmemeli).
+    void ReadField(const FieldInfo& f, void* component, const nlohmann::json& in);
 
     // entity'nin TUM entity referanslarini remap tablosundan gecirir:
     // component EntityRef alanlari (Follow.Target gibi) VE script Entity

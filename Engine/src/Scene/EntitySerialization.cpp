@@ -52,37 +52,38 @@ namespace FX::Detail
             }
         }
 
-        void ReadField(const FieldInfo& f, void* component, const json& in)
+    }
+
+    void ReadField(const FieldInfo& f, void* component, const json& in)
+    {
+        // Alan dosyada yoksa component'in varsayilani gecerli kalir.
+        // Eski sahneler yeni alanlarla sessizce uyumlu oluyor.
+        if (!in.contains(f.Name))
+            return;
+
+        const json& v = in[f.Name];
+        void* p = f.Get(component);
+
+        switch (f.Type)
         {
-            // Alan dosyada yoksa component'in varsayilani gecerli kalir.
-            // Eski sahneler yeni alanlarla sessizce uyumlu oluyor.
-            if (!in.contains(f.Name))
-                return;
+        case FieldType::Bool:   if (v.is_boolean())        *static_cast<bool*>(p)  = v.get<bool>();  break;
+        case FieldType::Int:    if (v.is_number())         *static_cast<int*>(p)   = v.get<int>();   break;
+        case FieldType::Float:  if (v.is_number())         *static_cast<float*>(p) = v.get<float>(); break;
+        case FieldType::Vec2:   ReadVec<2>(v, &static_cast<glm::vec2*>(p)->x); break;
+        case FieldType::Vec3:   ReadVec<3>(v, &static_cast<glm::vec3*>(p)->x); break;
+        case FieldType::Vec4:
+        case FieldType::Color:  ReadVec<4>(v, &static_cast<glm::vec4*>(p)->x); break;
 
-            const json& v = in[f.Name];
-            void* p = f.Get(component);
+        case FieldType::String:
+            if (v.is_string()) *static_cast<std::string*>(p) = v.get<std::string>();
+            break;
 
-            switch (f.Type)
-            {
-            case FieldType::Bool:   if (v.is_boolean())        *static_cast<bool*>(p)  = v.get<bool>();  break;
-            case FieldType::Int:    if (v.is_number())         *static_cast<int*>(p)   = v.get<int>();   break;
-            case FieldType::Float:  if (v.is_number())         *static_cast<float*>(p) = v.get<float>(); break;
-            case FieldType::Vec2:   ReadVec<2>(v, &static_cast<glm::vec2*>(p)->x); break;
-            case FieldType::Vec3:   ReadVec<3>(v, &static_cast<glm::vec3*>(p)->x); break;
-            case FieldType::Vec4:
-            case FieldType::Color:  ReadVec<4>(v, &static_cast<glm::vec4*>(p)->x); break;
-
-            case FieldType::String:
-                if (v.is_string()) *static_cast<std::string*>(p) = v.get<std::string>();
-                break;
-
-            case FieldType::EntityRef:
-                // Hedef entity henuz olusturulmamis olabilir; sorun degil,
-                // cozumleme her karede tekrarlaniyor.
-                if (v.is_number_unsigned())
-                    static_cast<EntityRef*>(p)->Target = UUID(v.get<std::uint64_t>());
-                break;
-            }
+        case FieldType::EntityRef:
+            // Hedef entity henuz olusturulmamis olabilir; sorun degil,
+            // cozumleme her karede tekrarlaniyor.
+            if (v.is_number_unsigned())
+                static_cast<EntityRef*>(p)->Target = UUID(v.get<std::uint64_t>());
+            break;
         }
     }
 

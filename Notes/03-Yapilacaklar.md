@@ -147,16 +147,25 @@ eşleniyor. Korunan: UUID'ler, hiyerarşi, bağ, **kök konumu**. Inspector'da
 snapshot ile. 2 birim testi. Ayrıntı:
 [Faz-C2-Notlar.md](Faz-C2-Notlar.md).
 
-### Kalanlar (C-3…C-5)
+### C-3. Override takibi ✅ (2026-07-23)
 
-- [ ] **C-3 Override takibi** — diff: örnek alanını kaynakla karşılaştır,
-      değişeni Inspector'da **kalın** göster (Unity). Alana sağ tık →
-      "bu alanı geri al/uygula"
+`FX::PrefabOverrides` — **diff tabanlı** (açık takip değil): kaynak dosya
+önbellekli (`last_write_time` ile kendiliğinden tazelenir), fark her
+soruluşta hesaplanıyor. `OverriddenFields` + `RevertField` (tek alan).
+EntityRef alanları uzay çevrimiyle kıyaslanıyor (örnek↔kaynak kimliği).
+Inspector'da sapan alanın etiketi **prefab mavisi**, değer widget'ına sağ
+tık → "Kaynak degerine dondur" (çoklu seçim + Undo). 3 birim testi.
+Ayrıntı: [Faz-C3-Notlar.md](Faz-C3-Notlar.md).
+
+### Kalanlar (C-4…C-5)
+
 - [ ] **C-4 Apply** — örneğin güncel halini `.fxprefab`'a geri yaz (kaynağın
-      kök UUID kimliği korunur), diğer açık örnekleri tazele. Undo kararı gerek
+      kök UUID kimliği korunur), diğer açık örnekleri tazele. Undo kararı
+      gerek. C-3'ün tespiti hazır: "neyi uyguluyorum?" cevaplanabiliyor
 - [ ] **C-5 Yayılma + kenar durumlar** — kaynak değişince örnekler tazelensin;
       prefab silinirse "kayıp" uyarısı (bağ tutulur, GUID korunuyor);
-      yapısal override (örnekte component/çocuk ekle-sil) kararı; nested prefab
+      yapısal override (örnekte component/çocuk ekle-sil) kararı; nested
+      prefab; doku (Extra) ve script alanı override göstergesi
 
 **Not:** en büyük editör işi. C-1 bitti; en pahalı parça C-3/C-4 (override
 semantiği + yazma yolu).

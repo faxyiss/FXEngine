@@ -38,6 +38,7 @@ set(FXENGINE_SOURCES
     src/Scene/EntitySnapshot.cpp
     src/Scene/SceneSerializer.cpp
     src/Scene/PrefabSerializer.cpp
+    src/Scene/PrefabOverrides.cpp
 )
 
 set(FXENGINE_HEADERS

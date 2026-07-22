@@ -5,6 +5,7 @@
 #include <FXEngine/Asset/AssetManager.h>
 #include <FXEngine/Core/Log.h>
 #include <FXEngine/Scene/Components.h>
+#include <FXEngine/Scene/PrefabOverrides.h>
 #include <FXEngine/Scene/Scene.h>
 #include <FXEngine/Scene/ScriptableEntity.h>
 #include <FXEngine/Scene/ScriptFields.h>
@@ -25,9 +26,24 @@ namespace FXEd::ComponentDrawer
     {
         constexpr float kLabelWidth = 110.0f;
 
+        // C-3: kaynaktan sapan (override) alanin etiketi vurgulu cizilir.
+        // Unity kalin yazi kullanir; kalin font atlasimiz yok, prefab
+        // mavisiyle renklendiriyoruz. Bayrak DrawComponentBody alan
+        // dongusunde kurulup temizleniyor.
+        bool s_LabelOverridden = false;
+        const ImVec4 kOverrideColor{ 0.55f, 0.75f, 1.0f, 1.0f };
+
+        void LabelText(const char* text)
+        {
+            if (s_LabelOverridden)
+                ImGui::TextColored(kOverrideColor, "%s", text);
+            else
+                ImGui::Text("%s", text);
+        }
+
         void Label(const char* text)
         {
-            ImGui::Text("%s", text);
+            LabelText(text);
             ImGui::SameLine(kLabelWidth);
             ImGui::SetNextItemWidth(-1.0f);
         }
@@ -122,7 +138,7 @@ namespace FXEd::ComponentDrawer
             switch (f.Type)
             {
             case FX::FieldType::Bool:
-                ImGui::Text("%s", f.Label);
+                LabelText(f.Label);
                 ImGui::SameLine(kLabelWidth);
                 changed = ImGui::Checkbox("##b", static_cast<bool*>(p));
                 break;
@@ -737,6 +753,21 @@ namespace FXEd::ComponentDrawer
         if (!component)
             return;
 
+        // C-3: prefab orneginde kaynaktan sapan alanlar. Kaynak dosya
+        // onbellekli, kiyas kare basina kucuk JSON islemleri.
+        const bool isInstance = entity.HasComponent<FX::PrefabInstanceComponent>();
+        std::vector<const char*> overridden;
+        if (isInstance)
+            overridden = FX::PrefabOverrides::OverriddenFields(entity, info);
+
+        auto isOverridden = [&overridden](const char* name)
+        {
+            for (const char* n : overridden)
+                if (std::strcmp(n, name) == 0)
+                    return true;
+            return false;
+        };
+
         for (const FX::FieldInfo& f : info.Fields)
         {
             if (f.HiddenInInspector)
@@ -752,7 +783,11 @@ namespace FXEd::ComponentDrawer
                     if (void* oc = info.GetPtr(other))
                         edits.push_back({ other, ReadFieldValue(f, oc) });
 
+            const bool fieldOverridden = isInstance && isOverridden(f.Name);
+
+            s_LabelOverridden = fieldOverridden;
             const bool changed = DrawField(f, component, entity);
+            s_LabelOverridden = false;
 
             // Bu alanin widget'i suren surukleme desteklermi? Suruklenebilir
             // olanlar (sayilar, renk, metin, onay kutusu) baslat/birak ile
@@ -801,6 +836,28 @@ namespace FXEd::ComponentDrawer
                                      s_Pending.FieldLabel, s_Pending.Targets);
                     s_Pending.Active = false;
                 }
+            }
+
+            // C-3: deger widget'ina sag tik -> alani kaynak degerine dondur.
+            // Coklu secimde her hedef KENDI kaynagina doner; edits'teki eski
+            // degerler komuta girer, islem geri alinabilir.
+            if (isInstance)
+            {
+                ImGui::PushID(f.Name);
+                if (ImGui::BeginPopupContextItem("##prefab_field"))
+                {
+                    if (ImGui::MenuItem("Kaynak degerine dondur", nullptr,
+                                        false, fieldOverridden))
+                    {
+                        for (const FieldEdit& fe : edits)
+                            if (fe.Entity && info.Has(fe.Entity))
+                                FX::PrefabOverrides::RevertField(fe.Entity, info, f.Name);
+
+                        PushFieldCommand(info.Name, f.Name, f.Label, edits);
+                    }
+                    ImGui::EndPopup();
+                }
+                ImGui::PopID();
             }
         }
 

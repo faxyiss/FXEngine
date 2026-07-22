@@ -152,7 +152,15 @@ namespace FXEd
         // gezilen klasore) yazar ve sistem editorunde acar. Derlenmesi
         // icin oyunu (Game.dll) Derle'ye basmak gerekiyor.
         void DrawNewScriptModal();
-        bool CreateScriptFile(const std::string& name, std::string& outPath);
+
+        // split=false: tek header (govdeler inline). split=true: <ad>.h
+        // (bildirim) + <ad>.cpp (govde) - B-7 .cpp derlemeyi acti.
+        // outSource yalnizca split'te dolar. Var olan dosyayi EZMEZ.
+        bool CreateScriptFile(const std::string& name, bool split,
+                              std::string& outHeader, std::string& outSource);
+
+        // Modal'daki "ayri .cpp da olustur" tercihi.
+        bool m_NewScriptSplit = false;
 
         // Yeni script'in yazilacagi KLASOR. Bos = varsayilan (assets/scripts).
         // Icerik panelinden "Yeni Script..." denince o klasore ayarlaniyor.

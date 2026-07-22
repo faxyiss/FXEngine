@@ -185,8 +185,11 @@ Aynı Z'deki sprite'ların sırası **keyfî** (EnTT view sırası + `GL_LESS`).
 - [ ] **Derlenmemiş script uyarısı** — dosya `assets/`'te var ama `Game.dll`'de
       yok; şu an hiçbir yerde görünmüyor. Dosya sayısı ↔ kayıt sayısı
       karşılaştırması yeterli
-- [ ] **"Yeni Script" → `.h` + `.cpp` seçeneği** (B-7 `.cpp`'yi açtı ama editör
-      hâlâ tek header üretiyor)
+- [x] **"Yeni Script" → `.h` + `.cpp` seçeneği** ✅ (2026-07-22) Modalda
+      onay kutusu; işaretliyse `<ad>.h` (bildirim) + `<ad>.cpp` (gövde)
+      üretiliyor, ikisi de açılıyor. `.cpp` içindeki `#include "<ad>.h"`
+      aynı klasörden çözülüyor (doğrulandı: proje DLL'i derlendi, kayıt
+      header'dan alındı). Tek header hâlâ varsayılan.
 - [ ] **İçerik panelinde "Yeni Dosya"** (herhangi bir uzantı)
 - [ ] `ContentBrowserPanel.cpp` ~1400 satır — bölünebilir
 

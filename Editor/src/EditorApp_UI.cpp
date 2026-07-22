@@ -886,8 +886,14 @@ namespace FXEd
         if (problem.empty() && FX::ScriptRegistry::Contains(name))
             problem = "Bu adda bir script zaten var.";
 
+        ImGui::Checkbox("Ayri .cpp da olustur (.h bildirim + .cpp govde)",
+                        &m_NewScriptSplit);
+
         if (!problem.empty())
             ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "%s", problem.c_str());
+        else if (m_NewScriptSplit)
+            ImGui::TextDisabled("Olusacak: %s.h + %s.cpp  ->  class %s",
+                                name.c_str(), name.c_str(), name.c_str());
         else
             ImGui::TextDisabled("Olusacak: %s.h  ->  class %s", name.c_str(), name.c_str());
 
@@ -903,16 +909,24 @@ namespace FXEd
         ImGui::BeginDisabled(!problem.empty());
         if (ImGui::Button("Olustur", ImVec2(120.0f, 0.0f)))
         {
-            std::string path;
-            if (CreateScriptFile(name, path))
+            std::string header, source;
+            if (CreateScriptFile(name, m_NewScriptSplit, header, source))
             {
-                SetStatus("Script olusturuldu: " + name + ".h (oyunu derle)");
-                FX_INFO("Script olusturuldu: %s", path.c_str());
-                FileDialogs::OpenExternally(path);
+                SetStatus("Script olusturuldu: " + name +
+                          (m_NewScriptSplit ? ".h + .cpp (oyunu derle)"
+                                            : ".h (oyunu derle)"));
+                FX_INFO("Script olusturuldu: %s", header.c_str());
+                // Bolunmuste .cpp'yi de ac: kullanici govdeleri orada yazacak.
+                if (!source.empty())
+                {
+                    FX_INFO("Script govdesi: %s", source.c_str());
+                    FileDialogs::OpenExternally(source);
+                }
+                FileDialogs::OpenExternally(header);
             }
             else
             {
-                SetStatus("Script OLUSTURULAMADI: " + name + ".h");
+                SetStatus("Script OLUSTURULAMADI: " + name);
             }
 
             ImGui::CloseCurrentPopup();

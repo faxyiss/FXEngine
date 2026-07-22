@@ -68,35 +68,21 @@ namespace FXEd
     //
     // Dosya adi = sinif adi = sahne dosyasina yazilan ad. Uc kimligi
     // ayirmak, uctan birini degistirince digerlerini bozmak demekti.
-    bool EditorApp::CreateScriptFile(const std::string& name, std::string& outPath)
+    namespace
     {
-        // Icerik panelinden gelen hedef klasor varsa oraya, yoksa
-        // varsayilan assets/scripts'e.
-        const std::string scriptsDir =
-            !m_NewScriptDir.empty() ? m_NewScriptDir : GameProject::ScriptsDir();
-        if (scriptsDir.empty())
-            return false;   // acik proje yok
+        // %NAME% -> ad. Sablonlar C++ kodu; kacis dizileriyle yazmak
+        // okunmaz olurdu, ham dize kullaniyoruz.
+        std::string FillName(const char* tpl, const std::string& name)
+        {
+            std::string s = tpl;
+            for (std::size_t pos = s.find("%NAME%"); pos != std::string::npos;
+                 pos = s.find("%NAME%", pos + name.size()))
+                s.replace(pos, 6, name);
+            return s;
+        }
 
-        const std::filesystem::path dir{ scriptsDir };
-
-        std::error_code ec;
-        std::filesystem::create_directories(dir, ec);
-
-        const std::filesystem::path file = dir / (name + ".h");
-        outPath = file.string();
-
-        // Var olani EZMIYORUZ: yazilmis bir script'i sessizce silmek
-        // geri alinamaz bir kayip olurdu.
-        if (std::filesystem::exists(file))
-            return false;
-
-        std::ofstream out(file);
-        if (!out)
-            return false;
-
-        // Ham dize: sablonun kendisi C++ kodu, kacis dizileriyle
-        // yazmak okunmaz hale getirirdi. %s yerine gecen tek sey ad.
-        static constexpr const char* kTemplate = R"TPL(#pragma once
+        // Tek header (govdeler inline) - varsayilan, basit script'ler icin.
+        constexpr const char* kSingleHeader = R"TPL(#pragma once
 
 #include <FXEngine/Scene/ScriptableEntity.h>
 #include <FXEngine/Scene/Components.h>
@@ -141,17 +127,112 @@ namespace FXGame
 }
 )TPL";
 
-        std::string content = kTemplate;
+        // Bolunmus: header BILDIRIR, govdeler .cpp'de (B-7 .cpp derlemeyi acti).
+        constexpr const char* kSplitHeader = R"TPL(#pragma once
 
-        for (std::size_t pos = content.find("%NAME%");
-             pos != std::string::npos;
-             pos = content.find("%NAME%", pos + name.size()))
+#include <FXEngine/Scene/ScriptableEntity.h>
+
+namespace FXGame
+{
+    // SINIF ADI DOSYA ADIYLA AYNI OLMALI: kayit CMake bunu tariyor.
+    // Govdeler %NAME%.cpp'de.
+    class %NAME% : public FX::ScriptableEntity
+    {
+    protected:
+        void OnCreate() override;
+        void OnUpdate(float dt) override;
+        void OnDestroy() override;
+        void OnReflect(FX::ScriptFieldVisitor& v) override;
+
+    private:
+        float m_Speed = 1.0f;   // birim/saniye
+    };
+}
+)TPL";
+
+        constexpr const char* kSplitSource = R"TPL(#include "%NAME%.h"
+
+#include <FXEngine/Scene/Components.h>
+#include <FXEngine/Core/Input.h>
+#include <FXEngine/Core/Log.h>
+
+namespace FXGame
+{
+    void %NAME%::OnCreate()
+    {
+        FX_INFO("%NAME%: OnCreate (%s)", GetEntity().GetName().c_str());
+    }
+
+    void %NAME%::OnUpdate(float dt)
+    {
+        auto& tf = GetComponent<FX::TransformComponent>();
+        tf.Translation.x += m_Speed * dt;
+    }
+
+    void %NAME%::OnDestroy()
+    {
+    }
+
+    void %NAME%::OnReflect(FX::ScriptFieldVisitor& v)
+    {
+        v.Visit("Hiz", m_Speed);
+    }
+}
+)TPL";
+
+        bool WriteNew(const std::filesystem::path& file, const std::string& content)
         {
-            content.replace(pos, 6, name);
+            // Var olani EZMIYORUZ: yazilmis bir script'i sessizce silmek
+            // geri alinamaz bir kayip olurdu.
+            if (std::filesystem::exists(file))
+                return false;
+            std::ofstream out(file);
+            if (!out)
+                return false;
+            out << content;
+            return out.good();
+        }
+    }
+
+    bool EditorApp::CreateScriptFile(const std::string& name, bool split,
+                                     std::string& outHeader, std::string& outSource)
+    {
+        outHeader.clear();
+        outSource.clear();
+
+        // Icerik panelinden gelen hedef klasor varsa oraya, yoksa
+        // varsayilan assets/scripts'e.
+        const std::string scriptsDir =
+            !m_NewScriptDir.empty() ? m_NewScriptDir : GameProject::ScriptsDir();
+        if (scriptsDir.empty())
+            return false;   // acik proje yok
+
+        const std::filesystem::path dir{ scriptsDir };
+        std::error_code ec;
+        std::filesystem::create_directories(dir, ec);
+
+        const std::filesystem::path header = dir / (name + ".h");
+        const std::filesystem::path source = dir / (name + ".cpp");
+
+        // Bolunmus modda ikisinden biri bile varsa dokunma.
+        if (std::filesystem::exists(header) || (split && std::filesystem::exists(source)))
+            return false;
+
+        if (split)
+        {
+            if (!WriteNew(header, FillName(kSplitHeader, name)))
+                return false;
+            if (!WriteNew(source, FillName(kSplitSource, name)))
+                return false;
+            outHeader = header.string();
+            outSource = source.string();
+            return true;
         }
 
-        out << content;
-        return out.good();
+        if (!WriteNew(header, FillName(kSingleHeader, name)))
+            return false;
+        outHeader = header.string();
+        return true;
     }
 
     // -----------------------------------------------------------------------

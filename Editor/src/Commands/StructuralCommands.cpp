@@ -4,7 +4,9 @@
 #include "SelectionContext.h"
 
 #include <FXEngine/Scene/ComponentMeta.h>
+#include <FXEngine/Scene/Components.h>
 #include <FXEngine/Scene/EntitySnapshot.h>
+#include <FXEngine/Scene/PrefabSerializer.h>
 #include <FXEngine/Scene/Scene.h>
 
 namespace FXEd::Structural
@@ -383,5 +385,46 @@ namespace FXEd::Structural
         };
         cmd.Redo = apply;
         s_Ctx.Commands->Push(std::move(cmd));
+    }
+
+    void RevertPrefabInstance(FX::Entity instanceRoot)
+    {
+        if (!Ready() || !instanceRoot ||
+            !instanceRoot.HasComponent<FX::PrefabInstanceComponent>())
+            return;
+
+        // Revert component KUMESINI degistirebiliyor (eklenen kalkar,
+        // silinen geri gelir), o yuzden alan-degeri degil TAM snapshot ile
+        // geri aliyoruz - silme/cogaltma undo'suyla ayni destroy+restore
+        // kalibi. UUID'ler korundugu icin arada ona bakan komutlar hedefini
+        // bulmaya devam ediyor.
+        const FX::EntitySnapshot before = FX::EntitySnapshot::Capture(instanceRoot);
+        const FX::UUID           rootId = instanceRoot.GetUUID();
+
+        FX::PrefabSerializer prefab(s_Ctx.Scene, s_Ctx.Library);
+        if (!prefab.RevertInstance(instanceRoot))
+            return;   // kaynak kayip veya is olmadi: gereksiz undo adimi yok
+
+        const FX::EntitySnapshot after = FX::EntitySnapshot::Capture(Find(rootId));
+
+        EditCommand cmd;
+        cmd.Name = "Prefab'i geri al (Revert)";
+        cmd.Undo = [before, rootId]()
+        {
+            if (FX::Entity e = Find(rootId))
+                s_Ctx.Scene->DestroyEntity(e);
+            before.Restore(*s_Ctx.Scene, s_Ctx.Library);
+            SelectByIds({ rootId });
+        };
+        cmd.Redo = [after, rootId]()
+        {
+            if (FX::Entity e = Find(rootId))
+                s_Ctx.Scene->DestroyEntity(e);
+            after.Restore(*s_Ctx.Scene, s_Ctx.Library);
+            SelectByIds({ rootId });
+        };
+        s_Ctx.Commands->Push(std::move(cmd));
+
+        SelectByIds({ rootId });
     }
 }

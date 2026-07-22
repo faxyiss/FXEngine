@@ -150,3 +150,76 @@ TEST_CASE("Prefab olarak kaydetmek bagi dosyaya yazmiyor", "[prefab]")
     for (const auto& e : doc["Entities"])
         CHECK_FALSE(e.contains("PrefabInstance"));
 }
+
+TEST_CASE("Revert ornegi kaynagina donduruyor", "[prefab]")
+{
+    TempProject project;
+    FX::Scene scene;
+
+    PreparedPrefab p = MakePrefab(scene);
+
+    FX::PrefabSerializer prefab(&scene, kNoTextures);
+    FX::Entity root = prefab.Instantiate(p.RelPath, { 5.0f, 6.0f, 0.0f });
+    REQUIRE(root);
+
+    FX::Entity child = root.GetChildren()[0];
+
+    // Ornekte override'lar: cocuk konumu, kok donmesi, eklenen component.
+    child.GetComponent<FX::TransformComponent>().Translation = { 9.0f, 9.0f, 0.0f };
+    root.GetComponent<FX::TransformComponent>().Rotation = 1.25f;
+    root.AddComponent<FX::CameraComponent>();
+
+    REQUIRE(prefab.RevertInstance(root));
+
+    // Cocuk konumu kaynaga dondu (kaynakta 0).
+    CHECK(child.GetComponent<FX::TransformComponent>().Translation.x == 0.0f);
+    CHECK(child.GetComponent<FX::TransformComponent>().Translation.y == 0.0f);
+
+    // Kok donmesi kaynaga dondu (kaynakta 0).
+    CHECK(root.GetComponent<FX::TransformComponent>().Rotation == 0.0f);
+
+    // Kok KONUMU korundu: ornek yerinde kalmali (Instantiate override'i).
+    CHECK(root.GetComponent<FX::TransformComponent>().Translation.x == 5.0f);
+    CHECK(root.GetComponent<FX::TransformComponent>().Translation.y == 6.0f);
+
+    // Ornekte EKLENEN component revert'te kalkti.
+    CHECK_FALSE(root.HasComponent<FX::CameraComponent>());
+
+    // Bag revert'ten sag cikti.
+    CHECK(root.HasComponent<FX::PrefabInstanceComponent>());
+    CHECK(child.HasComponent<FX::PrefabInstanceComponent>());
+}
+
+TEST_CASE("Revert ic referansi ornek kimligine yeniden esliyor", "[prefab]")
+{
+    // Kaynakta cocuk, koku takip ediyor (ic referans). Ornekte bu referans
+    // ornegin kokune bakmali - kaynagin degil. Revert bunu bozmamali.
+    TempProject project;
+    FX::Scene scene;
+
+    FX::Entity srcRoot  = scene.CreateEntity("Kok");
+    FX::Entity srcChild = scene.CreateEntity("Takipci");
+    srcChild.SetParent(srcRoot);
+    srcChild.AddComponent<FX::FollowComponent>(srcRoot.GetUUID());
+
+    const std::string rel = "assets/prefabs/takip.fxprefab";
+    FX::PrefabSerializer prefab(&scene, kNoTextures);
+    REQUIRE(prefab.Save(srcRoot, rel));
+    FX::AssetManager::ScanProject();
+
+    FX::Entity root  = prefab.Instantiate(rel, { 0.0f, 0.0f, 0.0f });
+    REQUIRE(root);
+    FX::Entity child = root.GetChildren()[0];
+
+    // Ornekleme sonrasi hedef ornegin kokune esitlenmis olmali.
+    REQUIRE(child.HasComponent<FX::FollowComponent>());
+    CHECK(child.GetComponent<FX::FollowComponent>().Target.Target == root.GetUUID());
+
+    // Referansi boz, sonra revert et.
+    child.GetComponent<FX::FollowComponent>().Target.Target = FX::UUID(0);
+    REQUIRE(prefab.RevertInstance(root));
+
+    // Revert sonrasi yine ornegin kokune bakmali (kaynagin kokune degil).
+    CHECK(child.GetComponent<FX::FollowComponent>().Target.Target == root.GetUUID());
+    CHECK(child.GetComponent<FX::FollowComponent>().Target.Target != srcRoot.GetUUID());
+}

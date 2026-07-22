@@ -86,5 +86,10 @@ namespace FXEd
                           const std::vector<FX::Entity>& targets);
         void RemoveComponent(const FX::ComponentInfo& info,
                              const std::vector<FX::Entity>& targets);
+
+        // Prefab ornegini kaynagina gore geri alir (C-2). instanceRoot
+        // ornegin KOKU olmali. Kaynak kayipsa / is olmadiysa komut yazmaz.
+        // Undo/Redo, alt agaci snapshot'tan geri koyar (destroy + restore).
+        void RevertPrefabInstance(FX::Entity instanceRoot);
     }
 }

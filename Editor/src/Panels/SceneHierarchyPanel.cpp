@@ -20,6 +20,33 @@
 
 namespace FXEd
 {
+    namespace
+    {
+        // Bir prefab ornegi entity'sinden AYNI prefab'a ait en dista
+        // atayi bulur. Bir cocuk seciliyken de islem tum ornege uygulansin
+        // diye: koku koparip cocuklari bagli birakmak tutarsiz olurdu.
+        // Ic ice prefab'ta (farkli handle) siniri asmiyor - C-5 konusu.
+        FX::Entity InstanceRoot(FX::Entity e)
+        {
+            if (!e || !e.HasComponent<FX::PrefabInstanceComponent>())
+                return e;
+
+            const FX::AssetHandle handle =
+                e.GetComponent<FX::PrefabInstanceComponent>().Prefab;
+
+            FX::Entity root = e;
+            while (FX::Entity parent = root.GetParent())
+            {
+                if (!parent.HasComponent<FX::PrefabInstanceComponent>())
+                    break;
+                if (parent.GetComponent<FX::PrefabInstanceComponent>().Prefab != handle)
+                    break;
+                root = parent;
+            }
+            return root;
+        }
+    }
+
     void SceneHierarchyPanel::SetContext(FX::Scene* scene)
     {
         m_Scene = scene;
@@ -521,7 +548,14 @@ namespace FXEd
                     ImGui::SetTooltip("%s", path.c_str());
             }
 
-            ImGui::SameLine();
+            // Revert yalnizca kaynak varken anlamli (kayip kaynaga
+            // donduremeyiz). Bagi Kir her durumda mumkun.
+            if (!path.empty())
+            {
+                if (ImGui::SmallButton("Revert"))
+                    m_RevertPrefab = entity;
+                ImGui::SameLine();
+            }
             if (ImGui::SmallButton("Bagi Kir"))
                 m_UnlinkPrefab = entity;
         }
@@ -583,6 +617,8 @@ namespace FXEd
 
         // "Bagi Kir": ornegi kaynagindan kopar. Tek entity degil TUM alt
         // agac - koku koparip cocuklari bagli birakmak tutarsiz olurdu.
+        // Once ornegin KOKUne cikiyoruz: bir cocuk seciliyken de tum ornek
+        // koparilir (Unity davranisi).
         if (m_UnlinkPrefab)
         {
             if (FX::ComponentInfo* info = FX::ComponentRegistry::Find("PrefabInstance"))
@@ -595,12 +631,19 @@ namespace FXEd
                     for (FX::Entity child : e.GetChildren())
                         gather(child);
                 };
-                gather(m_UnlinkPrefab);
+                gather(InstanceRoot(m_UnlinkPrefab));
 
                 if (!targets.empty())
                     Structural::RemoveComponent(*info, targets);
             }
             m_UnlinkPrefab = {};
+        }
+
+        // "Revert": ornegi kaynagina gore geri al. Kokten calisir.
+        if (m_RevertPrefab)
+        {
+            Structural::RevertPrefabInstance(InstanceRoot(m_RevertPrefab));
+            m_RevertPrefab = {};
         }
 
         ImGui::Separator();

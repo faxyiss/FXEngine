@@ -1,6 +1,7 @@
 #include "FXEngine/Scene/PrefabSerializer.h"
 #include "FXEngine/Scene/Entity.h"
 #include "FXEngine/Scene/Components.h"
+#include "FXEngine/Scene/ComponentMeta.h"
 #include "FXEngine/Asset/AssetManager.h"
 #include "FXEngine/Core/Log.h"
 #include "FXEngine/Core/FileSystem.h"
@@ -12,6 +13,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -199,5 +201,124 @@ namespace FX
 
         FX_CORE_INFO("Prefab orneklendi: %s (%zu entity)", fullPath.c_str(), remap.size());
         return newRoot;
+    }
+
+    bool PrefabSerializer::RevertInstance(Entity instanceRoot)
+    {
+        if (!m_Scene || !instanceRoot)
+            return false;
+
+        if (!instanceRoot.HasComponent<PrefabInstanceComponent>())
+        {
+            FX_CORE_ERROR("Revert: entity bir prefab ornegi degil.");
+            return false;
+        }
+
+        const AssetHandle handle =
+            instanceRoot.GetComponent<PrefabInstanceComponent>().Prefab;
+        const std::string relPath = AssetManager::GetPath(handle);
+        if (relPath.empty())
+        {
+            FX_CORE_ERROR("Revert: prefab kaynagi bulunamadi (kayip GUID).");
+            return false;
+        }
+
+        const std::string fullPath = FileSystem::ResolveProjectAsset(relPath);
+        std::ifstream in(fullPath);
+        if (!in)
+        {
+            FX_CORE_ERROR("Revert: prefab dosyasi acilamadi: %s", fullPath.c_str());
+            return false;
+        }
+
+        json doc;
+        try
+        {
+            in >> doc;
+        }
+        catch (const json::parse_error& err)
+        {
+            FX_CORE_ERROR("Revert: prefab dosyasi bozuk: %s", err.what());
+            return false;
+        }
+
+        if (!doc.contains("Entities") || !doc["Entities"].is_array())
+            return false;
+
+        // Kaynak UUID -> json entity nesnesi. doc yasadigi surece gecerli.
+        std::unordered_map<UUID, const json*> sourceById;
+        for (const auto& e : doc["Entities"])
+        {
+            const UUID id{ e.value("ID", std::uint64_t{ 0 }) };
+            if (id.IsValid())
+                sourceById[id] = &e;
+        }
+
+        std::vector<Entity> subtree;
+        CollectSubtree(instanceRoot, subtree);
+
+        // Ic referanslari cevirmek icin kaynak->ornek UUID eslemesi.
+        // Ornekleme sirasindaki remap'in tersi bilgisi: her damgali entity
+        // hangi kaynaktan geldigini SourceId'de tutuyor.
+        std::unordered_map<UUID, UUID> refRemap;
+        for (Entity e : subtree)
+        {
+            if (!e.HasComponent<PrefabInstanceComponent>())
+                continue;
+            const UUID srcId = e.GetComponent<PrefabInstanceComponent>().SourceId;
+            if (srcId.IsValid())
+                refRemap[srcId] = e.GetUUID();
+        }
+
+        int reverted = 0;
+        for (Entity e : subtree)
+        {
+            if (!e.HasComponent<PrefabInstanceComponent>())
+                continue;
+
+            const UUID srcId = e.GetComponent<PrefabInstanceComponent>().SourceId;
+            const auto it = sourceById.find(srcId);
+            if (it == sourceById.end())
+                continue;   // kaynakta karsiligi yok (ornekte eklendi) - dokunma
+
+            const json& src = *it->second;
+
+            // Kok konumu korunuyor: Instantiate'in override ettigi tek sey
+            // Translation'di; Revert de onu koruyor ki ornek yerinde kalsin.
+            const bool isRoot = (e == instanceRoot);
+            glm::vec3 keepTranslation{ 0.0f };
+            if (isRoot && e.HasComponent<TransformComponent>())
+                keepTranslation = e.GetComponent<TransformComponent>().Translation;
+
+            // Ornekte EKLENMIS (kaynakta olmayan) component'leri kaldir.
+            // PrefabInstance haric: bag revert'ten sag cikmali.
+            for (const ComponentInfo& info : ComponentRegistry::GetAll())
+            {
+                if (!info.SerializedByTable)
+                    continue;
+                if (std::string_view(info.Name) == "PrefabInstance")
+                    continue;
+                if (info.Has(e) && !src.contains(info.Name))
+                    info.Remove(e);
+            }
+
+            // Kaynak component'lerini uzerine yaz: eksigi ekler (ornekte
+            // silinmisti), var olani kaynak degeriyle degistirir.
+            Detail::ApplyComponents(e, src, m_Library);
+
+            if (isRoot && e.HasComponent<TransformComponent>())
+                e.GetComponent<TransformComponent>().Translation = keepTranslation;
+
+            ++reverted;
+        }
+
+        // Ic referanslar kaynak kimligini gosteriyor (dosyadan oyle geldi);
+        // ornek kimligine cevir. Disariya bakan referanslar dokunulmuyor.
+        for (Entity e : subtree)
+            Detail::RemapReferences(e, refRemap);
+
+        FX_CORE_INFO("Prefab ornegi kaynagina donduruldu: %s (%d entity).",
+                     relPath.c_str(), reverted);
+        return reverted > 0;
     }
 }

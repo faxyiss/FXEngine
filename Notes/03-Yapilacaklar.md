@@ -116,12 +116,12 @@ Yapısal ekle/sil kapsandı (2026-07-21). Kalanlar:
 
 ---
 
-## C. Prefab sistemi — bağ kuruldu, Apply/Revert sırada
+## C. Prefab sistemi — bağ + Revert var, Apply/override sırada
 
-**Bugünkü durum:** C-1 ile bağ kuruldu. `Instantiate` artık örneği
-kaynağına bağlıyor; örnek prefab GUID'ini + kaynak entity UUID'ini tutuyor
-ve Inspector'da görünüyor. Kaynak↔örnek senkronu (Apply/Revert/override)
-hâlâ yok — sıradaki parçalar.
+**Bugünkü durum:** C-1 bağı kurdu, C-2 Revert'i (kaynak → örnek) ekledi.
+Örnek prefab GUID'ini + kaynak entity UUID'ini tutuyor, Inspector'da
+görünüyor, "Revert" ile kaynağa döndürülebiliyor. Kalan yön **Apply**
+(örnek → kaynak) ve **override takibi**.
 
 16c'de bu doğrudan canımızı yaktı: `Star`'a script atadıktan sonra beş
 yıldızın hepsini tek tek düzeltmek gerekti. C-4 (Apply) bunu bitirecek.
@@ -137,11 +137,18 @@ kalmasın). Sahne **sürüm 5**. Inspector'da kimlik bloğunda "Prefab: &lt;ad&g
 uyarı. 3 birim testi (`[prefab]`). Ayrıntı:
 [Faz-C1-Notlar.md](Faz-C1-Notlar.md).
 
-### Kalanlar (C-2…C-5)
+### C-2. Revert (kaynak → örnek) ✅ (2026-07-22)
 
-- [ ] **C-2 Revert** — kaynağı yeniden oku, `SourceId` eşleşen örnek
-      entity'nin component'lerini üzerine yaz (örneğin kendi UUID/konum/
-      parent'ı korunur). Apply'ın da kullanacağı kaynak↔örnek eşlemesini kurar
+`PrefabSerializer::RevertInstance` — `SourceId` eşleşen örnek entity'lerin
+component'lerini kaynaktan yeniden yazıyor. Örnekte eklenen component'ler
+kalkıyor, silinenler geri geliyor, iç referanslar örnek kimliğine yeniden
+eşleniyor. Korunan: UUID'ler, hiyerarşi, bağ, **kök konumu**. Inspector'da
+**Revert** düğmesi (`InstanceRoot` ile kökten), Undo destroy+restore
+snapshot ile. 2 birim testi. Ayrıntı:
+[Faz-C2-Notlar.md](Faz-C2-Notlar.md).
+
+### Kalanlar (C-3…C-5)
+
 - [ ] **C-3 Override takibi** — diff: örnek alanını kaynakla karşılaştır,
       değişeni Inspector'da **kalın** göster (Unity). Alana sağ tık →
       "bu alanı geri al/uygula"

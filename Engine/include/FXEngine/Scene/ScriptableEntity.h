@@ -65,6 +65,31 @@ namespace FX
                 scene->DestroyEntityDeferred(other);
         }
 
+        // Bir PROTOTIP entity'yi (ve alt agacini) kopyalayarak sahneye yeni
+        // bir ornek koyar - runtime spawn (A-2). Prototip genelde bir
+        // EntityRef alaninda tutulur (Inspector'dan atanir); dosya-tabanli
+        // prefab yerine sahne ici sablon, cunku dokusu zaten yuklu ve yeni
+        // kimlik uretme mantigi DuplicateEntity'de test edilmis durumda.
+        //
+        // Aninda doner ama guvenli: ScriptSystem canli view yerine anlik
+        // kopya uzerinde geziyor. Spawn edilenin OnCreate'i bu karenin
+        // sonunda, OnUpdate'i sonraki kareden. Doner: yeni kok (basarisizsa
+        // gecersiz Entity).
+        Entity Instantiate(Entity prototype)
+        {
+            if (Scene* scene = m_Entity.GetScene())
+                return scene->DuplicateEntity(prototype);
+            return {};
+        }
+
+        // Kolaylik: EntityRef alanindan dogrudan spawn.
+        Entity Instantiate(const EntityRef& prototype)
+        {
+            if (Scene* scene = m_Entity.GetScene())
+                return Instantiate(scene->FindEntityByUUID(prototype.Target));
+            return {};
+        }
+
     protected:
         // Play basladiginda BIR KEZ. Kaynak bulma, baslangic durumu.
         virtual void OnCreate() {}

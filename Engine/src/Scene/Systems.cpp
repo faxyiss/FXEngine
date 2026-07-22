@@ -8,6 +8,7 @@
 #include "FXEngine/Core/Log.h"
 
 #include <cmath>
+#include <vector>
 
 namespace FX
 {
@@ -130,33 +131,30 @@ namespace FX
         }
     }
 
-    void ScriptSystem::OnRuntimeStart(Scene& scene)
+    // TEK entity'nin script ornegini yaratir + OnCreate. Instance zaten
+    // varsa ya da ad bossa dokunmaz. Hem baslangicta hem de oyun sirasinda
+    // SPAWN edilen entity'ler icin (A-2) ortak yol. ScriptSystem uyesi
+    // cunku m_Entity/OnCreate'e yalnizca arkadas sinif erisebiliyor.
+    void ScriptSystem::StartInstance(Scene& scene, entt::entity entityID)
     {
-        auto view = scene.GetRegistry().view<NativeScriptComponent>();
-        for (auto entityID : view)
-        {
-            auto& nsc = view.get<NativeScriptComponent>(entityID);
+            auto& nsc = scene.GetRegistry().get<NativeScriptComponent>(entityID);
 
-            // Script secilmemis olabilir; eksik script bir hata degil,
-            // henuz doldurulmamis bir alan.
             if (nsc.ScriptName.empty() || nsc.Instance)
-                continue;
+                return;
 
             nsc.Instance = ScriptRegistry::Create(nsc.ScriptName);
             if (!nsc.Instance)
             {
                 // Sahne dosyasindaki script bu derlemede kayitli degil.
-                // SESSIZ GECMEK en kotusu olurdu: kullanici "script neden
-                // calismiyor?" diye saatlerce arar.
+                // SESSIZ GECMEK en kotusu olurdu.
                 FX_CORE_WARN("ScriptSystem: '%s' kayitli degil, atlandi.",
                              nsc.ScriptName.c_str());
-                continue;
+                return;
             }
 
             nsc.Instance->m_Entity = Entity{ entityID, &scene };
 
-            // Editörde ayarlanan alan override'larini OnCreate'ten ONCE
-            // uygula: script kendi OnCreate'inde bu degerlere guvenebilsin.
+            // Alan override'larini OnCreate'ten ONCE uygula.
             if (!nsc.Fields.empty())
             {
                 ScriptFieldApplier applier(nsc.Fields);
@@ -164,15 +162,50 @@ namespace FX
             }
 
             nsc.Instance->OnCreate();
+    }
+
+    namespace
+    {
+        // Iterasyon icin entity'lerin ANLIK KOPYASI. Script'ler OnUpdate/
+        // OnCreate icinde yeni entity yaratabiliyor (spawn, A-2); canli bir
+        // view uzerinde gezerken registry'ye entity eklemek yineleyicileri
+        // bozardi. Kopya uzerinde gezmek hem bunu cozer hem de ayni karede
+        // spawn edilenin OnUpdate'inin calismamasini (bir kare beklemesini)
+        // garanti eder.
+        std::vector<entt::entity> SnapshotScriptEntities(Scene& scene)
+        {
+            auto view = scene.GetRegistry().view<NativeScriptComponent>();
+            std::vector<entt::entity> ids;
+            ids.reserve(view.size());
+            for (auto id : view)
+                ids.push_back(id);
+            return ids;
         }
+    }
+
+    void ScriptSystem::OnRuntimeStart(Scene& scene)
+    {
+        for (entt::entity id : SnapshotScriptEntities(scene))
+            StartInstance(scene, id);
+    }
+
+    void ScriptSystem::StartPending(Scene& scene)
+    {
+        // Oyun sirasinda spawn edilen entity'lerin ornegi henuz yok
+        // (Instance == null). Onlari da baslat: OnCreate spawn edildigi
+        // karenin SONUNDA, OnUpdate ise sonraki kareden itibaren.
+        for (entt::entity id : SnapshotScriptEntities(scene))
+            StartInstance(scene, id);
     }
 
     void ScriptSystem::Update(Scene& scene, float dt)
     {
-        auto view = scene.GetRegistry().view<NativeScriptComponent>();
-        for (auto entityID : view)
+        for (entt::entity id : SnapshotScriptEntities(scene))
         {
-            auto& nsc = view.get<NativeScriptComponent>(entityID);
+            // nsc'yi HER iterasyonda taze al: bir onceki OnUpdate spawn
+            // yapip component havuzunu yeniden konumlandirmis olabilir,
+            // eski referans sarkardi.
+            auto& nsc = scene.GetRegistry().get<NativeScriptComponent>(id);
             if (nsc.Instance)
                 nsc.Instance->OnUpdate(dt);
         }

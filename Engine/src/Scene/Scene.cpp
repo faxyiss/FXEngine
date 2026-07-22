@@ -425,6 +425,12 @@ namespace FX
         // Silme istekleri EN SONDA: hicbir sistem artik registry'yi
         // gezmiyor, dolayisiyla yapiyi degistirmek guvenli.
         FlushDestroyQueue();
+
+        // Bu karede spawn edilen entity'lerin script'lerini baslat
+        // (OnCreate). Silmeden SONRA: spawn edilip ayni karede silinen
+        // bir entity'yi bosuna baslatmayalim.
+        if (m_Running)
+            ScriptSystem::StartPending(*this);
     }
 
     void Scene::OnRender(const OrthographicCamera& camera)

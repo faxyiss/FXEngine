@@ -22,13 +22,34 @@ sonunda, view gezilirken değil.
 zaten var ama script'ten çağrılınca aynı `view` sorunu — yeni entity
 de gecikmeli kuyruğa girmeli ya da A-2 (prefab) ile birlikte çözülmeli.
 
-### A-2. Runtime'da prefab örnekleme
+### A-2. Runtime'da spawn ✅ (2026-07-22)
 
-A-1'in ikizi. `PrefabSerializer::Instantiate` var ama script'ten
-çağrılamıyor (editöre ait bir yol gibi duruyor).
+**Karar: dosya-tabanlı prefab değil, sahne içi prototipten spawn.**
+`ScriptableEntity::Instantiate(Entity/EntityRef prototype)` →
+`Scene::DuplicateEntity`. Dosya yolu / GUID / TextureLibrary sorunlarının
+üçünü de atlıyor: doku zaten shared_ptr olarak yüklü, yeni kimlik üretme
+`DuplicateEntity`'de test edilmiş. A-3 ile birleşiyor — prototip bir
+`EntityRef` alanında tutulup Inspector'dan atanıyor.
 
-- [ ] Script'ten `Instantiate(prefabAdı/GUID, konum)`
-- [ ] Yeni entity aynı karede mi yaşamaya başlasın, sonraki karede mi? (karar)
+**View güvenliği:** `ScriptSystem::Update` artık canlı view yerine
+entity'lerin **anlık kopyası** üzerinde geziyor → script içinde spawn
+etmek yineleyicileri bozmuyor, aynı karede spawn edilen bir kare bekliyor.
+`ScriptSystem::StartPending` (Scene::OnUpdate sonunda) spawn edilenin
+`OnCreate`'ini o karenin sonunda çağırıyor, `OnUpdate` sonraki kareden.
+Spawn **anında** dönüyor, script hemen konumunu ayarlayabiliyor.
+
+Kullanım:
+```cpp
+FX::EntityRef m_MermiPrefab;   // OnReflect ile Inspector'a
+FX::Entity m = Instantiate(m_MermiPrefab);
+m.GetComponent<FX::TransformComponent>().Translation = AtesNoktasi();
+```
+2 birim testi (`[spawn]`).
+
+**Dikkat (bilinen sınır):** prototip sahnede gerçek bir entity olduğu
+için **kendi script'i de Play'de çalışır**. Bir mermi prototipi ekranda
+durup kendi mantığını koşturur. Çözüm: bir "aktif/pasif" (enabled) bayrağı
+ya da prototipi ekran dışına koymak. Şimdilik ikincisi. → yeni madde F/A.
 
 ### A-3. Script alanı olarak entity referansı ✅ (2026-07-22)
 
@@ -154,7 +175,12 @@ Aynı Z'deki sprite'ların sırası **keyfî** (EnTT view sırası + `GL_LESS`).
 
 ---
 
-## F. Küçük editör borçları
+## F. Küçük editör / motor borçları
+
+- [ ] **Entity "aktif/pasif" (enabled) bayrağı.** A-2 spawn prototipi
+      sahnede kendi script'ini de çalıştırıyor. Pasif entity: render yok,
+      script yok, ama sahnede durur ve prototip olarak kopyalanabilir.
+      Unity `GameObject.SetActive(false)`. Küçük ama birçok yerde işe yarar.
 
 - [ ] **Derlenmemiş script uyarısı** — dosya `assets/`'te var ama `Game.dll`'de
       yok; şu an hiçbir yerde görünmüyor. Dosya sayısı ↔ kayıt sayısı

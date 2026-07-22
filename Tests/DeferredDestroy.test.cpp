@@ -40,12 +40,44 @@ namespace
         }
     };
 
+    int g_SpawnedCreated = 0;
+
+    // Spawn edilen ornegin OnCreate'inin gercekten calistigini sayar.
+    class Bullet : public FX::ScriptableEntity
+    {
+    protected:
+        void OnCreate() override { ++g_SpawnedCreated; }
+    };
+
+    // Ilk OnUpdate'te bir kez "Prototip"i spawn eder.
+    class Spawner : public FX::ScriptableEntity
+    {
+    public:
+        bool m_Done = false;
+    protected:
+        void OnUpdate(float) override
+        {
+            if (m_Done)
+                return;
+            m_Done = true;
+
+            FX::Entity proto = GetScene()->FindEntityByName("Prototip");
+            FX::Entity spawned = Instantiate(proto);
+
+            // Aninda gecerli bir handle donmeli ve hemen ayarlanabilmeli.
+            if (spawned)
+                spawned.GetComponent<FX::TransformComponent>().Translation.x = 7.0f;
+        }
+    };
+
     struct RegisterOnce
     {
         RegisterOnce()
         {
             FX::ScriptRegistry::Register<SelfDestruct>("__SelfDestruct");
             FX::ScriptRegistry::Register<Killer>("__Killer");
+            FX::ScriptRegistry::Register<Bullet>("__Bullet");
+            FX::ScriptRegistry::Register<Spawner>("__Spawner");
         }
     };
 
@@ -137,6 +169,55 @@ TEST_CASE("Silinen parent'in cocugu kuyrukta kalsa bile cokmuyor", "[deferred]")
     scene.FlushDestroyQueue();
 
     CHECK(scene.GetEntityCount() == 0);
+}
+
+TEST_CASE("Script prototip'ten runtime spawn edebiliyor", "[deferred][spawn]")
+{
+    EnsureRegistered();
+    g_SpawnedCreated = 0;
+
+    FX::Scene scene;
+
+    FX::Entity proto = scene.CreateEntity("Prototip");
+    proto.AddComponent<FX::NativeScriptComponent>().ScriptName = "__Bullet";
+
+    FX::Entity spawner = scene.CreateEntity("Spawner");
+    spawner.AddComponent<FX::NativeScriptComponent>().ScriptName = "__Spawner";
+
+    scene.OnRuntimeStart();
+    REQUIRE(scene.GetEntityCount() == 2);
+
+    // Prototip'in KENDI Bullet script'i de Play'de calisir (sahnedeki bir
+    // entity); OnCreate'i baslangicta bir kez cagrilir. Spawn sayimini
+    // yalitmak icin sayaci simdi sifirliyoruz.
+    CHECK(g_SpawnedCreated == 1);
+    g_SpawnedCreated = 0;
+
+    // Kare 1: spawner prototipi kopyalar. Spawn edilen entity ayni karede
+    // var olmali; OnCreate karenin SONUNDA (StartPending) calismali.
+    scene.OnUpdate(1.0f / 60.0f);
+
+    CHECK(scene.GetEntityCount() == 3);
+    CHECK(g_SpawnedCreated == 1);
+
+    // Spawn edilen kopya prototip gibi __Bullet script'i tasimali ve
+    // spawner'in ayarladigi konumu korumali.
+    FX::Entity bullet;
+    auto view = scene.GetRegistry().view<FX::TagComponent>();
+    for (auto id : view)
+    {
+        FX::Entity e{ id, &scene };
+        if (e.GetName() == "Prototip" && e != proto) { bullet = e; break; }
+    }
+    REQUIRE(bullet);
+    CHECK(bullet.GetComponent<FX::TransformComponent>().Translation.x == 7.0f);
+
+    // Kare 2: bir daha spawn YOK (spawner m_Done). OnCreate tekrar cagrilmaz.
+    scene.OnUpdate(1.0f / 60.0f);
+    CHECK(scene.GetEntityCount() == 3);
+    CHECK(g_SpawnedCreated == 1);
+
+    scene.OnRuntimeStop();
 }
 
 TEST_CASE("Silme istegi Edit modunda da calisiyor", "[deferred]")

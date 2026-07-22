@@ -83,10 +83,22 @@ namespace FX
         // Her sabit adimda: OnUpdate.
         static void Update(Scene& scene, float dt);
 
+        // Oyun sirasinda SPAWN edilen (ornegi henuz olmayan) entity'lerin
+        // script'lerini baslatir (OnCreate). Scene::OnUpdate her karede
+        // sistemlerden sonra cagiriyor (A-2).
+        static void StartPending(Scene& scene);
+
         // Stop'ta: OnDestroy cagirir ve ornekleri siler.
         // Cagrilmazsa bellek sizar - Scene yikicisi da bunu cagirir.
         static void OnRuntimeStop(Scene& scene);
 
+    private:
+        // TEK entity'nin ornegini yaratir + OnCreate (baslangic ve spawn
+        // ortak yolu). ScriptableEntity'nin arkadasi ScriptSystem SINIFI
+        // oldugu icin bu erisim serbest fonksiyondan degil buradan yapilir.
+        static void StartInstance(Scene& scene, entt::entity entityID);
+
+    public:
         // TEK bir entity'nin script ornegini sonlandirir (OnDestroy + delete).
         // Scene::DestroyEntity cagiriyor: oyun sirasinda silinen bir
         // entity'nin script'i de olmeli, yoksa hem OnDestroy hic calismaz

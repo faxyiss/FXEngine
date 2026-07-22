@@ -141,7 +141,11 @@ sınırı (F: aktif/pasif bayrağı), sürükle-bırakta iki satır arası ince 
 - **Girdi:** `FX::Input` (sorgu) + `FX::Event` (olay)
 - **Script'ten oyun kontrolü:** entity silme (`Destroy`), spawn
   (`Instantiate(prototip)`), hedef referansı (`EntityRef` alanı)
-- **Testler:** `FXTests` **77 test / 352 assertion**
+- **Prefab bağı (C-1):** örnek kaynağını biliyor
+  (`PrefabInstanceComponent` = prefab GUID + kaynak entity UUID). Inspector'da
+  "Prefab: &lt;ad&gt;" + Bağı Kır. Kaydet/yükle koruyor. Apply/Revert henüz yok
+  ([Faz-C1-Notlar.md](Faz-C1-Notlar.md), [03-Yapilacaklar.md](03-Yapilacaklar.md) C)
+- **Testler:** `FXTests` **80 test / 380 assertion**
 
 ---
 
@@ -261,8 +265,9 @@ kapatma turu (0.x) eklendi. Ayrıntı: `01-Yol-Haritasi-v2.md`.
 ## 5b. YENİ OTURUMDA İLK İŞ
 
 Aşama A/B, script alanları, 16c örnek oyun ve backlog A + B grupları
-**bitti**. Sıradaki iş **"Önerilen sıra"**da (aşağıda): D-1 metin ya da
-18c render sıralaması. Somut madde listesi **[03-Yapilacaklar.md](03-Yapilacaklar.md)**'da.
+**bitti**. Sıradaki iş **"Önerilen sıra"**da (aşağıda): D-1 metin, 18c render
+sıralaması ya da **prefab C-2 Revert** (C-1 bağı kuruldu). Somut madde
+listesi **[03-Yapilacaklar.md](03-Yapilacaklar.md)**'da.
 
 ### Aşama C (C#) değerlendirmesi — 2026-07-21 (hâlâ geçerli)
 

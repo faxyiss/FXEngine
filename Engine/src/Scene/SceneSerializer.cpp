@@ -35,8 +35,9 @@ namespace FX
         json root;
 
         // Surum 1: Faz 7. Surum 2: UUID + Follow. Surum 3: hiyerarsi.
+        // Surum 4: varlik GUID'i. Surum 5: prefab bagi (PrefabInstance).
         // Eski surumler hala aciliyor.
-        root["Version"] = 4;
+        root["Version"] = 5;
         root["Scene"]   = "Untitled";
 
         json entities = json::array();
@@ -123,9 +124,11 @@ namespace FX
                          "entity referanslari kaybolabilir.");
         else if (version == 2 || version == 3)
             FX_CORE_INFO("Sahne surum %d (varlik kimligi yol tabanli). Kaydedince "
-                         "surum 4'e (GUID) gececek.", version);
-        else if (version != 4)
-            FX_CORE_WARN("Sahne surumu %d, beklenen 4. Yine de denenecek.", version);
+                         "surum 5'e gececek.", version);
+        else if (version == 4)
+            FX_CORE_INFO("Sahne surum 4. Kaydedince surum 5'e (prefab bagi) gececek.");
+        else if (version != 5)
+            FX_CORE_WARN("Sahne surumu %d, beklenen 5. Yine de denenecek.", version);
 
         if (!root.contains("Entities") || !root["Entities"].is_array())
         {

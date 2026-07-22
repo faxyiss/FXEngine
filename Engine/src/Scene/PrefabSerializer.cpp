@@ -1,6 +1,7 @@
 #include "FXEngine/Scene/PrefabSerializer.h"
 #include "FXEngine/Scene/Entity.h"
 #include "FXEngine/Scene/Components.h"
+#include "FXEngine/Asset/AssetManager.h"
 #include "FXEngine/Core/Log.h"
 #include "FXEngine/Core/FileSystem.h"
 
@@ -53,6 +54,10 @@ namespace FX
             // ornekleme sirasinda cozulemeyen bir referans olur.
             if (e == root)
                 j.erase("Parent");
+
+            // Bir prefab ornegini yeni bir prefab olarak kaydediyor
+            // olabiliriz; kaynak dosya baska bir prefab'a bagli olmamali.
+            j.erase("PrefabInstance");
 
             entities.push_back(std::move(j));
         }
@@ -129,6 +134,11 @@ namespace FX
         const UUID oldRootID{ doc.value("Root", std::uint64_t{ 0 }) };
         Entity newRoot;
 
+        // Ornegin kaynagina baglanmasi icin (C-1). Yol degil GUID: dosya
+        // tasininca bag kopmasin. Handle gecersizse (proje disi prefab)
+        // bag yine kurulur ama Inspector "kayip" gosterir.
+        const AssetHandle prefabHandle = AssetManager::GetHandle(filepath);
+
         for (const auto& e : doc["Entities"])
         {
             const std::string name = e.value("Tag", std::string("Entity"));
@@ -140,6 +150,13 @@ namespace FX
             const UUID oldID{ e.value("ID", std::uint64_t{ 0 }) };
             if (oldID.IsValid())
                 remap[oldID] = entity;
+
+            // Her ornek entity kendi kaynak entity'sini bilir: alt agactaki
+            // her dugum kendi SourceId'siyle damgalanir (C-2 Revert bunu
+            // kaynak<->ornek eslemesi olarak kullanacak).
+            auto& link    = entity.AddComponent<PrefabInstanceComponent>();
+            link.Prefab   = prefabHandle;
+            link.SourceId = oldID;
 
             if (oldID == oldRootID)
                 newRoot = entity;

@@ -219,6 +219,12 @@ namespace FX
         ComponentBuilder& NotRemovable()   { m_Info->Removable = false;       return *this; }
         ComponentBuilder& HiddenInAddMenu(){ m_Info->AddableFromMenu = false; return *this; }
 
+        // Serilestirilir ve kopyalanir ama Inspector'in genel component
+        // dongusunde GORUNMEZ. Structural()'dan farki: dosyaya YAZILIR
+        // (SerializedByTable acik kalir). Prefab bagi boyle: kaydedilmesi
+        // gerek ama Inspector'da kimlik bloguyla birlikte elle ciziliyor.
+        ComponentBuilder& NotInInspector() { m_Info->ShowInInspector = false; return *this; }
+
         // Yapisal component: yalnizca kopyalamaya katilir.
         ComponentBuilder& Structural()
         {

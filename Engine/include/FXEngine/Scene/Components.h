@@ -18,6 +18,7 @@
 
 #include "FXEngine/Renderer/Texture.h"
 #include "FXEngine/Core/UUID.h"
+#include "FXEngine/Asset/Asset.h"
 #include "FXEngine/Scene/EntityRef.h"
 #include "FXEngine/Scene/ScriptFields.h"
 
@@ -241,6 +242,24 @@ namespace FX
         NativeScriptComponent() = default;
         explicit NativeScriptComponent(std::string name)
             : ScriptName(std::move(name)) {}
+    };
+
+    // -----------------------------------------------------------------------
+    // PrefabInstanceComponent - "bu entity bir prefab ORNEGI" (C-1)
+    // -----------------------------------------------------------------------
+    // Ornekleme bugune kadar bagi KOPARIYORDU: ornek kaynagini bilmezdi,
+    // kaynak degisince ornekler guncellenmezdi. Bu component o bagi tutar -
+    // saf veri, iki KIMLIK:
+    //   Prefab   : hangi .fxprefab dosyasi (varlik GUID'i, dosya yolu DEGIL)
+    //   SourceId : o dosyadaki KAYNAK entity'nin UUID'i
+    //
+    // Ikisi de kimlik cunku diske yazilabilen tek sey kimliktir (Faz 8/12
+    // ilkesi). Apply/Revert (C-2+) bu iki alana dayanacak; C-1 yalnizca
+    // bagi kurar, kalici kilar ve Inspector'da gosterir.
+    struct PrefabInstanceComponent
+    {
+        AssetHandle Prefab{ 0 };
+        UUID        SourceId{ 0 };
     };
 
     // -----------------------------------------------------------------------

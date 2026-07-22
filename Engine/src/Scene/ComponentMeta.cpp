@@ -112,6 +112,22 @@ namespace FX
                                  texPath.c_str());
             }
         }
+
+        // Prefab bagi iki UUID tasir; alan tablosu UUID tipini bilmiyor,
+        // bu yuzden ozel kanca (SpriteRenderer'in doku GUID'i gibi).
+        void SavePrefabLink(const void* component, json& out)
+        {
+            const auto& p = *static_cast<const PrefabInstanceComponent*>(component);
+            out["Prefab"]   = static_cast<std::uint64_t>(p.Prefab);
+            out["SourceId"] = static_cast<std::uint64_t>(p.SourceId);
+        }
+
+        void LoadPrefabLink(void* component, const json& in, TextureLibrary*)
+        {
+            auto& p = *static_cast<PrefabInstanceComponent*>(component);
+            p.Prefab   = AssetHandle(in.value("Prefab",   std::uint64_t{ 0 }));
+            p.SourceId = UUID(in.value("SourceId", std::uint64_t{ 0 }));
+        }
     }
 
     void ComponentRegistry::RegisterBuiltins()
@@ -231,6 +247,16 @@ namespace FX
                         nsc.Fields[name] = std::move(val);
                     }
                 });
+
+        // Prefab bagi (C-1): serilestirilir + Scene::Copy'de tasinir, ama
+        // menuden eklenmez, Inspector'da kimlik bloguyla birlikte elle
+        // cizilir (NotInInspector). Ornekleme damgaliyor. Removable kaliyor
+        // ki "Bagi Kir" ayni yapisal RemoveComponent yolunu kullanabilsin -
+        // NotInInspector oldugu icin genel 'X' zaten hic cizilmiyor.
+        ComponentRegistry::Register<PrefabInstanceComponent>("PrefabInstance", "Prefab Baglantisi")
+            .Extra(SavePrefabLink, LoadPrefabLink)
+            .HiddenInAddMenu()
+            .NotInInspector();
 
         FX_CORE_INFO("ComponentRegistry: %zu component kayitli.", Entries().size());
     }

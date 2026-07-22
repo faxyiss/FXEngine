@@ -2,6 +2,7 @@
 #include "Commands/StructuralCommands.h"
 #include "Panels/ComponentDrawer.h"
 
+#include <FXEngine/Asset/AssetManager.h>
 #include <FXEngine/Core/Log.h>
 #include <FXEngine/Scene/ComponentMeta.h>
 #include <FXEngine/Scene/Components.h>
@@ -13,6 +14,8 @@
 
 #include <algorithm>
 #include <cstring>
+#include <filesystem>
+#include <functional>
 #include <string>
 
 namespace FXEd
@@ -492,6 +495,37 @@ namespace FXEd
                 m_ReparentChild = entity, m_ReparentToRoot = true;
         }
 
+        // --- Prefab bagi (C-1) -------------------------------------------------
+        // Kimlik bloguna ait: bu bir duzenlenebilir component degil,
+        // entity'nin NEREDEN geldigi bilgisi. Component tablosunda
+        // NotInInspector, o yuzden genel dongude cizilmiyor; burada elle.
+        if (entity.HasComponent<FX::PrefabInstanceComponent>())
+        {
+            const auto& link = entity.GetComponent<FX::PrefabInstanceComponent>();
+            const std::string path = FX::AssetManager::GetPath(link.Prefab);
+
+            if (path.empty())
+            {
+                // GUID var ama karsiligi yok: prefab silinmis veya proje
+                // disindan gelmis. Sessizce gizlemek yerine gorunur uyari.
+                ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.35f, 1.0f),
+                                   "Prefab: <kayip kaynak>");
+            }
+            else
+            {
+                const std::string name =
+                    std::filesystem::path(path).stem().string();
+                ImGui::TextColored(ImVec4(0.55f, 0.75f, 1.0f, 1.0f),
+                                   "Prefab: %s", name.c_str());
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("%s", path.c_str());
+            }
+
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Bagi Kir"))
+                m_UnlinkPrefab = entity;
+        }
+
         ImGui::Separator();
 
         // Coklu secim: birincil DISINDAKI secili entity'ler. Bir alan
@@ -545,6 +579,28 @@ namespace FXEd
             }
 
             m_ComponentToRemove.clear();
+        }
+
+        // "Bagi Kir": ornegi kaynagindan kopar. Tek entity degil TUM alt
+        // agac - koku koparip cocuklari bagli birakmak tutarsiz olurdu.
+        if (m_UnlinkPrefab)
+        {
+            if (FX::ComponentInfo* info = FX::ComponentRegistry::Find("PrefabInstance"))
+            {
+                std::vector<FX::Entity> targets;
+                std::function<void(FX::Entity)> gather = [&](FX::Entity e)
+                {
+                    if (e.HasComponent<FX::PrefabInstanceComponent>())
+                        targets.push_back(e);
+                    for (FX::Entity child : e.GetChildren())
+                        gather(child);
+                };
+                gather(m_UnlinkPrefab);
+
+                if (!targets.empty())
+                    Structural::RemoveComponent(*info, targets);
+            }
+            m_UnlinkPrefab = {};
         }
 
         ImGui::Separator();

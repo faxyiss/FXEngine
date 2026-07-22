@@ -116,29 +116,43 @@ Yapısal ekle/sil kapsandı (2026-07-21). Kalanlar:
 
 ---
 
-## C. Prefab sistemi — bugün "kopyala-yapıştır"dan ibaret
+## C. Prefab sistemi — bağ kuruldu, Apply/Revert sırada
 
-**Bugünkü durum:** `Instantiate` prefab'ı sahneye açar ve **bağ kopar**.
-Örnek, kaynağını bilmez; kaynak değişince örnekler güncellenmez; örnekte
-yapılan değişikliğin "override" olduğu bilgisi hiçbir yerde durmaz.
+**Bugünkü durum:** C-1 ile bağ kuruldu. `Instantiate` artık örneği
+kaynağına bağlıyor; örnek prefab GUID'ini + kaynak entity UUID'ini tutuyor
+ve Inspector'da görünüyor. Kaynak↔örnek senkronu (Apply/Revert/override)
+hâlâ yok — sıradaki parçalar.
 
 16c'de bu doğrudan canımızı yaktı: `Star`'a script atadıktan sonra beş
-yıldızın hepsini tek tek düzeltmek ya da prefab'ı yeniden kaydedip
-hepsini silip yeniden sürüklemek gerekti.
+yıldızın hepsini tek tek düzeltmek gerekti. C-4 (Apply) bunu bitirecek.
 
-- [ ] **Bağ:** örnekte prefab GUID'i + kaynak entity kimliği tutulmalı
-      (yeni component: `PrefabInstanceComponent`?)
-- [ ] **Inspector'da görünsün:** "Prefab: Star.fxprefab" başlığı + `Aç` düğmesi
-- [ ] **Apply** — örnekteki değişiklikleri kaynağa yaz (tüm örnekler güncellenir)
-- [ ] **Revert** — örneği kaynağa döndür
-- [ ] **Override takibi:** hangi alan örnekte değiştirilmiş? Unity kalın yazıyla
-      gösterir. Bu olmadan Apply "neyi uyguluyorum?" sorusunu cevaplayamaz
-- [ ] Kaynak değişince açık sahnedeki örnekler tazelensin
-- [ ] Prefab silinirse/taşınırsa örnekler ne olacak? (GUID koruyor ama karar gerek)
-- [ ] Sahne dosyası formatı etkilenir — sürüm artışı
+### C-1. Bağ + Inspector'da göster ✅ (2026-07-22)
 
-**Not:** bu, listedeki en büyük editör işi. Tek oturumda bitmez; en az
-"bağ + Inspector'da göster" ve "Apply/Revert" diye ikiye bölünmeli.
+`PrefabInstanceComponent { AssetHandle Prefab; UUID SourceId; }` (saf veri,
+`ComponentMeta`'da tek yere kayıt, yeni builder `.NotInInspector()`).
+`Instantiate` alt ağacın **her** entity'sine kendi `SourceId`'siyle
+damga basıyor; `Save` bağı dosyaya yazmıyor (kaynak başka prefab'a bağlı
+kalmasın). Sahne **sürüm 5**. Inspector'da kimlik bloğunda "Prefab: &lt;ad&gt;"
++ hover yol + **Bağı Kır** (alt ağaç, Undo'ya bağlı). Kayıp kaynak turuncu
+uyarı. 3 birim testi (`[prefab]`). Ayrıntı:
+[Faz-C1-Notlar.md](Faz-C1-Notlar.md).
+
+### Kalanlar (C-2…C-5)
+
+- [ ] **C-2 Revert** — kaynağı yeniden oku, `SourceId` eşleşen örnek
+      entity'nin component'lerini üzerine yaz (örneğin kendi UUID/konum/
+      parent'ı korunur). Apply'ın da kullanacağı kaynak↔örnek eşlemesini kurar
+- [ ] **C-3 Override takibi** — diff: örnek alanını kaynakla karşılaştır,
+      değişeni Inspector'da **kalın** göster (Unity). Alana sağ tık →
+      "bu alanı geri al/uygula"
+- [ ] **C-4 Apply** — örneğin güncel halini `.fxprefab`'a geri yaz (kaynağın
+      kök UUID kimliği korunur), diğer açık örnekleri tazele. Undo kararı gerek
+- [ ] **C-5 Yayılma + kenar durumlar** — kaynak değişince örnekler tazelensin;
+      prefab silinirse "kayıp" uyarısı (bağ tutulur, GUID korunuyor);
+      yapısal override (örnekte component/çocuk ekle-sil) kararı; nested prefab
+
+**Not:** en büyük editör işi. C-1 bitti; en pahalı parça C-3/C-4 (override
+semantiği + yazma yolu).
 
 ---
 

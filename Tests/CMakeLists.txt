@@ -19,6 +19,7 @@ add_executable(FXTests
     DeferredDestroy.test.cpp
     Duplicate.test.cpp
     ChildOrder.test.cpp
+    Prefab.test.cpp
     AssetManager.test.cpp
     Project.test.cpp
     Input.test.cpp

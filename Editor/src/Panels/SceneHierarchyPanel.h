@@ -99,6 +99,10 @@ namespace FXEd
         // ayni sebeple guvensiz; istek dongu bitince isleniyor.
         std::string m_ComponentToRemove;
 
+        // "Bagi Kir": prefab ornegini kaynagindan kopar (alt agac dahil).
+        // Yapisal islem; istek dongu disinda isleniyor.
+        FX::Entity m_UnlinkPrefab;
+
         // Bu karede cizilen entity'ler, GORUNEN sirada (kapali dallarin
         // cocuklari yok). Shift araligi bunun uzerinden hesaplaniyor.
         std::vector<FX::Entity> m_VisibleOrder;
